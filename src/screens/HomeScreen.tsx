@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { SectionCard } from '@/components/SectionCard';
-import { useTheme } from '@/hooks/useTheme';
+import { colors } from '@/theme/colors';
 
 type HomeScreenProps = {
   deviceCount: number;
@@ -10,17 +10,15 @@ type HomeScreenProps = {
 };
 
 export function HomeScreen({ deviceCount, transferCount }: HomeScreenProps) {
-  const { colors } = useTheme();
-
   return (
     <View style={styles.container}>
       <SectionCard
-        title="Welcome to CrossBeam"
-        subtitle="Fast, private, and offline file sharing across Android, iOS, and Android TV."
+        title="CrossBeam"
+        subtitle="Fast offline sharing for Android, iOS, and Android TV"
       >
-        <Text style={[styles.text, { color: colors.textPrimary }]}>Nearby devices discovered: {deviceCount}</Text>
-        <Text style={[styles.text, { color: colors.textPrimary }]}>Total transfer jobs: {transferCount}</Text>
-        <Text style={[styles.muted, { color: colors.textSecondary }]}>No ads are shown while transfers are active.</Text>
+        <Text style={styles.text}>Nearby devices: {deviceCount}</Text>
+        <Text style={styles.text}>Transfer jobs: {transferCount}</Text>
+        <Text style={styles.textMuted}>Ads are hidden while a transfer is active.</Text>
       </SectionCard>
     </View>
   );
@@ -31,11 +29,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   text: {
-    fontSize: 15,
-    lineHeight: 20,
+    color: colors.textPrimary,
+    fontSize: 14,
   },
-  muted: {
+  textMuted: {
+    color: colors.textSecondary,
     fontSize: 13,
-    lineHeight: 18,
   },
 });

@@ -1,6 +1,6 @@
-export type ConnectionType = 'wifi-direct' | 'hotspot' | 'lan';
+export type ConnectionType = "wifi-direct" | "hotspot" | "lan";
 
-export type DevicePlatform = 'android' | 'ios' | 'android-tv';
+export type DevicePlatform = "android" | "ios" | "android-tv";
 
 export type Device = {
   id: string;
@@ -10,7 +10,13 @@ export type Device = {
   lastSeenAt: number;
 };
 
-export type TransferStatus = 'queued' | 'in-progress' | 'paused' | 'completed' | 'failed' | 'rejected';
+export type TransferStatus =
+  | "queued"
+  | "in-progress"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "rejected";
 
 export type TransferJob = {
   id: string;

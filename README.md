@@ -1,34 +1,22 @@
 # CrossBeamApp
 
-CrossBeamApp is an offline-first cross-platform file sharing app (Android, iOS, Android TV) built with React Native + Expo.
+Initial React Native (Expo + TypeScript) implementation scaffold based on `SRS.md`.
 
-## What's improved
+## Current implementation focus
 
-- Brand-aligned UI with a custom CrossBeam logo inspired by your design direction
-- Real network test lab to validate LAN behavior on actual devices
-  - Endpoint probe (GET)
-  - Packet send test (POST)
-  - Real download throughput check (GET binary)
-- Transfer dashboard with encrypted jobs, progress, pause/resume, and incoming-request confirmation
-- Device discovery refresh flow and transfer history
+- Device discovery UI and refresh flow (mock service)
+- File transfer model with progress + pause/resume simulation
+- History view for transfer jobs
+- Minimal ad placeholder hidden during active transfer
+- SRS alignment notes in-app
 
-## Real environment testing workflow
-
-1. Connect 2 devices on the same Wi-Fi / hotspot / LAN.
-2. Run a simple HTTP receiver endpoint on one device or local machine.
-3. In CrossBeam `transfer` tab:
-   - set receiver endpoint URL
-   - run **Probe endpoint**
-   - run **Send test packet**
-   - set downloadable file URL and run **Run download test**
-4. Validate latency, response status, and throughput from the in-app result panel.
-
-> Note: Native direct device-to-device transport stacks (Wi-Fi Direct, Multipeer Connectivity) require platform-specific modules and are a next milestone.
-
-## Local development
+## Run
 
 ```bash
 npm install
-npm run typecheck
 npm run start
 ```
+
+## Notes
+
+This is a foundation build and uses mocked networking/transfer services. Native platform-specific transfer stacks (Wi‑Fi Direct, Multipeer Connectivity, and Android TV optimizations) will be integrated in subsequent milestones.

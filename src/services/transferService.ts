@@ -1,8 +1,9 @@
-import { IncomingTransferRequest, TransferJob } from '@/types/domain';
+import { IncomingTransferRequest, TransferJob } from "@/types/domain";
 
 const FIVE_GB = 5 * 1024 * 1024 * 1024;
 
-export const supportsLargeTransfer = (sizeBytes: number): boolean => sizeBytes >= FIVE_GB;
+export const supportsLargeTransfer = (sizeBytes: number): boolean =>
+  sizeBytes >= FIVE_GB;
 
 export const createTransferJob = (
   fileInput: string[] | string,
@@ -19,7 +20,7 @@ export const createTransferJob = (
     fileName: fileNames[0],
     sizeBytes,
     progress: 0,
-    status: 'queued',
+    status: "queued",
     fromDeviceName,
     toDeviceName,
     encrypted: true,
@@ -50,7 +51,7 @@ export const progressTransfer = (job: TransferJob): TransferJob => {
   return {
     ...job,
     progress,
-    status: progress === 100 ? 'completed' : 'in-progress',
+    status: progress === 100 ? "completed" : "in-progress",
     updatedAt: now,
   };
 };

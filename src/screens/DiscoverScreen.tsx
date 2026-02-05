@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { SectionCard } from '@/components/SectionCard';
-import { colors } from '@/theme/colors';
+import { useTheme } from '@/hooks/useTheme';
 import { Device } from '@/types/domain';
 
 type DiscoverScreenProps = {
@@ -11,20 +11,37 @@ type DiscoverScreenProps = {
   isRefreshing: boolean;
 };
 
+const platformLabel: Record<Device['platform'], string> = {
+  android: 'Android Phone',
+  ios: 'iPhone/iPad',
+  'android-tv': 'Android TV',
+};
+
 export function DiscoverScreen({ devices, onRefresh, isRefreshing }: DiscoverScreenProps) {
+  const { colors } = useTheme();
+
   return (
     <SectionCard
-      title="Device Discovery"
-      subtitle="Automatic local network scan (Wi‑Fi Direct / hotspot / LAN)"
+      title="Nearby Devices"
+      subtitle="Automatic local discovery over Wi‑Fi Direct, hotspot, and LAN."
+      rightSlot={
+        <Pressable
+          style={[styles.button, { backgroundColor: colors.accent }]}
+          onPress={onRefresh}
+          accessibilityRole="button"
+          focusable
+        >
+          <Text style={[styles.buttonLabel, { color: colors.textInverse }]}>
+            {isRefreshing ? 'Scanning…' : 'Refresh'}
+          </Text>
+        </Pressable>
+      }
     >
-      <Pressable style={styles.button} onPress={onRefresh}>
-        <Text style={styles.buttonLabel}>{isRefreshing ? 'Scanning…' : 'Refresh devices'}</Text>
-      </Pressable>
       {devices.map((device) => (
-        <View key={device.id} style={styles.row}>
-          <Text style={styles.primary}>{device.name}</Text>
-          <Text style={styles.secondary}>
-            {device.platform} • {device.connection}
+        <View key={device.id} style={[styles.row, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.primary, { color: colors.textPrimary }]}>{device.name}</Text>
+          <Text style={[styles.secondary, { color: colors.textSecondary }]}>
+            {platformLabel[device.platform]} • {device.connection}
           </Text>
         </View>
       ))}
@@ -34,29 +51,25 @@ export function DiscoverScreen({ devices, onRefresh, isRefreshing }: DiscoverScr
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    minWidth: 110,
+    alignItems: 'center',
   },
   buttonLabel: {
-    color: '#041429',
     fontWeight: '700',
   },
   row: {
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.cardAlt,
   },
   primary: {
-    color: colors.textPrimary,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   secondary: {
-    color: colors.textSecondary,
     fontSize: 12,
-    marginTop: 3,
+    marginTop: 4,
   },
 });

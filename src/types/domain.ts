@@ -1,27 +1,43 @@
-export type ConnectionType = 'wifi-direct' | 'hotspot' | 'lan';
+export type ConnectionType = "wifi-direct" | "hotspot" | "lan";
+
+export type DevicePlatform = "android" | "ios" | "android-tv";
 
 export type Device = {
   id: string;
   name: string;
-  platform: 'android' | 'ios' | 'android-tv';
+  platform: DevicePlatform;
   connection: ConnectionType;
   lastSeenAt: number;
 };
 
 export type TransferStatus =
-  | 'queued'
-  | 'in-progress'
-  | 'paused'
-  | 'completed'
-  | 'failed';
+  | "queued"
+  | "in-progress"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "rejected";
 
 export type TransferJob = {
   id: string;
-  fileName: string;
+  // Canonical shape (multi-file support).
+  fileNames: string[];
+  // Backward compatibility with earlier single-file model.
+  fileName?: string;
   sizeBytes: number;
   progress: number;
   status: TransferStatus;
   fromDeviceName: string;
   toDeviceName: string;
   encrypted: boolean;
+  startedAt: number;
+  updatedAt: number;
+};
+
+export type IncomingTransferRequest = {
+  id: string;
+  fromDeviceName: string;
+  fileNames: string[];
+  sizeBytes: number;
+  requestedAt: number;
 };

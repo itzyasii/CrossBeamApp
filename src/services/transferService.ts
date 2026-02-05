@@ -33,19 +33,14 @@ export const createTransferFromIncoming = (
   request: IncomingTransferRequest,
   receiverDeviceName: string,
 ): TransferJob =>
-  createTransferJob(
-    request.fileNames,
-    request.sizeBytes,
-    request.fromDeviceName,
-    receiverDeviceName,
-  );
+  createTransferJob(request.fileNames, request.sizeBytes, request.fromDeviceName, receiverDeviceName);
 
 export const progressTransfer = (job: TransferJob): TransferJob => {
   if (
-    job.status === "paused" ||
-    job.status === "failed" ||
-    job.status === "completed" ||
-    job.status === "rejected"
+    job.status === 'paused' ||
+    job.status === 'failed' ||
+    job.status === 'completed' ||
+    job.status === 'rejected'
   ) {
     return job;
   }

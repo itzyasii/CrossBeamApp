@@ -11,6 +11,15 @@ type TransferScreenProps = {
   onStartDemoTransfer: () => void;
   onPauseResume: (id: string) => void;
   onMockIncomingRequest: () => void;
+  endpoint: string;
+  onChangeEndpoint: (value: string) => void;
+  downloadUrl: string;
+  onChangeDownloadUrl: (value: string) => void;
+  onProbeEndpoint: () => void;
+  onSendPacket: () => void;
+  onRunDownloadTest: () => void;
+  isRealTransferRunning: boolean;
+  realTransferResult: { kind: 'probe' | 'send' | 'download'; ok: boolean; durationMs: number; details: string } | null;
 };
 
 export function TransferScreen({
@@ -18,14 +27,20 @@ export function TransferScreen({
   onStartDemoTransfer,
   onPauseResume,
   onMockIncomingRequest,
+  endpoint,
+  onChangeEndpoint,
+  downloadUrl,
+  onChangeDownloadUrl,
+  onProbeEndpoint,
+  onSendPacket,
+  onRunDownloadTest,
+  isRealTransferRunning,
+  realTransferResult,
 }: TransferScreenProps) {
   const { colors } = useTheme();
 
   return (
-    <SectionCard
-      title="Transfers"
-      subtitle="Encrypted, resumable transfers for files of all sizes."
-    >
+    <SectionCard title="Transfers" subtitle="Encrypted, resumable transfers + real LAN endpoint tests.">
       <View style={styles.actionsRow}>
         <Pressable
           style={[styles.primaryButton, { backgroundColor: colors.success }]}
@@ -33,9 +48,7 @@ export function TransferScreen({
           accessibilityRole="button"
           focusable
         >
-          <Text style={[styles.primaryLabel, { color: colors.textInverse }]}>
-            Send files
-          </Text>
+          <Text style={[styles.primaryLabel, { color: colors.textInverse }]}>Send files</Text>
         </Pressable>
         <Pressable
           style={[styles.secondaryButton, { borderColor: colors.border }]}
@@ -43,9 +56,7 @@ export function TransferScreen({
           accessibilityRole="button"
           focusable
         >
-          <Text style={[styles.secondaryLabel, { color: colors.textPrimary }]}>
-            Simulate receive request
-          </Text>
+          <Text style={[styles.secondaryLabel, { color: colors.textPrimary }]}>Simulate receive request</Text>
         </Pressable>
       </View>
 

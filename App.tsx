@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -7,23 +7,25 @@ import {
   StyleSheet,
   Text,
   View,
-} from "react-native";
-import { StatusBar } from "expo-status-bar";
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
-import { HistoryScreen } from "@/screens/HistoryScreen";
-import { HomeScreen } from "@/screens/HomeScreen";
-import { DiscoverScreen } from "@/screens/DiscoverScreen";
-import { TransferScreen } from "@/screens/TransferScreen";
-import { useAds } from "@/hooks/useAds";
-import { useDeviceDiscovery } from "@/hooks/useDeviceDiscovery";
-import { useTheme } from "@/hooks/useTheme";
-import { useTransferManager } from "@/hooks/useTransferManager";
-import { formatSize, supportsLargeTransfer } from "@/services/transferService";
-import { formatRelativeTime } from "@/utils/time";
+import { CrossBeamLogo } from '@/components/CrossBeamLogo';
+import { HistoryScreen } from '@/screens/HistoryScreen';
+import { HomeScreen } from '@/screens/HomeScreen';
+import { DiscoverScreen } from '@/screens/DiscoverScreen';
+import { TransferScreen } from '@/screens/TransferScreen';
+import { useAds } from '@/hooks/useAds';
+import { useDeviceDiscovery } from '@/hooks/useDeviceDiscovery';
+import { useRealTransferLab } from '@/hooks/useRealTransferLab';
+import { useTheme } from '@/hooks/useTheme';
+import { useTransferManager } from '@/hooks/useTransferManager';
+import { formatSize, supportsLargeTransfer } from '@/services/transferService';
+import { formatRelativeTime } from '@/utils/time';
 
-type Tab = "home" | "discover" | "transfer" | "history";
+type Tab = 'home' | 'discover' | 'transfer' | 'history';
 
-const TABS: Tab[] = ["home", "discover", "transfer", "history"];
+const TABS: Tab[] = ['home', 'discover', 'transfer', 'history'];
 
 export default function App() {
   const { colors, isDark } = useTheme();

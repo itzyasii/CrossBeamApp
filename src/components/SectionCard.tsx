@@ -1,22 +1,15 @@
 import React, { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { useTheme } from '@/hooks/useTheme';
+import { colors } from '@/theme/colors';
 
-type SectionCardProps = PropsWithChildren<{ title: string; subtitle?: string; rightSlot?: React.ReactNode }>;
+type SectionCardProps = PropsWithChildren<{ title: string; subtitle?: string }>;
 
-export function SectionCard({ title, subtitle, children, rightSlot }: SectionCardProps) {
-  const { colors } = useTheme();
-
+export function SectionCard({ title, subtitle, children }: SectionCardProps) {
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerText}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
-          {subtitle ? <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text> : null}
-        </View>
-        {rightSlot}
-      </View>
+    <View style={styles.card}>
+      <Text style={styles.title}>{title}</Text>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       <View style={styles.content}>{children}</View>
     </View>
   );
@@ -24,30 +17,22 @@ export function SectionCard({ title, subtitle, children, rightSlot }: SectionCar
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderRadius: 12,
     padding: 16,
-    gap: 10,
-    borderWidth: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  headerText: {
-    flex: 1,
-    gap: 2,
+    gap: 6,
   },
   title: {
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
   },
   subtitle: {
+    color: colors.textSecondary,
     fontSize: 13,
-    lineHeight: 18,
   },
   content: {
-    gap: 10,
+    marginTop: 8,
+    gap: 8,
   },
 });

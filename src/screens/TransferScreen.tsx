@@ -2,63 +2,33 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { SectionCard } from '@/components/SectionCard';
-import { useTheme } from '@/hooks/useTheme';
-import { formatSize } from '@/services/transferService';
+import { colors } from '@/theme/colors';
 import { TransferJob } from '@/types/domain';
 
 type TransferScreenProps = {
   transfers: TransferJob[];
   onStartDemoTransfer: () => void;
   onPauseResume: (id: string) => void;
-  onMockIncomingRequest: () => void;
 };
 
-export function TransferScreen({
-  transfers,
-  onStartDemoTransfer,
-  onPauseResume,
-  onMockIncomingRequest,
-}: TransferScreenProps) {
-  const { colors } = useTheme();
-
+export function TransferScreen({ transfers, onStartDemoTransfer, onPauseResume }: TransferScreenProps) {
   return (
-    <SectionCard title="Transfers" subtitle="Encrypted, resumable transfers for files of all sizes.">
-      <View style={styles.actionsRow}>
-        <Pressable
-          style={[styles.primaryButton, { backgroundColor: colors.success }]}
-          onPress={onStartDemoTransfer}
-          accessibilityRole="button"
-          focusable
-        >
-          <Text style={[styles.primaryLabel, { color: colors.textInverse }]}>Send files</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.secondaryButton, { borderColor: colors.border }]}
-          onPress={onMockIncomingRequest}
-          accessibilityRole="button"
-          focusable
-        >
-          <Text style={[styles.secondaryLabel, { color: colors.textPrimary }]}>Simulate receive request</Text>
-        </Pressable>
-      </View>
-
+    <SectionCard title="File Transfer" subtitle="Encrypted transfer with pause/resume">
+      <Pressable style={styles.button} onPress={onStartDemoTransfer}>
+        <Text style={styles.buttonLabel}>Start demo transfer</Text>
+      </Pressable>
       {transfers.map((job) => (
-        <View key={job.id} style={[styles.jobCard, { backgroundColor: colors.surfaceAlt }]}>
-          <Text style={[styles.fileName, { color: colors.textPrimary }]}>{job.fileNames.join(', ')}</Text>
-          <Text style={[styles.meta, { color: colors.textSecondary }]}>
-            {job.fromDeviceName} → {job.toDeviceName} • {formatSize(job.sizeBytes)}
+        <View key={job.id} style={styles.jobCard}>
+          <Text style={styles.fileName}>{job.fileName}</Text>
+          <Text style={styles.meta}>
+            {job.fromDeviceName} → {job.toDeviceName}
           </Text>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-            <View style={[styles.progressFill, { width: `${job.progress}%`, backgroundColor: colors.accent }]} />
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${job.progress}%` }]} />
           </View>
-          <Text style={[styles.meta, { color: colors.textSecondary }]}>Status: {job.status} • {job.progress}%</Text>
-          <Pressable
-            style={[styles.secondaryButton, { borderColor: colors.border }]}
-            onPress={() => onPauseResume(job.id)}
-            accessibilityRole="button"
-            focusable
-          >
-            <Text style={[styles.secondaryLabel, { color: colors.textPrimary }]}>
+          <Text style={styles.meta}>Status: {job.status} • {job.progress}%</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => onPauseResume(job.id)}>
+            <Text style={styles.secondaryLabel}>
               {job.status === 'paused' ? 'Resume' : 'Pause'}
             </Text>
           </Pressable>
@@ -69,47 +39,51 @@ export function TransferScreen({
 }
 
 const styles = StyleSheet.create({
-  actionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  primaryButton: {
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  primaryLabel: {
-    fontWeight: '700',
-  },
-  secondaryButton: {
+  button: {
+    backgroundColor: colors.success,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderWidth: 1,
+    alignSelf: 'flex-start',
   },
-  secondaryLabel: {
-    fontWeight: '600',
-    fontSize: 12,
+  buttonLabel: {
+    color: '#053320',
+    fontWeight: '700',
   },
   jobCard: {
-    borderRadius: 12,
+    backgroundColor: colors.cardAlt,
+    borderRadius: 10,
     padding: 12,
-    gap: 8,
+    gap: 6,
   },
   fileName: {
+    color: colors.textPrimary,
     fontWeight: '700',
-    fontSize: 14,
   },
   meta: {
+    color: colors.textSecondary,
     fontSize: 12,
   },
   progressTrack: {
     height: 8,
     borderRadius: 999,
+    backgroundColor: '#324A71',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
+    backgroundColor: colors.accent,
+  },
+  secondaryButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.textSecondary,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  secondaryLabel: {
+    color: colors.textPrimary,
+    fontSize: 12,
   },
 });

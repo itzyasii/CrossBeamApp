@@ -5,6 +5,7 @@ import {
   CrossBeamNativeEvents,
   NativePeer,
   NativeTransferRequest,
+  NativeTransferEvent,
 } from 'crossbeam-native';
 import { Device } from '@/types/domain';
 
@@ -82,5 +83,9 @@ export const nativeCrossBeam = {
     );
     return () => subscription?.remove();
   },
-};
 
+  addTransferProgressListener(listener: (event: NativeTransferEvent) => void): () => void {
+    const subscription = CrossBeamNativeEvents?.addListener('onTransferProgress', listener);
+    return () => subscription?.remove();
+  },
+};

@@ -17,6 +17,7 @@ export type TransferStatus =
   | "paused"
   | "completed"
   | "failed"
+  | "cancelled"
   | "rejected";
 
 export type SelectedFile = {
@@ -35,6 +36,8 @@ export type TransferJob = {
   fileName?: string;
   sizeBytes: number;
   progress: number;
+  bytesTransferred?: number;
+  totalBytes?: number;
   status: TransferStatus;
   fromDeviceName: string;
   toDeviceName: string;

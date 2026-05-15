@@ -133,6 +133,11 @@ export function TransferScreen({
           <Text style={[styles.meta, { color: colors.textSecondary }]}>
             Status: {job.status} - {job.progress}%
           </Text>
+          {typeof job.bytesTransferred === 'number' && typeof job.totalBytes === 'number' ? (
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+              {formatSize(job.bytesTransferred)} / {formatSize(job.totalBytes)}
+            </Text>
+          ) : null}
           {job.errorMessage ? (
             <Text style={[styles.meta, { color: colors.textSecondary }]}>
               {job.errorMessage}

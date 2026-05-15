@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as DocumentPicker from "expo-document-picker";
 
 import { nativeCrossBeam } from "@/native/crossbeamNative";
@@ -8,6 +8,57 @@ export const useTransferManager = () => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [transferError, setTransferError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return nativeCrossBeam.addTransferProgressListener((event) => {
+      setTransfers((current) => {
+        const progress =
+          event.totalBytes > 0
+            ? Math.min(100, Math.round((event.bytesTransferred / event.totalBytes) * 100))
+            : 0;
+        const existing = current.find((job) => job.id === event.transferId);
+        if (!existing) {
+          return [
+            {
+              id: event.transferId,
+              fileNames: event.fileName ? [event.fileName] : ["Incoming transfer"],
+              fileName: event.fileName,
+              sizeBytes: event.totalBytes,
+              bytesTransferred: event.bytesTransferred,
+              totalBytes: event.totalBytes,
+              progress,
+              status: event.status,
+              fromDeviceName: event.peerId,
+              toDeviceName: "This Device",
+              encrypted: true,
+              startedAt: Date.now(),
+              updatedAt: Date.now(),
+              errorMessage: event.errorMessage,
+            },
+            ...current,
+          ];
+        }
+
+        return current.map((job) =>
+          job.id === event.transferId
+            ? {
+                ...job,
+                fileNames:
+                  event.fileName && !job.fileNames.includes(event.fileName)
+                    ? [...job.fileNames, event.fileName]
+                    : job.fileNames,
+                bytesTransferred: event.bytesTransferred,
+                totalBytes: event.totalBytes,
+                progress,
+                status: event.status,
+                updatedAt: Date.now(),
+                errorMessage: event.errorMessage,
+              }
+            : job,
+        );
+      });
+    });
+  }, []);
 
   const pickFiles = async () => {
     setTransferError(null);
@@ -52,6 +103,8 @@ export const useTransferManager = () => {
       fileName: selectedFiles[0]?.name,
       sizeBytes: selectedFiles.reduce((sum, file) => sum + file.sizeBytes, 0),
       progress: 0,
+      bytesTransferred: 0,
+      totalBytes: selectedFiles.reduce((sum, file) => sum + file.sizeBytes, 0),
       status: "queued",
       fromDeviceName: "This Device",
       toDeviceName: targetDeviceName,

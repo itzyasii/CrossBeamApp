@@ -12,6 +12,7 @@ public final class CrossBeamNativeModule: Module {
   private var peerIds: [String: MCPeerID] = [:]
   private var pendingTransfersByPeer: [String: PendingTransfer] = [:]
   private var progressObservers: [String: NSKeyValueObservation] = [:]
+  private var transferProgress: [String: [Progress]] = [:]
 
   public func definition() -> ModuleDefinition {
     Name("CrossBeamNative")
@@ -73,6 +74,17 @@ public final class CrossBeamNativeModule: Module {
     }
 
     AsyncFunction("cancelTransfer") { (_ transferId: String) in
+      self.transferProgress[transferId]?.forEach { $0.cancel() }
+      self.transferProgress.removeValue(forKey: transferId)
+      self.sendTransferEvent(
+        transferId: transferId,
+        peerId: "unknown-peer",
+        fileName: nil,
+        bytesTransferred: 0,
+        totalBytes: 1,
+        status: "cancelled",
+        errorMessage: nil
+      )
       return
     }
 
@@ -119,6 +131,7 @@ public final class CrossBeamNativeModule: Module {
     peerIds.removeAll()
     pendingTransfersByPeer.removeAll()
     progressObservers.removeAll()
+    transferProgress.removeAll()
   }
 
   private func sendPendingTransfer(_ transfer: PendingTransfer) {
@@ -155,6 +168,7 @@ public final class CrossBeamNativeModule: Module {
       }
 
       if let progress {
+        transferProgress[transfer.id, default: []].append(progress)
         let observerKey = "\(transfer.id)-\(file.name)"
         progressObservers[observerKey] = progress.observe(\.fractionCompleted, options: [.new]) { observedProgress, _ in
           let fileBytes = Int64(Double(file.sizeBytes) * observedProgress.fractionCompleted)

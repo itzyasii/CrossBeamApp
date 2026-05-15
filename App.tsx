@@ -35,6 +35,7 @@ export default function App() {
     clearSelectedFiles,
     startTransfer,
     togglePause,
+    cancelTransfer,
   } = useTransferManager();
 
   const targetDevice = devices[0] ?? null;
@@ -114,6 +115,7 @@ export default function App() {
               void startTransfer(targetDevice?.id ?? null, targetDevice?.name ?? 'No peer selected')
             }
             onPauseResume={togglePause}
+            onCancel={(id) => void cancelTransfer(id)}
           />
         ) : null}
         {tab === 'history' ? <HistoryScreen transfers={transfers} /> : null}

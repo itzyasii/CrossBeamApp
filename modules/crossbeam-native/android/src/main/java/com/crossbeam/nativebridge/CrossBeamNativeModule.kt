@@ -30,6 +30,8 @@ class CrossBeamNativeModule : Module() {
   private var serverSocket: ServerSocket? = null
   private var serverThread: Thread? = null
   private var localServiceName: String? = null
+  private val activeSockets = ConcurrentHashMap<String, Socket>()
+  private val cancelledTransfers = ConcurrentHashMap.newKeySet<String>()
   private val serviceType = "_crossbeam._tcp."
   private val protocolMagic = "CROSSBEAM1"
 
@@ -89,7 +91,9 @@ class CrossBeamNativeModule : Module() {
     }
 
     AsyncFunction("cancelTransfer") { transferId: String ->
-      Unit
+      cancelledTransfers.add(transferId)
+      activeSockets.remove(transferId)?.close()
+      emitTransfer(transferId, "unknown-peer", null, 0, 1, "cancelled", null)
     }
 
     AsyncFunction("pauseTransfer") { transferId: String ->
@@ -269,6 +273,7 @@ class CrossBeamNativeModule : Module() {
         }
 
         Socket(host, port).use { socket ->
+          activeSockets[transferId] = socket
           DataOutputStream(BufferedOutputStream(socket.getOutputStream())).use { output ->
             output.writeUTF(protocolMagic)
             output.writeUTF(transferId)
@@ -291,6 +296,9 @@ class CrossBeamNativeModule : Module() {
                   val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                   var read = input.read(buffer)
                   while (read >= 0) {
+                    if (cancelledTransfers.contains(transferId)) {
+                      throw TransferCancelledException()
+                    }
                     output.write(buffer, 0, read)
                     transferred += read
                     emitTransfer(
@@ -311,8 +319,18 @@ class CrossBeamNativeModule : Module() {
           }
         }
 
-        emitTransfer(transferId, peerId, null, totalBytes, totalBytes, "completed", null)
+        if (cancelledTransfers.remove(transferId)) {
+          emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "cancelled", null)
+        } else {
+          emitTransfer(transferId, peerId, null, totalBytes, totalBytes, "completed", null)
+        }
+        activeSockets.remove(transferId)
+      } catch (_: TransferCancelledException) {
+        activeSockets.remove(transferId)
+        cancelledTransfers.remove(transferId)
+        emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "cancelled", null)
       } catch (error: Exception) {
+        activeSockets.remove(transferId)
         emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "failed", error.message)
       }
     }
@@ -329,10 +347,9 @@ class CrossBeamNativeModule : Module() {
 
           val transferId = input.readUTF()
           val fileCount = input.readInt()
-          val outputDir = File(
-            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-            "CrossBeam"
-          )
+          val downloadsRoot =
+            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+          val outputDir = File(downloadsRoot, "CrossBeam")
           outputDir.mkdirs()
 
           var batchTotal = 0L
@@ -461,4 +478,6 @@ class CrossBeamNativeModule : Module() {
     val size: Long,
     val checksum: String
   )
+
+  private class TransferCancelledException : Exception()
 }

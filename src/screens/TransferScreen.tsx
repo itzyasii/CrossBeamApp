@@ -14,6 +14,7 @@ type TransferScreenProps = {
   onClearSelectedFiles: () => void;
   onStartTransfer: () => void;
   onPauseResume: (id: string) => void;
+  onCancel: (id: string) => void;
 };
 
 export function TransferScreen({
@@ -24,6 +25,7 @@ export function TransferScreen({
   onClearSelectedFiles,
   onStartTransfer,
   onPauseResume,
+  onCancel,
 }: TransferScreenProps) {
   const { colors } = useTheme();
 
@@ -153,6 +155,18 @@ export function TransferScreen({
               style={[styles.secondaryLabel, { color: colors.textPrimary }]}
             >
               Pause / resume
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.secondaryButton, { borderColor: colors.border }]}
+            onPress={() => onCancel(job.id)}
+            accessibilityRole="button"
+            focusable
+          >
+            <Text
+              style={[styles.secondaryLabel, { color: colors.textPrimary }]}
+            >
+              Cancel
             </Text>
           </Pressable>
         </View>

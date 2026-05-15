@@ -33,24 +33,35 @@ This repository now includes a local native module package at
 Implemented native bridge surface:
 
 - Android: DNS-SD / NSD discovery for `_crossbeam._tcp.` peers
+- Android: DNS-SD service advertising with a TCP receive server
+- Android: socket-stream multi-file transfer with byte progress events
+- Android: SHA-256 checksum verification on received files
+- Android: safe received-file naming and conflict handling
 - iOS: Multipeer Connectivity advertiser/browser for `crossbeam` peers
+- iOS: Multipeer invitation flow and encrypted MCSession setup
+- iOS: MCSession resource transfer progress callbacks
+- iOS: received resources saved into the app Documents/CrossBeam directory
 - Shared TypeScript adapter consumed by the app
+- Native cancel API wired into Android socket transfer and iOS Progress cancellation
 - Platform permission declarations for local network, Wi-Fi, notifications, and
   foreground data sync
 
 Remaining native work to meet the full production acceptance criteria:
 
-- Android Wi-Fi Direct / Wi-Fi P2P group negotiation and socket transport
-- Android foreground service and transfer progress notifications
+- Android Wi-Fi Direct / Wi-Fi P2P group negotiation
+- Android foreground service and transfer progress notifications for long-running transfers
 - Android share target integration
 - Android TV launcher, D-pad focus, receive mode, and large-file storage flow
-- iOS authenticated invitation handling and MCSession resource transfer
-- iOS Files save flow
+- iOS user-facing incoming invitation confirmation and trust workflow
+- iOS Files app export/save workflow
 - Secure pairing, key storage, session keys, streaming encryption, checksums,
   resumable checkpoints, and transfer queue persistence
+- Pause/resume using chunk checkpoints
+- Analytics dashboard and selective sync
 
-Until the transfer adapters exist, CrossBeam refuses to show fake successful
-transfers.
+The implemented transfer paths must still be validated on real Android/iOS
+devices. This Windows machine does not have Android Studio/Xcode installed, so
+native compilation was not completed here.
 
 ## Setup
 

@@ -159,6 +159,21 @@ export const useTransferManager = () => {
     );
   };
 
+  const cancelTransfer = async (id: string) => {
+    try {
+      await nativeCrossBeam.cancelTransfer(id);
+      setTransfers((current) =>
+        current.map((job) =>
+          job.id === id
+            ? { ...job, status: "cancelled", updatedAt: Date.now() }
+            : job,
+        ),
+      );
+    } catch (error) {
+      setTransferError(String(error));
+    }
+  };
+
   const activeTransferExists = useMemo(
     () =>
       transfers.some(
@@ -175,6 +190,7 @@ export const useTransferManager = () => {
     clearSelectedFiles,
     startTransfer,
     togglePause,
+    cancelTransfer,
     activeTransferExists,
   };
 };

@@ -67,6 +67,13 @@ export const nativeCrossBeam = {
     return CrossBeamNative.sendFiles(request);
   },
 
+  async cancelTransfer(transferId: string): Promise<void> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) {
+      throw new Error('CrossBeam native transfer module is not installed in this runtime.');
+    }
+    await CrossBeamNative.cancelTransfer(transferId);
+  },
+
   addPeerFoundListener(listener: (device: Device) => void): () => void {
     const subscription = CrossBeamNativeEvents?.addListener('onPeerFound', (peer: NativePeer) => {
       listener(toDevice(peer));

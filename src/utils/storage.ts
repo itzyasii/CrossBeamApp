@@ -3,10 +3,10 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TransferHistory, AppSettings } from '@types/index';
-import { APP_CONFIG, DEFAULT_SETTINGS } from '@constants/config';
+import { TransferHistory, AppSettings } from '@/types';
+import { APP_CONFIG, DEFAULT_SETTINGS } from '@/constants/config';
 
-class StorageService {
+class StorageServiceImpl {
   /**
    * Save transfer history
    */
@@ -21,6 +21,10 @@ class StorageService {
     } catch (error) {
       console.error('Error adding to transfer history:', error);
     }
+  }
+
+  async saveTransfer(transfer: TransferHistory): Promise<void> {
+    await this.addToTransferHistory(transfer);
   }
 
   /**
@@ -192,4 +196,7 @@ class StorageService {
   }
 }
 
-export default new StorageService();
+const storageService = new StorageServiceImpl();
+
+export { storageService as StorageService };
+export default storageService;

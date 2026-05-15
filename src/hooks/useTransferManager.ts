@@ -1,99 +1,109 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import * as DocumentPicker from "expo-document-picker";
 
-import {
-  createTransferFromIncoming,
-  createTransferJob,
-  progressTransfer,
-} from "@/services/transferService";
-import { IncomingTransferRequest, TransferJob } from "@/types/domain";
-
-const TICK_MS = 1_100;
+import { nativeCrossBeam } from "@/native/crossbeamNative";
+import { SelectedFile, TransferJob } from "@/types/domain";
 
 export const useTransferManager = () => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
-  const [pendingIncomingRequest, setPendingIncomingRequest] =
-    useState<IncomingTransferRequest | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTransfers((current) => current.map(progressTransfer));
-    }, TICK_MS);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const startTransfer = (targetDeviceName: string) => {
-    const files = ["holiday-clip.mov", "invoice.pdf", "family-photo.heic"];
-    const totalSize = 6.2 * 1024 * 1024 * 1024;
-    const job = createTransferJob(
-      files,
-      totalSize,
-      "This Device",
-      targetDeviceName,
-    );
-    setTransfers((current) => [job, ...current]);
-  };
-
-  const togglePause = (id: string) => {
-    setTransfers((current) =>
-      current.map((job) => {
-        if (
-          job.id !== id ||
-          job.status === "completed" ||
-          job.status === "failed" ||
-          job.status === "rejected"
-        ) {
-          return job;
-        }
-
-        return {
-          ...job,
-          status: job.status === "paused" ? "in-progress" : "paused",
-          updatedAt: Date.now(),
-        };
-      }),
-    );
-  };
-
-  const mockIncomingRequest = () => {
-    setPendingIncomingRequest({
-      id: `${Date.now()}-incoming`,
-      fromDeviceName: "Office iPad",
-      fileNames: ["pitch-deck.pptx", "notes.txt"],
-      sizeBytes: 820 * 1024 * 1024,
-      requestedAt: Date.now(),
+  const pickFiles = async () => {
+    setTransferError(null);
+    const result = await DocumentPicker.getDocumentAsync({
+      multiple: true,
+      copyToCacheDirectory: false,
     });
-  };
 
-  const acceptIncomingRequest = () => {
-    if (!pendingIncomingRequest) return;
-    const job = createTransferFromIncoming(
-      pendingIncomingRequest,
-      "This Device",
+    if (result.canceled) return;
+
+    setSelectedFiles(
+      result.assets.map((asset) => ({
+        id: `${asset.uri}-${asset.name}`,
+        name: asset.name,
+        sizeBytes: asset.size ?? 0,
+        mimeType: asset.mimeType,
+        uri: asset.uri,
+      })),
     );
-    setTransfers((current) => [job, ...current]);
-    setPendingIncomingRequest(null);
   };
 
-  const rejectIncomingRequest = () => {
-    if (!pendingIncomingRequest) return;
+  const clearSelectedFiles = () => {
+    setSelectedFiles([]);
+    setTransferError(null);
+  };
 
-    setTransfers((current) => [
-      {
-        id: `${pendingIncomingRequest.id}-rejected`,
-        fileNames: pendingIncomingRequest.fileNames,
-        sizeBytes: pendingIncomingRequest.sizeBytes,
-        progress: 0,
-        status: "rejected",
-        fromDeviceName: pendingIncomingRequest.fromDeviceName,
-        toDeviceName: "This Device",
-        encrypted: true,
-        startedAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-      ...current,
-    ]);
-    setPendingIncomingRequest(null);
+  const startTransfer = async (targetDeviceId: string | null, targetDeviceName: string) => {
+    if (selectedFiles.length === 0) {
+      setTransferError("Select one or more files before starting a transfer.");
+      return;
+    }
+
+    if (!targetDeviceId) {
+      setTransferError("Select a discovered peer before starting a transfer.");
+      return;
+    }
+
+    const now = Date.now();
+    const baseJob: TransferJob = {
+      id: `${now}-pending`,
+      fileNames: selectedFiles.map((file) => file.name),
+      fileName: selectedFiles[0]?.name,
+      sizeBytes: selectedFiles.reduce((sum, file) => sum + file.sizeBytes, 0),
+      progress: 0,
+      status: "queued",
+      fromDeviceName: "This Device",
+      toDeviceName: targetDeviceName,
+      encrypted: true,
+      startedAt: now,
+      updatedAt: now,
+    };
+
+    setTransfers((current) => [baseJob, ...current]);
+
+    try {
+      const result = await nativeCrossBeam.sendFiles({
+        peerId: targetDeviceId,
+        files: selectedFiles.map((file) => ({
+          id: file.id,
+          name: file.name,
+          uri: file.uri,
+          sizeBytes: file.sizeBytes,
+          mimeType: file.mimeType,
+        })),
+      });
+      setTransfers((current) =>
+        current.map((job) =>
+          job.id === baseJob.id
+            ? { ...job, id: result.transferId, status: "in-progress", updatedAt: Date.now() }
+            : job,
+        ),
+      );
+      setTransferError(null);
+    } catch (error) {
+      const message = String(error);
+      setTransferError(message);
+      setTransfers((current) =>
+        current.map((job) =>
+          job.id === baseJob.id
+            ? {
+                ...job,
+                status: "blocked",
+                encrypted: false,
+                updatedAt: Date.now(),
+                errorMessage: message,
+              }
+            : job,
+        ),
+      );
+    }
+  };
+
+  const togglePause = (_id: string) => {
+    setTransferError(
+      "Pause and resume are only available after the native streaming transfer engine is installed.",
+    );
   };
 
   const activeTransferExists = useMemo(
@@ -106,12 +116,12 @@ export const useTransferManager = () => {
 
   return {
     transfers,
+    selectedFiles,
+    transferError,
+    pickFiles,
+    clearSelectedFiles,
     startTransfer,
     togglePause,
     activeTransferExists,
-    pendingIncomingRequest,
-    mockIncomingRequest,
-    acceptIncomingRequest,
-    rejectIncomingRequest,
   };
 };

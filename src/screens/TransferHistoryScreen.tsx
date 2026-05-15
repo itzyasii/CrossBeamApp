@@ -12,11 +12,11 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Text, Divider } from 'react-native-paper';
-import { useAppStore } from '@store/index';
-import { GlassCard } from '@components/GlassCard';
-import { Colors, Spacing, Typography } from '@constants/theme';
-import { formatBytes, formatTime } from '@utils/helpers';
-import { fileTransferService } from '@services/index';
+import { useAppStore } from '@/store';
+import { GlassCard } from '@/components/GlassCard';
+import { Colors, Spacing, Typography } from '@/constants/theme';
+import { formatBytes, formatTime } from '@/utils/helpers';
+import { fileTransferService } from '@/services';
 import { format } from 'date-fns';
 
 export const TransferHistoryScreen: React.FC = () => {
@@ -25,7 +25,7 @@ export const TransferHistoryScreen: React.FC = () => {
   useEffect(() => {
     // Load transfer history on mount
     const loadHistory = async () => {
-      const history = fileTransferService.getTransferHistory();
+      const history = await fileTransferService.getTransferHistory();
       if (history.length > 0) {
         setTransferHistory(history);
       }
@@ -101,7 +101,7 @@ export const TransferHistoryScreen: React.FC = () => {
 
             <View style={styles.historyInfo}>
               <Text
-                style={[styles.fileName, Typography.fontWeight.semibold]}
+                style={[styles.fileName, { fontWeight: Typography.fontWeight.semibold }]}
                 numberOfLines={1}
               >
                 {transfer.files[0]?.name}
@@ -112,7 +112,7 @@ export const TransferHistoryScreen: React.FC = () => {
             </View>
 
             <View style={styles.historyDetails}>
-              <Text style={[styles.size, Typography.fontWeight.semibold]}>
+              <Text style={[styles.size, { fontWeight: Typography.fontWeight.semibold }]}>
                 {formatBytes(transfer.totalSize)}
               </Text>
               <Text style={styles.duration}>
@@ -138,7 +138,7 @@ export const TransferHistoryScreen: React.FC = () => {
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyIcon}>📋</Text>
-      <Text style={[styles.emptyTitle, Typography.fontWeight.semibold]}>
+      <Text style={[styles.emptyTitle, { fontWeight: Typography.fontWeight.semibold }]}>
         No Transfer History
       </Text>
       <Text style={styles.emptySubtitle}>
@@ -150,7 +150,7 @@ export const TransferHistoryScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, Typography.fontWeight.bold]}>
+        <Text style={[styles.title, { fontWeight: Typography.fontWeight.bold }]}>
           History
         </Text>
         <Text style={styles.subtitle}>

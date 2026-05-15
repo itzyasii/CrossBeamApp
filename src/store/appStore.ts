@@ -3,9 +3,8 @@
  */
 
 import { create } from 'zustand';
-import { Device, Transfer, TransferHistory } from '@types/index';
-import { DeviceDiscoveryService, FileTransferService } from '@services/index';
-import storage from '@utils/storage';
+import { Device, Transfer, TransferHistory } from '@/types';
+import storage from '@/utils/storage';
 
 interface AppState {
   // Devices
@@ -18,6 +17,7 @@ interface AppState {
   activeTransfers: Transfer[];
   selectedTransfer: Transfer | null;
   transferHistory: TransferHistory[];
+  setTransferHistory: (history: TransferHistory[]) => void;
   addTransfer: (transfer: Transfer) => void;
   updateTransfer: (transfer: Transfer) => void;
   removeTransfer: (transferId: string) => void;
@@ -36,7 +36,7 @@ interface AppState {
   isLoadingHistory: boolean;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set) => ({
   // Devices
   discoveredDevices: [],
   connectedDevice: null,
@@ -47,6 +47,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTransfers: [],
   selectedTransfer: null,
   transferHistory: [],
+  setTransferHistory: (history) => set({ transferHistory: history }),
   addTransfer: (transfer) => {
     set((state) => ({
       activeTransfers: [...state.activeTransfers, transfer],

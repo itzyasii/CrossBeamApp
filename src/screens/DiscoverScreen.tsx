@@ -9,6 +9,7 @@ type DiscoverScreenProps = {
   devices: Device[];
   onRefresh: () => void;
   isRefreshing: boolean;
+  statusMessage: string;
 };
 
 const platformLabel: Record<Device['platform'], string> = {
@@ -17,13 +18,18 @@ const platformLabel: Record<Device['platform'], string> = {
   'android-tv': 'Android TV',
 };
 
-export function DiscoverScreen({ devices, onRefresh, isRefreshing }: DiscoverScreenProps) {
+export function DiscoverScreen({
+  devices,
+  onRefresh,
+  isRefreshing,
+  statusMessage,
+}: DiscoverScreenProps) {
   const { colors } = useTheme();
 
   return (
     <SectionCard
       title="Nearby Devices"
-      subtitle="Automatic local discovery over Wi‑Fi Direct, hotspot, and LAN."
+      subtitle="Real peer discovery requires native Android and iOS adapters."
       rightSlot={
         <Pressable
           style={[styles.button, { backgroundColor: colors.accent }]}
@@ -32,16 +38,31 @@ export function DiscoverScreen({ devices, onRefresh, isRefreshing }: DiscoverScr
           focusable
         >
           <Text style={[styles.buttonLabel, { color: colors.textInverse }]}>
-            {isRefreshing ? 'Scanning…' : 'Refresh'}
+            {isRefreshing ? 'Scanning...' : 'Refresh'}
           </Text>
         </Pressable>
       }
     >
-      {devices.map((device) => (
-        <View key={device.id} style={[styles.row, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.primary, { color: colors.textPrimary }]}>{device.name}</Text>
+      {devices.length === 0 ? (
+        <View style={[styles.empty, { borderColor: colors.border }]}>
+          <Text style={[styles.primary, { color: colors.textPrimary }]}>
+            No real peers discovered
+          </Text>
           <Text style={[styles.secondary, { color: colors.textSecondary }]}>
-            {platformLabel[device.platform]} • {device.connection}
+            {statusMessage}
+          </Text>
+        </View>
+      ) : null}
+      {devices.map((device) => (
+        <View
+          key={device.id}
+          style={[styles.row, { borderBottomColor: colors.border }]}
+        >
+          <Text style={[styles.primary, { color: colors.textPrimary }]}>
+            {device.name}
+          </Text>
+          <Text style={[styles.secondary, { color: colors.textSecondary }]}>
+            {platformLabel[device.platform]} - {device.connection}
           </Text>
         </View>
       ))}
@@ -64,6 +85,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  empty: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+  },
   primary: {
     fontSize: 15,
     fontWeight: '600',
@@ -71,5 +98,6 @@ const styles = StyleSheet.create({
   secondary: {
     fontSize: 12,
     marginTop: 4,
+    lineHeight: 18,
   },
 });

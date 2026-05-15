@@ -2,9 +2,9 @@
  * Device discovery service for peer detection
  */
 
-import { Device, DeviceStatus, Platform } from '@types/index';
-import { generateRandomColor, generateId } from '@utils/helpers';
-import * as Device as ExpoDevice from 'expo-device';
+import { Device, DeviceStatus, Platform } from '@/types';
+import { generateRandomColor, generateId } from '@/utils/helpers';
+import * as ExpoDevice from 'expo-device';
 
 type DeviceListener = (devices: Device[]) => void;
 
@@ -37,7 +37,11 @@ class DeviceDiscoveryService {
   }
 
   /**
-   * Start scanning for nearby devices
+   * Start scanning for nearby devices.
+   *
+   * Real Android Wi-Fi Direct and iOS Multipeer discovery require native
+   * modules. The Expo runtime cannot enumerate peers from JavaScript alone, so
+   * this service intentionally reports no peers instead of fabricating devices.
    */
   async startScanning(interval = 2000): Promise<void> {
     if (this.isScanning) return;
@@ -63,57 +67,11 @@ class DeviceDiscoveryService {
   }
 
   /**
-   * Scan for devices (mock implementation)
+   * Scan for devices.
    */
   private async scanDevices(): Promise<void> {
     try {
-      // Mock: Generate random devices for testing
-      // In production, replace with real device discovery (NSD, mDNS)
-
-      // Randomly add or update a mock device
-      if (Math.random() > 0.7) {
-        const mockDeviceId = 'mock-device-' + Math.floor(Math.random() * 5);
-
-        if (!this.discoveredDevices.has(mockDeviceId)) {
-          const platforms: Platform[] = ['android', 'ios', 'android-tv'];
-          const device: Device = {
-            id: mockDeviceId,
-            name: `Device ${mockDeviceId.slice(-1)}`,
-            platform: platforms[Math.floor(Math.random() * platforms.length)],
-            ipAddress: `192.168.1.${Math.floor(Math.random() * 200) + 10}`,
-            port: 5354,
-            status: 'idle',
-            signalStrength: Math.floor(Math.random() * 50) + 50,
-            batteryLevel: Math.floor(Math.random() * 40) + 60,
-            storageAvailable: Math.random() * 50 * 1024 * 1024 * 1024,
-            lastSeen: Date.now(),
-            avatarColor: generateRandomColor(mockDeviceId),
-            capabilities: {
-              supportsWiFiDirect: true,
-              supportsMultipeer: true,
-              supportsBluetooth: true,
-            },
-          };
-
-          this.discoveredDevices.set(mockDeviceId, device);
-          this.notifyListeners();
-        }
-      }
-
-      // Update lastSeen for all devices
-      this.discoveredDevices.forEach((device) => {
-        device.lastSeen = Date.now();
-      });
-
-      // Remove devices not seen in 60 seconds
-      const now = Date.now();
-      const timeout = 60000;
-
-      this.discoveredDevices.forEach((device, id) => {
-        if (now - device.lastSeen > timeout) {
-          this.discoveredDevices.delete(id);
-        }
-      });
+      this.notifyListeners();
     } catch (error) {
       console.error('Error scanning devices:', error);
     }
@@ -138,18 +96,10 @@ class DeviceDiscoveryService {
         return null;
       }
 
-      // Update status
-      device.status = 'connecting';
+      device.status = 'error';
       this.notifyListeners();
-
-      // Simulate connection delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Update status to connected
-      device.status = 'connected';
-      this.notifyListeners();
-
-      return device;
+      console.error('Native peer connection adapter is not installed.');
+      return null;
     } catch (error) {
       console.error('Error connecting to device:', error);
       return null;
@@ -184,7 +134,7 @@ class DeviceDiscoveryService {
    */
   private async getDeviceName(): Promise<string> {
     try {
-      const name = await ExpoDevice.getDeviceNameAsync();
+      const name = ExpoDevice.deviceName ?? ExpoDevice.modelName;
       return name || 'Unknown Device';
     } catch (error) {
       return 'Unknown Device';

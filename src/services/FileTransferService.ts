@@ -2,14 +2,9 @@
  * File transfer service for managing transfers
  */
 
-import { Transfer, TransferFile, TransferStatus, TransferHistory } from '@types/index';
-import {
-  calculatePercentage,
-  calculateSpeed,
-  calculateRemainingTime,
-  generateId,
-} from '@utils/helpers';
-import storage from '@utils/storage';
+import { Transfer, TransferFile, TransferHistory } from '@/types';
+import { generateId } from '@/utils/helpers';
+import storage from '@/utils/storage';
 
 type TransferListener = (transfer: Transfer) => void;
 
@@ -79,12 +74,12 @@ class FileTransferService {
       throw new Error(`Transfer ${transferId} not found`);
     }
 
-    transfer.status = 'in-progress';
-    transfer.startTime = Date.now();
+    transfer.status = 'failed';
+    transfer.error =
+      'Native streaming transfer engine is not installed. Real transfers require Android and iOS native adapters.';
+    transfer.endTime = Date.now();
     this.notifyListeners(transfer);
-
-    // Simulate transfer progress
-    await this.simulateTransfer(transferId);
+    await this.saveTransferToHistory(transfer);
   }
 
   /**
@@ -116,11 +111,10 @@ class FileTransferService {
     }
 
     if (transfer.status === 'paused') {
-      transfer.status = 'in-progress';
-      transfer.resumeTime = Date.now();
+      transfer.status = 'failed';
+      transfer.error =
+        'Resume requires a native chunked transfer engine with checkpoint support.';
       this.notifyListeners(transfer);
-
-      await this.simulateTransfer(transferId);
     }
   }
 
@@ -156,67 +150,19 @@ class FileTransferService {
     return Array.from(this.activeTransfers.values());
   }
 
+  async getTransferHistory(): Promise<TransferHistory[]> {
+    return storage.getTransferHistory();
+  }
+
+  async deleteTransferHistory(transferId: string): Promise<void> {
+    await storage.deleteTransferFromHistory(transferId);
+  }
+
   /**
    * Remove completed transfer
    */
   removeTransfer(transferId: string): void {
     this.activeTransfers.delete(transferId);
-  }
-
-  /**
-   * Simulate file transfer with progress updates
-   */
-  private async simulateTransfer(transferId: string): Promise<void> {
-    const transfer = this.activeTransfers.get(transferId);
-
-    if (!transfer) return;
-
-    const chunkSize = 1024 * 100; // 100KB chunks for simulation
-    const totalChunks = Math.ceil(transfer.totalBytes / chunkSize);
-
-    for (let i = 0; i < totalChunks; i++) {
-      if (transfer.status !== 'in-progress') {
-        break; // Transfer was paused or cancelled
-      }
-
-      // Simulate network delay (50-200ms per chunk)
-      const delay = Math.random() * 150 + 50;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-
-      // Update bytes transferred
-      const newBytesTransferred = Math.min(
-        (i + 1) * chunkSize,
-        transfer.totalBytes
-      );
-
-      transfer.bytesTransferred = newBytesTransferred;
-
-      // Calculate metrics
-      const elapsed = (Date.now() - transfer.startTime) / 1000; // seconds
-      transfer.speed = Math.floor(transfer.bytesTransferred / elapsed);
-      transfer.progress = calculatePercentage(
-        transfer.bytesTransferred,
-        transfer.totalBytes
-      );
-      transfer.remainingTime = calculateRemainingTime(
-        transfer.totalBytes - transfer.bytesTransferred,
-        transfer.speed
-      );
-
-      this.notifyListeners(transfer);
-
-      // Complete transfer when all bytes transferred
-      if (transfer.bytesTransferred >= transfer.totalBytes) {
-        transfer.status = 'completed';
-        transfer.endTime = Date.now();
-        transfer.progress = 100;
-        this.notifyListeners(transfer);
-
-        // Save to history
-        await this.saveTransferToHistory(transfer);
-        break;
-      }
-    }
   }
 
   /**

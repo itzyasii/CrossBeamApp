@@ -6,9 +6,9 @@
 import React from 'react';
 import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { Text, Switch, Divider } from 'react-native-paper';
-import { GlassCard } from '@components/GlassCard';
-import { Colors, Spacing, Typography } from '@constants/theme';
-import { StorageService } from '@utils/storage';
+import { GlassCard } from '@/components/GlassCard';
+import { Colors, Spacing, Typography } from '@/constants/theme';
+import { StorageService } from '@/utils/storage';
 
 export const SettingsScreen: React.FC = () => {
   const [settings, setSettings] = React.useState({
@@ -20,13 +20,17 @@ export const SettingsScreen: React.FC = () => {
   const handleSettingChange = (key: string, value: boolean) => {
     const updatedSettings = { ...settings, [key]: value };
     setSettings(updatedSettings);
-    StorageService.saveSettings(updatedSettings);
+    void StorageService.updateSettings({
+      enableNotifications: updatedSettings.notifications,
+      autoTransfer: updatedSettings.autoTransfer,
+      enableMeteredNetworks: updatedSettings.useMeteredNetworks,
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, Typography.fontWeight.bold]}>
+        <Text style={[styles.title, { fontWeight: Typography.fontWeight.bold }]}>
           Settings
         </Text>
       </View>
@@ -34,7 +38,7 @@ export const SettingsScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Notifications Section */}
         <GlassCard style={styles.section} elevation="md">
-          <Text style={[styles.sectionTitle, Typography.fontWeight.semibold]}>
+          <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
             Notifications
           </Text>
           <Divider style={styles.divider} />
@@ -53,7 +57,7 @@ export const SettingsScreen: React.FC = () => {
 
         {/* Transfer Settings Section */}
         <GlassCard style={styles.section} elevation="md">
-          <Text style={[styles.sectionTitle, Typography.fontWeight.semibold]}>
+          <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
             Transfer
           </Text>
           <Divider style={styles.divider} />
@@ -95,7 +99,7 @@ export const SettingsScreen: React.FC = () => {
 
         {/* About Section */}
         <GlassCard style={styles.section} elevation="md">
-          <Text style={[styles.sectionTitle, Typography.fontWeight.semibold]}>
+          <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
             About
           </Text>
           <Divider style={styles.divider} />

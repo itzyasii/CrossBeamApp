@@ -3,7 +3,7 @@
  */
 
 import * as Network from 'expo-network';
-import { NetworkState } from '@types/index';
+import { NetworkState } from '@/types';
 
 type NetworkListener = (state: NetworkState) => void;
 

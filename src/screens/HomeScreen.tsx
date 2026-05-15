@@ -7,18 +7,23 @@ import { colors } from '@/theme/colors';
 type HomeScreenProps = {
   deviceCount: number;
   transferCount: number;
+  discoveryStatus: string;
 };
 
-export function HomeScreen({ deviceCount, transferCount }: HomeScreenProps) {
+export function HomeScreen({
+  deviceCount,
+  transferCount,
+  discoveryStatus,
+}: HomeScreenProps) {
   return (
     <View style={styles.container}>
       <SectionCard
         title="CrossBeam"
-        subtitle="Fast offline sharing for Android, iOS, and Android TV"
+        subtitle="Ad-free local sharing for Android, iOS, and Android TV"
       >
         <Text style={styles.text}>Nearby devices: {deviceCount}</Text>
-        <Text style={styles.text}>Transfer jobs: {transferCount}</Text>
-        <Text style={styles.textMuted}>Ads are hidden while a transfer is active.</Text>
+        <Text style={styles.text}>Transfer records: {transferCount}</Text>
+        <Text style={styles.textMuted}>{discoveryStatus}</Text>
       </SectionCard>
     </View>
   );
@@ -35,5 +40,6 @@ const styles = StyleSheet.create({
   textMuted: {
     color: colors.textSecondary,
     fontSize: 13,
+    lineHeight: 18,
   },
 });

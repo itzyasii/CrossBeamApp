@@ -10,10 +10,29 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.crossbeam.app"
+      "bundleIdentifier": "com.crossbeam.app",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "CrossBeam uses the local network to discover and connect to nearby devices for private file sharing.",
+        "NSBonjourServices": [
+          "_crossbeam._tcp"
+        ],
+        "NSPhotoLibraryUsageDescription": "CrossBeam lets you choose photos and videos to share with nearby devices.",
+        "NSDocumentsFolderUsageDescription": "CrossBeam lets you choose documents to share with nearby devices."
+      }
     },
     "android": {
-      "package": "com.crossbeam.app"
+      "package": "com.crossbeam.app",
+      "permissions": [
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_STATE",
+        "android.permission.INTERNET",
+        "android.permission.NEARBY_WIFI_DEVICES",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+      ]
     }
   }
 }

@@ -1,4 +1,4 @@
-export type ConnectionType = "wifi-direct" | "hotspot" | "lan";
+export type ConnectionType = "wifi-direct" | "hotspot" | "lan" | "local-network" | "multipeer";
 
 export type DevicePlatform = "android" | "ios" | "android-tv";
 
@@ -11,12 +11,21 @@ export type Device = {
 };
 
 export type TransferStatus =
+  | "blocked"
   | "queued"
   | "in-progress"
   | "paused"
   | "completed"
   | "failed"
   | "rejected";
+
+export type SelectedFile = {
+  id: string;
+  name: string;
+  sizeBytes: number;
+  mimeType?: string;
+  uri: string;
+};
 
 export type TransferJob = {
   id: string;
@@ -32,6 +41,7 @@ export type TransferJob = {
   encrypted: boolean;
   startedAt: number;
   updatedAt: number;
+  errorMessage?: string;
 };
 
 export type IncomingTransferRequest = {

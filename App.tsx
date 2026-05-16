@@ -186,6 +186,7 @@ export default function App() {
   const insets = useSafeAreaInsets();
   const [tabIndex, setTabIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const tab = TABS[tabIndex].id;
 
@@ -248,12 +249,17 @@ export default function App() {
     }
   }, [sharedFiles, addSelectedFiles, setSharedFiles, goToTab]);
 
-  const targetDevice = devices[0] ?? null;
+  const targetDevice = devices.find(device => device.id === selectedDeviceId) ?? devices[0] ?? null;
   const screenProps = {
     devices, isRefreshing, statusMessage,
     refreshDevices: () => void refreshDevices(),
     transfers, selectedFiles, transferError,
     pickFiles, clearSelectedFiles, startTransfer, togglePause, cancelTransfer, targetDevice,
+    selectedDeviceId,
+    selectDeviceForTransfer: (id: string) => {
+      setSelectedDeviceId(id);
+      goToTab(TABS.findIndex(t => t.id === 'transfer'));
+    },
     goToTab: (id: Tab) => goToTab(TABS.findIndex(t => t.id === id)),
   };
 
@@ -372,7 +378,7 @@ function renderScreen(tab: Tab, p: any, _contentPB: number) {
     case 'home':
       return <HomeScreen deviceCount={p.devices.length} transferCount={p.transfers.length} discoveryStatus={p.statusMessage} onStartDiscovery={p.refreshDevices} />;
     case 'discover':
-      return <DiscoverScreen devices={p.devices} onRefresh={p.refreshDevices} isRefreshing={p.isRefreshing} statusMessage={p.statusMessage} />;
+      return <DiscoverScreen devices={p.devices} onRefresh={p.refreshDevices} isRefreshing={p.isRefreshing} statusMessage={p.statusMessage} onSelectDevice={p.selectDeviceForTransfer} />;
     case 'transfer':
       return (
         <TransferScreen
@@ -382,6 +388,7 @@ function renderScreen(tab: Tab, p: any, _contentPB: number) {
           onPickFiles={() => void p.pickFiles()}
           onClearSelectedFiles={p.clearSelectedFiles}
           onStartTransfer={() => void p.startTransfer(p.targetDevice?.id ?? null, p.targetDevice?.name ?? 'No peer')}
+          targetDeviceName={p.targetDevice?.name ?? null}
           onPauseResume={p.togglePause}
           onCancel={(id: string) => void p.cancelTransfer(id)}
         />

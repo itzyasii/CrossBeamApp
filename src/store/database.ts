@@ -109,20 +109,60 @@ export const removeTrustedDevice = async (deviceId: string) => {
 };
 
 export const getAnalyticsData = async () => {
-    const database = await initDatabase();
-    
-    const totalBytesRow = await database.getFirstAsync<{total: number}>('SELECT SUM(sizeBytes) as total FROM transfers WHERE status = "completed"');
-    const totalBytes = totalBytesRow?.total ?? 0;
+  const database = await initDatabase();
 
-    const totalFilesRow = await database.getFirstAsync<{total: number}>('SELECT COUNT(*) as total FROM transfers WHERE status = "completed"');
-    const totalFiles = totalFilesRow?.total ?? 0;
+  const rows = await database.getAllAsync<any>('SELECT * FROM transfers ORDER BY updatedAt DESC');
+  const transfers = rows.map((row: any) => ({
+    id: row.id,
+    fileName: row.fileName,
+    fileNames: row.fileNames ? JSON.parse(row.fileNames) : [],
+    sizeBytes: row.sizeBytes,
+    bytesTransferred: row.bytesTransferred,
+    totalBytes: row.sizeBytes,
+    progress: row.progress,
+    status: row.status,
+    fromDeviceName: row.fromDeviceName,
+    toDeviceName: row.toDeviceName,
+    encrypted: true,
+    startedAt: row.startedAt,
+    updatedAt: row.updatedAt,
+    errorMessage: row.errorMessage,
+  })) as TransferHistory[];
 
-    const failedRow = await database.getFirstAsync<{total: number}>('SELECT COUNT(*) as total FROM transfers WHERE status = "failed"');
-    const totalFailed = failedRow?.total ?? 0;
+  const completed = transfers.filter((transfer) => transfer.status === 'completed');
+  const failed = transfers.filter((transfer) => transfer.status === 'failed' || transfer.status === 'blocked' || transfer.status === 'rejected');
+  const totalBytes = completed.reduce((sum, transfer) => sum + (transfer.sizeBytes ?? 0), 0);
+  const totalFiles = completed.reduce((sum, transfer) => sum + Math.max(transfer.fileNames?.length ?? 0, transfer.fileName ? 1 : 0), 0);
+  const totalFailed = failed.length;
 
-    return {
-        totalBytes,
-        totalFiles,
-        totalFailed,
-    };
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const dailyBytes = Array.from({ length: 7 }, (_, index) => {
+    const dayStart = startOfToday.getTime() - (6 - index) * 24 * 60 * 60 * 1000;
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+    return completed
+      .filter((transfer) => transfer.updatedAt >= dayStart && transfer.updatedAt < dayEnd)
+      .reduce((sum, transfer) => sum + (transfer.sizeBytes ?? 0), 0);
+  });
+
+  const deviceTotals = new Map<string, number>();
+  completed.forEach((transfer) => {
+    const peerName = transfer.fromDeviceName === 'This Device' ? transfer.toDeviceName : transfer.fromDeviceName;
+    deviceTotals.set(peerName, (deviceTotals.get(peerName) ?? 0) + (transfer.sizeBytes ?? 0));
+  });
+
+  const topDevices = Array.from(deviceTotals.entries())
+    .map(([name, bytes]) => ({ name, bytes }))
+    .sort((a, b) => b.bytes - a.bytes)
+    .slice(0, 5);
+
+  return {
+    totalBytes,
+    totalFiles,
+    totalFailed,
+    totalJobs: transfers.length,
+    dailyBytes,
+    topDevices,
+    recentTransfers: transfers.slice(0, 8),
+  };
 };

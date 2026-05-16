@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { CheckCircle2, Clock3, FileText, Trash2, XCircle } from 'lucide-react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CheckCircle2, Clock3, FileText, Search, Trash2, XCircle } from 'lucide-react-native';
 
 import { GlassCard } from '@/components/GlassCard';
 import { useTheme } from '@/hooks/useTheme';
@@ -30,6 +30,8 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
   const { colors } = useTheme();
   const [storedTransfers, setStoredTransfers] = useState<TransferJob[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
 
   const loadHistory = useCallback(async () => {
     setRefreshing(true);
@@ -49,6 +51,24 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
     [...transfers, ...storedTransfers].forEach((job) => byId.set(job.id, job));
     return Array.from(byId.values()).sort((a, b) => b.updatedAt - a.updatedAt);
   }, [storedTransfers, transfers]);
+
+  const filteredTransfers = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return mergedTransfers.filter((job) => {
+      const directionMatches =
+        filter === 'all' ||
+        (filter === 'sent' && job.fromDeviceName === 'This Device') ||
+        (filter === 'received' && job.toDeviceName === 'This Device');
+      const searchMatches =
+        normalizedQuery.length === 0 ||
+        [...(job.fileNames ?? []), job.fileName, job.fromDeviceName, job.toDeviceName]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedQuery);
+      return directionMatches && searchMatches;
+    });
+  }, [filter, mergedTransfers, query]);
 
   const clearHistory = () => {
     Alert.alert('Clear transfer history?', 'This only clears local history records. It does not delete files.', [
@@ -83,6 +103,41 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
         )}
       </View>
 
+      {mergedTransfers.length > 0 && (
+        <View style={S.searchArea}>
+          <View style={[S.searchBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <Search size={18} color={colors.textMuted} strokeWidth={2.3} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search files or devices..."
+              placeholderTextColor={colors.textMuted}
+              style={[S.searchInput, { color: colors.textPrimary }]}
+            />
+          </View>
+          <View style={S.filterRow}>
+            {(['all', 'sent', 'received'] as const).map((item) => {
+              const active = item === filter;
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => setFilter(item)}
+                  style={[
+                    S.filterChip,
+                    {
+                      backgroundColor: active ? colors.accent : colors.surfaceHover,
+                      borderColor: active ? colors.accent : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[S.filterText, { color: active ? '#FFFFFF' : colors.textSecondary }]}>{item}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       {mergedTransfers.length === 0 ? (
         <GlassCard animate>
           <View style={S.empty}>
@@ -95,7 +150,12 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
         </GlassCard>
       ) : (
         <View style={S.list}>
-          {mergedTransfers.map((job) => {
+          {filteredTransfers.length === 0 ? (
+            <GlassCard>
+              <Text style={[S.emptyText, { color: colors.textSecondary }]}>No matching transfer records.</Text>
+            </GlassCard>
+          ) : null}
+          {filteredTransfers.map((job) => {
             const color = statusColor(job.status, colors);
             const Icon = statusIcon(job.status);
             return (
@@ -134,6 +194,12 @@ const S = StyleSheet.create({
   subtitle: { fontSize: FONT_SIZE.sm, lineHeight: 20 },
   clearButton: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: SPACING.md },
   clearText: { fontSize: FONT_SIZE.sm, fontWeight: '800' },
+  searchArea: { gap: SPACING.sm },
+  searchBox: { minHeight: 48, borderWidth: 1, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.md },
+  searchInput: { flex: 1, fontSize: FONT_SIZE.base, fontWeight: '600', paddingVertical: 0 },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  filterChip: { borderWidth: 1, borderRadius: RADIUS.full, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  filterText: { fontSize: FONT_SIZE.xs, fontWeight: '900', textTransform: 'capitalize' },
   list: { gap: SPACING.sm },
   item: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   statusIcon: { width: 42, height: 42, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },

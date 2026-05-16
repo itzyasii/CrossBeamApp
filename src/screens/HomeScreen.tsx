@@ -1,12 +1,17 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Animated, StyleSheet, Text, View, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Radio, Zap, Rocket } from 'lucide-react-native';
 import { GlassCard } from '@/components/GlassCard';
 import { useTheme } from '@/hooks/useTheme';
-import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
+import { FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 
-type Props = { deviceCount: number; transferCount: number; discoveryStatus: string };
+type Props = {
+  deviceCount: number;
+  transferCount: number;
+  discoveryStatus: string;
+  onStartDiscovery?: () => void;
+};
 
 const OrbCore = () => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -84,7 +89,7 @@ const BentoCard = ({
   );
 };
 
-export function HomeScreen({ deviceCount, transferCount, discoveryStatus }: Props) {
+export function HomeScreen({ deviceCount, transferCount, discoveryStatus, onStartDiscovery }: Props) {
   const { colors } = useTheme();
 
   return (
@@ -139,7 +144,7 @@ export function HomeScreen({ deviceCount, transferCount, discoveryStatus }: Prop
         </View>
 
         <View style={S.row}>
-          <Pressable style={{ flex: 1 }}>
+          <Pressable onPress={onStartDiscovery} style={{ flex: 1 }} accessibilityRole="button">
             <GlassCard padding={SPACING.lg} style={S.wideAction}>
               <LinearGradient
                 colors={['#6366F1', '#4F46E5']}

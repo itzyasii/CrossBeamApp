@@ -55,6 +55,11 @@ export const getTransferHistory = async (): Promise<TransferHistory[]> => {
   }));
 };
 
+export const clearTransferHistory = async () => {
+  const database = await initDatabase();
+  await database.runAsync('DELETE FROM transfers');
+};
+
 export const saveTransferHistory = async (transfer: TransferHistory) => {
   const database = await initDatabase();
   await database.runAsync(
@@ -96,6 +101,11 @@ export const saveDevice = async (device: Device) => {
     `INSERT OR REPLACE INTO devices (id, name, platform, isTrusted, lastSeenAt) VALUES (?, ?, ?, ?, ?)`,
     [device.id, device.name, device.platform, device.isTrusted ? 1 : 0, device.lastSeenAt]
   );
+};
+
+export const removeTrustedDevice = async (deviceId: string) => {
+  const database = await initDatabase();
+  await database.runAsync('UPDATE devices SET isTrusted = 0, lastSeenAt = ? WHERE id = ?', [Date.now(), deviceId]);
 };
 
 export const getAnalyticsData = async () => {

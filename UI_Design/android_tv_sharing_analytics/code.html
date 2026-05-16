@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CrossBeam Station | Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #020617;
+            overflow: hidden;
+            font-family: 'Hanken Grotesk', sans-serif;
+        }
+        .glass-card {
+            backdrop-filter: blur(20px);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .beam-glow {
+            box-shadow: 0 0 20px rgba(192, 193, 255, 0.15);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .focus-ring:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #c0c1ff;
+            transform: scale(1.02);
+            transition: all 0.3s ease;
+        }
+        .chart-pulse {
+            animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #c0c1ff, transparent);
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: scan 3s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            50% { opacity: 0.5; }
+            100% { top: 100%; opacity: 0; }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#c0c1ff",
+                        "on-secondary-fixed": "#00201c",
+                        "outline-variant": "#464554",
+                        "inverse-on-surface": "#283044",
+                        "tertiary-fixed": "#ffddb8",
+                        "surface-bright": "#31394d",
+                        "primary-container": "#8083ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "surface": "#0b1326",
+                        "surface-container-high": "#222a3d",
+                        "on-background": "#dae2fd",
+                        "secondary-fixed": "#71f8e4",
+                        "on-error": "#690005",
+                        "tertiary-container": "#ca8100",
+                        "surface-container-lowest": "#060e20",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary-fixed-variant": "#005048",
+                        "on-secondary-container": "#003f38",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "primary": "#c0c1ff",
+                        "on-tertiary": "#472a00",
+                        "surface-tint": "#c0c1ff",
+                        "on-tertiary-container": "#3e2400",
+                        "primary-fixed": "#e1e0ff",
+                        "on-surface-variant": "#c7c4d7",
+                        "on-primary": "#1000a9",
+                        "on-surface": "#dae2fd",
+                        "surface-variant": "#2d3449",
+                        "on-error-container": "#ffdad6",
+                        "error-container": "#93000a",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#0b1326",
+                        "on-primary-fixed": "#07006c",
+                        "inverse-primary": "#494bd6",
+                        "secondary": "#4fdbc8",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "on-secondary": "#003731",
+                        "secondary-container": "#04b4a2",
+                        "tertiary": "#ffb95f",
+                        "surface-container-low": "#131b2e",
+                        "surface-container-highest": "#2d3449",
+                        "on-tertiary-fixed": "#2a1700",
+                        "secondary-fixed-dim": "#4fdbc8",
+                        "inverse-surface": "#dae2fd",
+                        "background": "#0b1326",
+                        "surface-container": "#171f33",
+                        "outline": "#908fa0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-desktop": "64px",
+                        "xs": "4px",
+                        "margin-mobile": "20px",
+                        "unit": "4px",
+                        "sm": "8px",
+                        "gutter": "16px",
+                        "md": "16px",
+                        "xl": "40px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "label-mono": ["Geist"],
+                        "headline-lg-mobile": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-mono": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="flex min-h-screen text-on-surface bg-background">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full w-[280px] border-r border-white/10 bg-surface-container-low/60 backdrop-blur-[40px] flex flex-col py-xl px-lg z-50">
+<div class="mb-xl">
+<div class="flex items-center gap-md mb-md">
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30">
+<img alt="Station Identity Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBb1Kl-c-CMy9GQGBhP-Vj7JcsuJ_qBpwH7EARjoaGEnuOopUPVAwyQXVweJ2qqyNsWgwkz_A7B9O4Lzs6JelskfWNPhKp1odol8uH1hA6CmO8AGmX6ft3F-jEnhGX9nMOkHVjGF10ewCCov5CMN_5HrFD1R3raJdJqeqQDUGC6GF19u-zVYU4t0AxAqDwDH-pAiHtR8K1ryFAMjYTj8kIUHwflTIvZqELLO-xDVvkn4DMDv2ggRQ5LUlYFvGwKUGd1n4HBwATAKYo"/>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-bold tracking-tight text-primary">CrossBeam</h1>
+<p class="font-label-mono text-label-mono text-on-surface-variant">CB-7742</p>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary-container py-3 rounded-xl font-body-md font-bold focus-ring flex items-center justify-center gap-2 transition-all">
+<span class="material-symbols-outlined">send</span>
+                Send Files
+            </button>
+</div>
+<nav class="flex-grow flex flex-col gap-sm">
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-on-surface px-4 py-3 transition-colors rounded-xl focus-ring" href="#">
+<span class="material-symbols-outlined" data-icon="radar">radar</span>
+<span class="font-body-md">Discovery</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-on-surface px-4 py-3 transition-colors rounded-xl focus-ring" href="#">
+<span class="material-symbols-outlined" data-icon="swap_horizontal_circle">swap_horizontal_circle</span>
+<span class="font-body-md">Active Transfers</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-on-surface px-4 py-3 transition-colors rounded-xl focus-ring" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span class="font-body-md">File Library</span>
+</a>
+<a class="flex items-center gap-4 bg-primary-container text-on-primary-container rounded-xl px-4 py-3 ring-2 ring-primary/50 shadow-[0_0_15px_rgba(192,193,255,0.3)] focus-ring" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-body-md">Sharing Analytics</span>
+</a>
+</nav>
+<footer class="mt-auto pt-lg border-t border-white/5 flex flex-col gap-sm">
+<p class="font-label-mono text-label-mono text-on-surface-variant">v2.4.0 • Local Only • Encrypted</p>
+<div class="flex gap-md">
+<a class="font-label-mono text-label-mono text-on-surface-variant hover:text-primary transition-colors" href="#">Network Status</a>
+<a class="font-label-mono text-label-mono text-on-surface-variant hover:text-primary transition-colors" href="#">Help</a>
+</div>
+</footer>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[280px] w-full p-xl overflow-y-auto">
+<!-- Header -->
+<header class="flex justify-between items-end mb-xl">
+<div>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-xs">Sharing Analytics</h2>
+<p class="font-body-md text-on-surface-variant">Real-time localized data transmission performance</p>
+</div>
+<div class="flex gap-md">
+<div class="glass-card px-md py-sm rounded-xl flex items-center gap-sm">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-label-mono text-label-mono uppercase tracking-widest">Node Online</span>
+</div>
+</div>
+</header>
+<!-- Metrics Grid -->
+<section class="grid grid-cols-12 gap-lg mb-xl">
+<!-- Total Data -->
+<div class="col-span-4 glass-card p-lg rounded-2xl relative overflow-hidden group focus-ring transition-all cursor-default" tabindex="0">
+<div class="scanline"></div>
+<div class="flex justify-between items-start mb-md">
+<span class="material-symbols-outlined text-primary text-3xl">database</span>
+<span class="font-label-mono text-secondary text-label-mono">+12% vs last week</span>
+</div>
+<h3 class="font-label-mono text-label-mono text-on-surface-variant uppercase mb-xs">Total Data Transferred</h3>
+<div class="flex items-baseline gap-xs">
+<span class="font-display-lg text-display-lg text-on-surface">1.84</span>
+<span class="font-headline-lg text-headline-lg text-primary">TB</span>
+</div>
+</div>
+<!-- Total Files -->
+<div class="col-span-4 glass-card p-lg rounded-2xl group focus-ring transition-all cursor-default" tabindex="0">
+<div class="flex justify-between items-start mb-md">
+<span class="material-symbols-outlined text-primary text-3xl">file_copy</span>
+<span class="font-label-mono text-on-surface-variant text-label-mono">14,203 files total</span>
+</div>
+<h3 class="font-label-mono text-label-mono text-on-surface-variant uppercase mb-xs">Successful Exchanges</h3>
+<div class="flex items-baseline gap-xs">
+<span class="font-display-lg text-display-lg text-on-surface">12.8</span>
+<span class="font-headline-lg text-headline-lg text-primary">k</span>
+</div>
+</div>
+<!-- Success Rate -->
+<div class="col-span-4 glass-card p-lg rounded-2xl group focus-ring transition-all cursor-default" tabindex="0">
+<div class="flex justify-between items-start mb-md">
+<span class="material-symbols-outlined text-secondary text-3xl">verified</span>
+<div class="flex flex-col items-end">
+<span class="font-label-mono text-label-mono text-on-surface-variant">Loss Rate</span>
+<span class="font-label-mono text-label-mono text-error">0.02%</span>
+</div>
+</div>
+<h3 class="font-label-mono text-label-mono text-on-surface-variant uppercase mb-xs">Transmission Integrity</h3>
+<div class="flex items-baseline gap-xs">
+<span class="font-display-lg text-display-lg text-on-surface">99.98</span>
+<span class="font-headline-lg text-headline-lg text-primary">%</span>
+</div>
+</div>
+</section>
+<!-- Weekly Activity Visual -->
+<section class="grid grid-cols-12 gap-lg mb-xl">
+<div class="col-span-8 glass-card p-xl rounded-2xl relative">
+<div class="flex justify-between items-center mb-xl">
+<h3 class="font-headline-lg text-headline-lg">Weekly Activity</h3>
+<div class="flex gap-md font-label-mono text-label-mono">
+<div class="flex items-center gap-xs">
+<span class="w-3 h-3 rounded-full bg-primary"></span> Uploads
+                        </div>
+<div class="flex items-center gap-xs">
+<span class="w-3 h-3 rounded-full bg-secondary"></span> Downloads
+                        </div>
+</div>
+</div>
+<!-- Chart Mockup -->
+<div class="h-64 w-full flex items-end gap-md relative">
+<!-- Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none border-b border-white/10">
+<div class="w-full border-t border-white/5"></div>
+<div class="w-full border-t border-white/5"></div>
+<div class="w-full border-t border-white/5"></div>
+</div>
+<!-- Bars -->
+<div class="flex-1 flex flex-col items-center gap-sm h-full justify-end">
+<div class="w-full bg-primary/20 rounded-t-lg relative group overflow-hidden" style="height: 40%;">
+<div class="absolute bottom-0 w-full bg-primary h-full chart-pulse"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant">MON</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-sm h-full justify-end">
+<div class="w-full bg-primary/20 rounded-t-lg relative overflow-hidden" style="height: 65%;">
+<div class="absolute bottom-0 w-full bg-primary h-full opacity-80"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant">TUE</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-sm h-full justify-end">
+<div class="w-full bg-primary/20 rounded-t-lg relative overflow-hidden" style="height: 85%;">
+<div class="absolute bottom-0 w-full bg-primary h-full opacity-90"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant">WED</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-sm h-full justify-end">
+<div class="w-full bg-primary/20 rounded-t-lg relative overflow-hidden" style="height: 55%;">
+<div class="absolute bottom-0 w-full bg-primary h-full opacity-70"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant">THU</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-sm h-full justify-end">
+<div class="w-full bg-primary/20 rounded-t-lg relative overflow-hidden" style="height: 95%;">
+<div class="absolute bottom-0 w-full bg-primary h-full beam-glow"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant">FRI</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-sm h-full justify-end">
+<div class="w-full bg-primary/20 rounded-t-lg relative overflow-hidden" style="height: 30%;">
+<div class="absolute bottom-0 w-full bg-primary h-full opacity-60"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant">SAT</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-sm h-full justify-end">
+<div class="w-full bg-primary/20 rounded-t-lg relative overflow-hidden" style="height: 20%;">
+<div class="absolute bottom-0 w-full bg-primary h-full opacity-50"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant">SUN</span>
+</div>
+</div>
+</div>
+<!-- Activity Pulse -->
+<div class="col-span-4 glass-card p-xl rounded-2xl">
+<h3 class="font-headline-lg text-headline-lg mb-lg">Activity Pulse</h3>
+<div class="flex flex-col gap-md">
+<!-- Connection Item 1 -->
+<div class="flex items-center gap-md p-md rounded-xl hover:bg-white/5 transition-all focus-ring group" tabindex="0">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-secondary" data-icon="laptop_mac">laptop_mac</span>
+</div>
+<div class="flex-grow">
+<h4 class="font-body-md font-bold text-on-surface">MacBook Pro 16</h4>
+<p class="font-label-mono text-label-mono text-on-surface-variant">Peer Node: MB-990</p>
+</div>
+<div class="text-right">
+<span class="font-label-mono text-label-mono text-secondary">42.5 GB</span>
+<div class="flex items-center justify-end gap-xs text-[10px] text-on-surface-variant uppercase">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">arrow_downward</span>
+                                Recv
+                            </div>
+</div>
+</div>
+<!-- Connection Item 2 -->
+<div class="flex items-center gap-md p-md rounded-xl hover:bg-white/5 transition-all focus-ring group" tabindex="0">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-primary" data-icon="smartphone">smartphone</span>
+</div>
+<div class="flex-grow">
+<h4 class="font-body-md font-bold text-on-surface">Pixel 8 Pro</h4>
+<p class="font-label-mono text-label-mono text-on-surface-variant">Peer Node: PX-221</p>
+</div>
+<div class="text-right">
+<span class="font-label-mono text-label-mono text-primary">1.2 GB</span>
+<div class="flex items-center justify-end gap-xs text-[10px] text-on-surface-variant uppercase">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">arrow_upward</span>
+                                Sent
+                            </div>
+</div>
+</div>
+<!-- Connection Item 3 -->
+<div class="flex items-center gap-md p-md rounded-xl hover:bg-white/5 transition-all focus-ring group" tabindex="0">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-secondary" data-icon="tablet">tablet</span>
+</div>
+<div class="flex-grow">
+<h4 class="font-body-md font-bold text-on-surface">iPad Air M2</h4>
+<p class="font-label-mono text-label-mono text-on-surface-variant">Peer Node: IP-445</p>
+</div>
+<div class="text-right">
+<span class="font-label-mono text-label-mono text-secondary">8.8 GB</span>
+<div class="flex items-center justify-end gap-xs text-[10px] text-on-surface-variant uppercase">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">arrow_downward</span>
+                                Recv
+                            </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Secondary Insights (Asymmetric Row) -->
+<section class="grid grid-cols-12 gap-lg pb-xl">
+<div class="col-span-12 glass-card p-xl rounded-2xl flex items-center justify-between overflow-hidden">
+<div class="z-10">
+<h3 class="font-headline-lg text-headline-lg mb-sm">Network Efficiency Report</h3>
+<p class="font-body-md text-on-surface-variant max-w-xl">Your node is performing 45% better than the local average. Optimal throughput reached at 19:00 GMT+1.</p>
+<button class="mt-lg px-lg py-sm border border-primary/30 text-primary rounded-xl font-label-mono text-label-mono uppercase hover:bg-primary/10 transition-all focus-ring">Download Protocol Log</button>
+</div>
+<div class="absolute right-0 top-0 h-full w-1/3 opacity-20 pointer-events-none">
+<img alt="Network Flow Visual" class="w-full h-full object-cover" data-alt="An abstract generative technical digital art piece representing data flow through a network. Deep obsidian background with intricate, glowing line patterns in neon blue and violet. The aesthetic is clean, minimalist, and high-fidelity, suggesting high-speed fiber optic data transmission through a futuristic server environment. Dramatic lighting with focused glows at intersection points." src="https://lh3.googleusercontent.com/aida-public/AB6AXuByKOM_ra1XdrTg4fm3K2_F0nyITQ8ObQsQ9RXm7nJOWpjPrAtmvsDrZIHmYN8Wi3rT-BMlPg3IdafqF6FeDkoBPA4cDPrWNnWfYre9jNE1ZITCxqqV429ylQI-MZHrBq5B5LgNDCVjYtQwcEsyoxKfFepKG2HIS8F_ywkZesqahtf57IdAladCYL4icZCug5jc5v3joZy883yJVDLrGfaJ5sl7EHklss6yexluyzkp3b0g3ApPolFeiakPsFOsLp-nx59PtQthKig"/>
+</div>
+</div>
+</section>
+</main>
+<script>
+        // TV Navigation logic for Remote (Arrow Keys + Enter)
+        document.addEventListener('keydown', (e) => {
+            const focusables = Array.from(document.querySelectorAll('[tabindex="0"], button, a'));
+            const current = document.activeElement;
+            const index = focusables.indexOf(current);
+
+            if (e.key === 'ArrowDown') {
+                const next = focusables[index + 1] || focusables[0];
+                next.focus();
+                e.preventDefault();
+            } else if (e.key === 'ArrowUp') {
+                const next = focusables[index - 1] || focusables[focusables.length - 1];
+                next.focus();
+                e.preventDefault();
+            }
+        });
+
+        // Initial focus for TV
+        window.addEventListener('DOMContentLoaded', () => {
+            const firstNav = document.querySelector('nav a:nth-child(4)');
+            if(firstNav) firstNav.focus();
+        });
+    </script>
+</body></html>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as DocumentPicker from "expo-document-picker";
 
 import { nativeCrossBeam } from "@/native/crossbeamNative";
-import { SelectedFile, TransferJob, TransferHistory } from "@/types/domain";
+import { SelectedFile, TransferJob } from "@/types/domain";
 import { saveTransferHistory } from "@/store/database";
 import { usePermissions } from "./usePermissions";
 

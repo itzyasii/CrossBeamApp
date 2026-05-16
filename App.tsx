@@ -23,6 +23,7 @@ import { DiscoverScreen } from '@/screens/DiscoverScreen';
 import { TransferScreen } from '@/screens/TransferScreen';
 import { AnalyticsScreen } from '@/screens/AnalyticsScreen';
 import { DevicesScreen } from '@/screens/DevicesScreen';
+import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useDeviceDiscovery } from '@/hooks/useDeviceDiscovery';
 import { useTheme } from '@/hooks/useTheme';
 import { useTransferManager } from '@/hooks/useTransferManager';
@@ -34,7 +35,8 @@ import {
   Zap, 
   Clock, 
   BarChart2, 
-  Smartphone 
+  Smartphone,
+  Settings
 } from 'lucide-react-native';
 import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 
@@ -42,7 +44,7 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const DRAWER_W = 280;
 const TAB_BAR_H = 72;
 
-type Tab = 'home' | 'discover' | 'transfer' | 'history' | 'analytics' | 'devices';
+type Tab = 'home' | 'discover' | 'transfer' | 'history' | 'analytics' | 'devices' | 'settings';
 
 const TABS: { id: Tab; icon: any; label: string }[] = [
   { id: 'home',      icon: Home,       label: 'Home' },
@@ -51,6 +53,7 @@ const TABS: { id: Tab; icon: any; label: string }[] = [
   { id: 'history',   icon: Clock,      label: 'History' },
   { id: 'analytics', icon: BarChart2,  label: 'Analytics' },
   { id: 'devices',   icon: Smartphone, label: 'Devices' },
+  { id: 'settings',  icon: Settings,   label: 'Settings' },
 ];
 
 // ─── Bottom Tab Item ──────────────────────────────────────────────────────────
@@ -251,6 +254,7 @@ export default function App() {
     refreshDevices: () => void refreshDevices(),
     transfers, selectedFiles, transferError,
     pickFiles, clearSelectedFiles, startTransfer, togglePause, cancelTransfer, targetDevice,
+    goToTab: (id: Tab) => goToTab(TABS.findIndex(t => t.id === id)),
   };
 
   // Heights for layout
@@ -366,7 +370,7 @@ export default function App() {
 function renderScreen(tab: Tab, p: any, _contentPB: number) {
   switch (tab) {
     case 'home':
-      return <HomeScreen deviceCount={p.devices.length} transferCount={p.transfers.length} discoveryStatus={p.statusMessage} />;
+      return <HomeScreen deviceCount={p.devices.length} transferCount={p.transfers.length} discoveryStatus={p.statusMessage} onStartDiscovery={p.refreshDevices} />;
     case 'discover':
       return <DiscoverScreen devices={p.devices} onRefresh={p.refreshDevices} isRefreshing={p.isRefreshing} statusMessage={p.statusMessage} />;
     case 'transfer':
@@ -384,7 +388,8 @@ function renderScreen(tab: Tab, p: any, _contentPB: number) {
       );
     case 'history':   return <HistoryScreen transfers={p.transfers as any} />;
     case 'analytics': return <AnalyticsScreen />;
-    case 'devices':   return <DevicesScreen />;
+    case 'devices':   return <DevicesScreen onPairDevice={() => p.goToTab('discover')} />;
+    case 'settings':  return <SettingsScreen />;
   }
 }
 

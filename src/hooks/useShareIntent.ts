@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ShareIntent, useShareIntent as useExpoShareIntent } from 'expo-share-intent';
+import { useShareIntent as useExpoShareIntent } from 'expo-share-intent';
 
 export const useShareIntent = () => {
-  const { hasShareIntent, shareIntent, resetShareIntent, error } = useExpoShareIntent();
+  const { hasShareIntent, shareIntent, resetShareIntent } = useExpoShareIntent();
   const [sharedFiles, setSharedFiles] = useState<{ id: string; name: string; sizeBytes: number; uri: string; mimeType?: string }[]>([]);
 
   useEffect(() => {

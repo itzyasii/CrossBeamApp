@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Geist:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed-dim": "#c0c1ff",
+                    "on-error": "#690005",
+                    "secondary-container": "#04b4a2",
+                    "error-container": "#93000a",
+                    "on-secondary-fixed-variant": "#005048",
+                    "on-tertiary": "#472a00",
+                    "surface-container-lowest": "#060e20",
+                    "on-secondary": "#003731",
+                    "secondary-fixed": "#71f8e4",
+                    "surface-container-low": "#131b2e",
+                    "background": "#0b1326",
+                    "tertiary-container": "#ca8100",
+                    "tertiary-fixed": "#ffddb8",
+                    "secondary": "#4fdbc8",
+                    "on-tertiary-fixed": "#2a1700",
+                    "primary": "#c0c1ff",
+                    "primary-fixed": "#e1e0ff",
+                    "on-surface-variant": "#c7c4d7",
+                    "surface-bright": "#31394d",
+                    "surface": "#0b1326",
+                    "surface-tint": "#c0c1ff",
+                    "outline": "#908fa0",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "error": "#ffb4ab",
+                    "inverse-surface": "#dae2fd",
+                    "tertiary": "#ffb95f",
+                    "on-error-container": "#ffdad6",
+                    "primary-container": "#8083ff",
+                    "surface-container-highest": "#2d3449",
+                    "inverse-primary": "#494bd6",
+                    "surface-variant": "#2d3449",
+                    "on-primary-container": "#0d0096",
+                    "inverse-on-surface": "#283044",
+                    "on-secondary-container": "#003f38",
+                    "on-background": "#dae2fd",
+                    "on-tertiary-container": "#3e2400",
+                    "on-surface": "#dae2fd",
+                    "secondary-fixed-dim": "#4fdbc8",
+                    "on-primary-fixed": "#07006c",
+                    "on-primary-fixed-variant": "#2f2ebe",
+                    "on-primary": "#1000a9",
+                    "surface-dim": "#0b1326",
+                    "on-secondary-fixed": "#00201c",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "outline-variant": "#464554",
+                    "surface-container": "#171f33",
+                    "surface-container-high": "#222a3d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "2xl": "1rem",
+                    "3xl": "1.5rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-mobile": "20px",
+                    "xs": "4px",
+                    "unit": "4px",
+                    "sm": "8px",
+                    "lg": "24px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "xl": "40px",
+                    "margin-desktop": "64px"
+            },
+            "fontFamily": {
+                    "display-lg": ["Hanken Grotesk"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "label-mono": ["Geist"],
+                    "body-md": ["Hanken Grotesk"],
+                    "headline-lg-mobile": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-mono": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-card {
+            backdrop-filter: blur(24px);
+            background: rgba(23, 31, 51, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .beam-focus:focus-within, .beam-focus:focus {
+            outline: none;
+            border-color: rgba(192, 193, 255, 0.8);
+            box-shadow: 0 0 50px rgba(192, 193, 255, 0.5), inset 0 0 20px rgba(192, 193, 255, 0.1);
+            transform: scale(1.03);
+            z-index: 10;
+        }
+        .nav-focus:focus {
+            outline: none;
+            background: rgba(192, 193, 255, 0.15);
+            border-color: rgba(192, 193, 255, 0.8);
+            box-shadow: 0 0 30px rgba(192, 193, 255, 0.3);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        @keyframes pulse-beam {
+            0% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+            100% { opacity: 0.4; transform: scale(1); }
+        }
+        .pulse-effect {
+            animation: pulse-beam 3s infinite ease-in-out;
+        }
+        body {
+            cursor: none; /* Emulate TV environment where mouse is absent */
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-primary/30">
+<!-- Navigation Drawer (TV Sidebar) -->
+<aside class="fixed left-0 top-0 h-full w-[280px] bg-surface-container-low/95 backdrop-blur-3xl border-r border-white/15 hidden lg:flex flex-col py-xl gap-sm z-50 shadow-2xl">
+<div class="font-display-lg text-primary mb-lg px-md flex items-center gap-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">sensors</span>
+            CrossBeam
+        </div>
+<nav class="flex flex-col gap-sm px-sm">
+<button class="nav-focus flex items-center gap-md px-md py-lg rounded-2xl text-primary bg-primary/10 border border-primary/30 font-bold shadow-[0_0_20px_rgba(192,193,255,0.15)] transition-all duration-300">
+<span class="material-symbols-outlined">radar</span>
+<span class="font-body-md text-body-md text-[18px]">Discovery</span>
+</button>
+<button class="nav-focus flex items-center gap-md px-md py-lg rounded-2xl text-on-surface-variant hover:bg-white/10 border border-transparent transition-all duration-300">
+<span class="material-symbols-outlined">swap_horiz</span>
+<span class="font-body-md text-body-md text-[18px]">Active Transfers</span>
+</button>
+<button class="nav-focus flex items-center gap-md px-md py-lg rounded-2xl text-on-surface-variant hover:bg-white/10 border border-transparent transition-all duration-300">
+<span class="material-symbols-outlined">folder_open</span>
+<span class="font-body-md text-body-md text-[18px]">File Library</span>
+</button>
+<button class="nav-focus flex items-center gap-md px-md py-lg rounded-2xl text-on-surface-variant hover:bg-white/10 border border-transparent transition-all duration-300">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md text-[18px]">System Settings</span>
+</button>
+</nav>
+<div class="mt-auto px-md pb-lg">
+<div class="glass-card p-md rounded-2xl flex items-center gap-sm opacity-80 hover:opacity-100 transition-opacity">
+<div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[28px]">tv</span>
+</div>
+<div>
+<div class="text-[14px] font-label-mono opacity-60 tracking-wider">STATION ID</div>
+<div class="text-[18px] font-bold text-primary">LR-TV-01</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="lg:ml-[280px] min-h-screen p-margin-desktop flex flex-col gap-xl relative overflow-hidden">
+<!-- Subtle Ambient Glows -->
+<div class="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[140px] pointer-events-none"></div>
+<div class="absolute bottom-[-5%] left-[10%] w-[500px] h-[500px] bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
+<!-- Header Info -->
+<header class="flex justify-between items-end relative z-10">
+<div>
+<h1 class="font-display-lg text-display-lg text-primary-fixed-dim drop-shadow-lg">Discovery Mode</h1>
+<p class="text-on-surface-variant font-body-md text-[20px] mt-sm">This TV: <span class="text-on-surface font-bold text-white">Living Room TV</span> <span class="mx-md text-outline/50">|</span> <span class="font-label-mono text-[16px] text-white/80">192.168.1.15</span></p>
+</div>
+<div class="flex items-center gap-lg">
+<div class="text-right">
+<div class="text-[14px] font-label-mono text-on-surface-variant tracking-widest">SIGNAL STRENGTH</div>
+<div class="flex gap-sm mt-sm justify-end">
+<div class="w-2 h-5 bg-primary rounded-full shadow-[0_0_10px_rgba(192,193,255,0.5)]"></div>
+<div class="w-2 h-5 bg-primary rounded-full shadow-[0_0_10px_rgba(192,193,255,0.5)]"></div>
+<div class="w-2 h-5 bg-primary rounded-full shadow-[0_0_10px_rgba(192,193,255,0.5)]"></div>
+<div class="w-2 h-5 bg-white/20 rounded-full"></div>
+</div>
+</div>
+</div>
+</header>
+<!-- Focus Area: Receive Mode -->
+<section class="grid grid-cols-12 gap-[40px] relative z-10">
+<div class="col-span-8">
+<button class="beam-focus w-full text-left glass-card p-xl rounded-[40px] flex flex-col gap-xl transition-all duration-300 relative group overflow-hidden border-2 border-white/10">
+<!-- Scanning Animation Layer -->
+<div class="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/10 to-primary/0 -translate-x-full group-focus:animate-[shimmer_3s_infinite] pointer-events-none"></div>
+<div class="flex justify-between items-start">
+<div class="bg-primary/20 p-lg rounded-3xl shadow-inner">
+<span class="material-symbols-outlined text-[64px] text-primary pulse-effect drop-shadow-[0_0_15px_rgba(192,193,255,0.8)]" style="font-variation-settings: 'FILL' 1;">radar</span>
+</div>
+<span class="px-lg py-md bg-primary text-on-primary rounded-full font-label-mono text-[16px] font-bold tracking-wider shadow-[0_0_20px_rgba(192,193,255,0.4)]">ACTIVE</span>
+</div>
+<div class="flex flex-col gap-md">
+<h2 class="font-display-lg text-[40px] text-white">Receive Mode</h2>
+<p class="text-on-surface-variant text-[20px] leading-relaxed max-w-2xl">Currently visible to all devices on the "Home_Network_5G". Accepting high-speed local transmissions.</p>
+</div>
+<div class="mt-lg pt-xl border-t border-white/15 flex items-center justify-between">
+<div class="flex items-center gap-lg">
+<div class="w-4 h-4 bg-primary rounded-full pulse-effect shadow-[0_0_15px_#c0c1ff]"></div>
+<span class="font-label-mono text-[16px] text-primary/90 tracking-widest uppercase">Awaiting incoming files...</span>
+</div>
+<div class="flex gap-lg">
+<span class="material-symbols-outlined text-outline text-[32px]">wifi</span>
+<span class="material-symbols-outlined text-outline text-[32px]">lan</span>
+</div>
+</div>
+</button>
+</div>
+<!-- Recent Activity / Info -->
+<div class="col-span-4 flex flex-col gap-[24px]">
+<div class="glass-card p-lg rounded-[32px] flex flex-col gap-md border border-white/15">
+<h3 class="text-[14px] font-label-mono text-outline uppercase tracking-widest">Last Received</h3>
+<div class="flex items-center gap-lg mt-sm">
+<div class="w-16 h-16 bg-surface-container-highest rounded-2xl flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary text-[32px]">smartphone</span>
+</div>
+<div>
+<div class="font-bold text-[20px] text-white">Pixel 8 Pro</div>
+<div class="text-[14px] font-label-mono text-on-surface-variant mt-xs">2 mins ago • 4 files</div>
+</div>
+</div>
+</div>
+<div class="glass-card p-lg rounded-[32px] flex-grow relative overflow-hidden group border border-white/15">
+<img class="absolute inset-0 w-full h-full object-cover opacity-30 grayscale group-focus:grayscale-0 transition-all duration-500" data-alt="A macro photograph of high-tech circuit boards and glowing fiber optic cables illuminated with a deep neon purple and teal light. The aesthetic is futuristic and precise, mirroring a technical hardware environment. The lighting is moody and atmospheric, focusing on the intricate details of digital transmission components in a dark obsidian setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDxDptq3Ur3lLSRIiy8yHme-SW44juHvdvYjvjmYDrn9rPYFzaHXOI6Wxlw3iEl3dHOQEo6OQ-UDDqm6umUXNFAX_nPGl9o4pAZOGSBVpqR4UIOBdPL4bDDiA937e8FzO3-HG3EsUEw4_egfWyFX4NVL6c25I7ELwRlTBYAl1oF8J2GH_OBJt2QHIo2Dev729QmmssbdgqKFUL50PajyTSv5p_8NdWjuNbjdLYMi0EXaj0yY4CT8_m8-7I_aXweGyeZmaYi9uXoBk"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent"></div>
+<div class="relative z-10 h-full flex flex-col justify-end">
+<h3 class="text-[14px] font-label-mono text-white/80 uppercase tracking-widest mb-md">Storage Status</h3>
+<div class="mt-auto">
+<div class="flex justify-between mb-sm font-label-mono text-[14px]">
+<span class="text-white/90 font-bold">INTERNAL STORAGE</span>
+<span class="text-primary font-bold">72% FULL</span>
+</div>
+<div class="w-full h-2.5 bg-white/20 rounded-full overflow-hidden backdrop-blur-md">
+<div class="h-full bg-primary w-[72%] shadow-[0_0_15px_#c0c1ff]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Suggested/Other Actions -->
+<section class="mt-lg relative z-10">
+<h3 class="text-[16px] font-label-mono text-outline uppercase tracking-widest mb-xl px-xs">Nearby Nodes</h3>
+<div class="grid grid-cols-4 gap-[24px]">
+<!-- Node 1 -->
+<button class="nav-focus glass-card p-xl rounded-[24px] text-left transition-all duration-300 flex flex-col items-start gap-lg border border-white/10 hover:border-white/20">
+<div class="w-14 h-14 rounded-2xl bg-surface-container-highest border border-white/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[28px]">laptop</span>
+</div>
+<div>
+<div class="font-bold text-[20px] text-white">MacBook Pro</div>
+<div class="text-[14px] font-label-mono text-secondary mt-xs tracking-wider">READY</div>
+</div>
+</button>
+<!-- Node 2 -->
+<button class="nav-focus glass-card p-xl rounded-[24px] text-left transition-all duration-300 flex flex-col items-start gap-lg border border-white/10 hover:border-white/20">
+<div class="w-14 h-14 rounded-2xl bg-surface-container-highest border border-white/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[28px]">tablet</span>
+</div>
+<div>
+<div class="font-bold text-[20px] text-white">iPad Air</div>
+<div class="text-[14px] font-label-mono text-secondary mt-xs tracking-wider">READY</div>
+</div>
+</button>
+<!-- Node 3 -->
+<button class="nav-focus glass-card p-xl rounded-[24px] text-left transition-all duration-300 flex flex-col items-start gap-lg border border-white/10 hover:border-white/20">
+<div class="w-14 h-14 rounded-2xl bg-surface-container-highest border border-white/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-outline text-[28px]">desktop_windows</span>
+</div>
+<div>
+<div class="font-bold text-[20px] text-white/60">Workstation</div>
+<div class="text-[14px] font-label-mono text-error mt-xs tracking-wider">BUSY</div>
+</div>
+</button>
+<!-- Node 4 -->
+<button class="nav-focus glass-card p-xl rounded-[24px] text-left transition-all duration-300 flex flex-col items-start gap-lg border-2 border-dashed border-white/20 bg-transparent hover:bg-white/5">
+<div class="w-14 h-14 rounded-2xl border-2 border-white/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-outline text-[28px]">add</span>
+</div>
+<div>
+<div class="font-bold text-[20px] text-outline">Pair New</div>
+<div class="text-[14px] font-label-mono text-outline/50 mt-xs tracking-wider">SCAN QR</div>
+</div>
+</button>
+</div>
+</section>
+</main>
+<!-- TV Navigation Hint -->
+<footer class="fixed bottom-lg right-xl flex gap-xl items-center pointer-events-none z-50 bg-background/80 backdrop-blur-md px-lg py-sm rounded-full border border-white/10 shadow-2xl">
+<div class="flex items-center gap-md">
+<span class="w-8 h-8 rounded-full bg-white text-background flex items-center justify-center text-[12px] font-bold shadow-lg">OK</span>
+<span class="text-[16px] font-bold text-white/90 tracking-wide">Select</span>
+</div>
+<div class="flex items-center gap-md">
+<span class="w-8 h-8 rounded-full bg-surface-container-highest text-white border border-white/20 flex items-center justify-center text-[10px] font-bold">BACK</span>
+<span class="text-[16px] font-bold text-white/70 tracking-wide">Exit</span>
+</div>
+</footer>
+<script>
+        // Simple D-pad emulation for demonstration
+        document.addEventListener('keydown', (e) => {
+            const focusable = Array.from(document.querySelectorAll('button, [tabindex="0"]'));
+            const current = document.activeElement;
+            let index = focusable.indexOf(current);
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                index = (index + 1) % focusable.length;
+                focusable[index].focus();
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                index = (index - 1 + focusable.length) % focusable.length;
+                focusable[index].focus();
+            }
+        });
+
+        // Initialize focus on the main card
+        window.addEventListener('DOMContentLoaded', () => {
+            const mainCard = document.querySelector('.beam-focus');
+            if (mainCard) mainCard.focus();
+        });
+    </script>
+</body></html>

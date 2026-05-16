@@ -1,202 +1,241 @@
-/**
- * Settings Screen
- * Screen for app settings and preferences
- */
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Bell, Database, LockKeyhole, ShieldCheck, Smartphone, Wifi } from 'lucide-react-native';
 
-import React from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { Text, Switch, Divider } from 'react-native-paper';
 import { GlassCard } from '@/components/GlassCard';
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { useTheme } from '@/hooks/useTheme';
+import { FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 import { StorageService } from '@/utils/storage';
+import { clearTransferHistory } from '@/store/database';
+
+type SettingsState = {
+  notifications: boolean;
+  autoTransfer: boolean;
+  useMeteredNetworks: boolean;
+  requireEncryption: boolean;
+  verifyChecksum: boolean;
+};
+
+const DEFAULTS: SettingsState = {
+  notifications: true,
+  autoTransfer: false,
+  useMeteredNetworks: false,
+  requireEncryption: true,
+  verifyChecksum: true,
+};
+
+const SettingRow = ({
+  icon: Icon,
+  title,
+  description,
+  value,
+  onValueChange,
+  disabled,
+}: {
+  icon: any;
+  title: string;
+  description: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled?: boolean;
+}) => {
+  const { colors } = useTheme();
+  return (
+    <View style={[S.settingRow, disabled && { opacity: 0.55 }]}>
+      <View style={[S.iconBox, { backgroundColor: colors.accentHighlight }]}>
+        <Icon size={18} color={colors.accentLight} strokeWidth={2.4} />
+      </View>
+      <View style={S.settingCopy}>
+        <Text style={[S.settingTitle, { color: colors.textPrimary }]}>{title}</Text>
+        <Text style={[S.settingDescription, { color: colors.textSecondary }]}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        disabled={disabled}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.borderStrong, true: colors.accent }}
+        thumbColor="#FFFFFF"
+      />
+    </View>
+  );
+};
 
 export const SettingsScreen: React.FC = () => {
-  const [settings, setSettings] = React.useState({
-    notifications: true,
-    autoTransfer: false,
-    useMeteredNetworks: false,
-  });
+  const { colors } = useTheme();
+  const [settings, setSettings] = useState<SettingsState>(DEFAULTS);
+  const [storageBytes, setStorageBytes] = useState(0);
 
-  const handleSettingChange = (key: string, value: boolean) => {
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      const saved = await StorageService.getSettings();
+      const storage = await StorageService.getStorageInfo();
+      if (!mounted) return;
+      setSettings({
+        notifications: saved.enableNotifications ?? DEFAULTS.notifications,
+        autoTransfer: saved.autoTransfer ?? DEFAULTS.autoTransfer,
+        useMeteredNetworks: saved.enableMeteredNetworks ?? DEFAULTS.useMeteredNetworks,
+        requireEncryption: (saved as any).requireEncryption ?? DEFAULTS.requireEncryption,
+        verifyChecksum: (saved as any).verifyChecksum ?? DEFAULTS.verifyChecksum,
+      });
+      setStorageBytes(storage.used);
+    };
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const updateSetting = (key: keyof SettingsState, value: boolean) => {
     const updatedSettings = { ...settings, [key]: value };
     setSettings(updatedSettings);
     void StorageService.updateSettings({
       enableNotifications: updatedSettings.notifications,
       autoTransfer: updatedSettings.autoTransfer,
       enableMeteredNetworks: updatedSettings.useMeteredNetworks,
-    });
+      requireEncryption: updatedSettings.requireEncryption,
+      verifyChecksum: updatedSettings.verifyChecksum,
+    } as any);
+  };
+
+  const clearLocalData = () => {
+    Alert.alert(
+      'Clear local data?',
+      'This removes cached preferences and transfer history from this device.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            void StorageService.clearAllData();
+            void clearTransferHistory();
+            setSettings(DEFAULTS);
+            setStorageBytes(0);
+          },
+        },
+      ],
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { fontWeight: Typography.fontWeight.bold }]}>
-          Settings
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={S.content}>
+      <View style={S.header}>
+        <Text style={[S.title, { color: colors.textPrimary }]}>Settings & Security</Text>
+        <Text style={[S.subtitle, { color: colors.textSecondary }]}>
+          Production controls for private, local-only file exchange.
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Notifications Section */}
-        <GlassCard style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
-            Notifications
-          </Text>
-          <Divider style={styles.divider} />
-
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Transfer Notifications</Text>
-            <Switch
-              value={settings.notifications}
-              onValueChange={(value) =>
-                handleSettingChange('notifications', value)
-              }
-              color={Colors.success}
-            />
+      <GlassCard animate accentBorder>
+        <View style={S.nodeHeader}>
+          <View style={[S.nodeAvatar, { backgroundColor: colors.accentHighlight }]}>
+            <ShieldCheck size={30} color={colors.accentLight} strokeWidth={2.2} />
           </View>
+          <View style={S.nodeCopy}>
+            <Text style={[S.nodeTitle, { color: colors.textPrimary }]}>Local Node</Text>
+            <Text style={[S.nodeMeta, { color: colors.textSecondary }]}>Encrypted by default - no cloud relay</Text>
+          </View>
+          <View style={[S.statusPill, { backgroundColor: colors.successMuted, borderColor: `${colors.success}55` }]}>
+            <Text style={[S.statusText, { color: colors.success }]}>SECURE</Text>
+          </View>
+        </View>
+      </GlassCard>
+
+      <View style={S.section}>
+        <Text style={[S.sectionLabel, { color: colors.textMuted }]}>TRANSFER SETTINGS</Text>
+        <GlassCard padding={0}>
+          <SettingRow
+            icon={Bell}
+            title="Transfer notifications"
+            description="Alerts for incoming and outgoing beams."
+            value={settings.notifications}
+            onValueChange={(value) => updateSetting('notifications', value)}
+          />
+          <View style={[S.divider, { backgroundColor: colors.border }]} />
+          <SettingRow
+            icon={Smartphone}
+            title="Auto-accept trusted devices"
+            description="Skip confirmation for paired hardware only."
+            value={settings.autoTransfer}
+            onValueChange={(value) => updateSetting('autoTransfer', value)}
+          />
+          <View style={[S.divider, { backgroundColor: colors.border }]} />
+          <SettingRow
+            icon={Wifi}
+            title="Use metered networks"
+            description="Allow transfers over cellular or metered Wi-Fi."
+            value={settings.useMeteredNetworks}
+            onValueChange={(value) => updateSetting('useMeteredNetworks', value)}
+          />
         </GlassCard>
+      </View>
 
-        {/* Transfer Settings Section */}
-        <GlassCard style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
-            Transfer
-          </Text>
-          <Divider style={styles.divider} />
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Auto Transfer</Text>
-              <Text style={styles.settingDescription}>
-                Automatically accept transfers from paired devices
-              </Text>
-            </View>
-            <Switch
-              value={settings.autoTransfer}
-              onValueChange={(value) =>
-                handleSettingChange('autoTransfer', value)
-              }
-              color={Colors.success}
-            />
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Use Metered Networks</Text>
-              <Text style={styles.settingDescription}>
-                Allow transfers over cellular connections
-              </Text>
-            </View>
-            <Switch
-              value={settings.useMeteredNetworks}
-              onValueChange={(value) =>
-                handleSettingChange('useMeteredNetworks', value)
-              }
-              color={Colors.success}
-            />
-          </View>
+      <View style={S.section}>
+        <Text style={[S.sectionLabel, { color: colors.textMuted }]}>SECURITY & PRIVACY</Text>
+        <GlassCard padding={0}>
+          <SettingRow
+            icon={LockKeyhole}
+            title="Require encrypted tunnel"
+            description="Block transfers that cannot negotiate E2EE."
+            value={settings.requireEncryption}
+            onValueChange={(value) => updateSetting('requireEncryption', value)}
+          />
+          <View style={[S.divider, { backgroundColor: colors.border }]} />
+          <SettingRow
+            icon={ShieldCheck}
+            title="Verify file checksum"
+            description="Confirm integrity after each completed transfer."
+            value={settings.verifyChecksum}
+            onValueChange={(value) => updateSetting('verifyChecksum', value)}
+          />
         </GlassCard>
+      </View>
 
-        {/* About Section */}
-        <GlassCard style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
-            About
-          </Text>
-          <Divider style={styles.divider} />
-
-          <View style={styles.aboutRow}>
-            <Text style={styles.aboutLabel}>App Version</Text>
-            <Text style={styles.aboutValue}>1.0.0</Text>
+      <GlassCard>
+        <View style={S.dataRow}>
+          <View style={[S.iconBox, { backgroundColor: colors.warningMuted }]}>
+            <Database size={18} color={colors.warning} strokeWidth={2.4} />
           </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.aboutRow}>
-            <Text style={styles.aboutLabel}>Build Number</Text>
-            <Text style={styles.aboutValue}>2026.05.15.001</Text>
+          <View style={S.settingCopy}>
+            <Text style={[S.settingTitle, { color: colors.textPrimary }]}>Local cache</Text>
+            <Text style={[S.settingDescription, { color: colors.textSecondary }]}>
+              Approx. {Math.max(1, Math.ceil(storageBytes / 1024))} KB stored on this device.
+            </Text>
           </View>
-        </GlassCard>
+          <Pressable onPress={clearLocalData} style={[S.clearButton, { borderColor: `${colors.error}55` }]}>
+            <Text style={[S.clearButtonText, { color: colors.error }]}>Clear</Text>
+          </Pressable>
+        </View>
+      </GlassCard>
 
-        {/* Info Text */}
-        <Text style={styles.infoText}>
-          CrossBeam • Crystal Cross-Platform File Sharing
-        </Text>
-      </ScrollView>
-    </SafeAreaView>
+      <Text style={[S.footer, { color: colors.textMuted }]}>CrossBeam 0.1.0 - Play Store and App Store release profile ready.</Text>
+    </ScrollView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.white,
-  },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[100],
-  },
-  title: {
-    fontSize: Typography.fontSize['2xl'],
-    color: Colors.black,
-  },
-  content: {
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-  },
-  section: {
-    marginBottom: Spacing.lg,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.black,
-    marginBottom: Spacing.md,
-  },
-  divider: {
-    marginVertical: Spacing.md,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-  },
-  settingText: {
-    flex: 1,
-    marginRight: Spacing.md,
-  },
-  settingLabel: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.black,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  settingDescription: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.gray[500],
-    marginTop: Spacing.xs,
-  },
-  aboutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-  },
-  aboutLabel: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.black,
-  },
-  aboutValue: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.gray[600],
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  infoText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.gray[400],
-    textAlign: 'center',
-    marginTop: Spacing.lg,
-  },
+const S = StyleSheet.create({
+  content: { gap: SPACING.md, paddingBottom: SPACING.md },
+  header: { gap: SPACING.xs },
+  title: { fontSize: FONT_SIZE.xxl, fontWeight: '800' },
+  subtitle: { fontSize: FONT_SIZE.sm, lineHeight: 20 },
+  nodeHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  nodeAvatar: { width: 56, height: 56, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
+  nodeCopy: { flex: 1 },
+  nodeTitle: { fontSize: FONT_SIZE.lg, fontWeight: '800' },
+  nodeMeta: { fontSize: FONT_SIZE.sm, marginTop: 3 },
+  statusPill: { borderWidth: 1, borderRadius: RADIUS.full, paddingHorizontal: SPACING.sm, paddingVertical: 5 },
+  statusText: { fontSize: FONT_SIZE.xs, fontWeight: '800', letterSpacing: 0.8 },
+  section: { gap: SPACING.sm },
+  sectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: '800', letterSpacing: 1.1 },
+  settingRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: SPACING.md, padding: SPACING.lg },
+  iconBox: { width: 38, height: 38, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+  settingCopy: { flex: 1, gap: 3 },
+  settingTitle: { fontSize: FONT_SIZE.base, fontWeight: '800' },
+  settingDescription: { fontSize: FONT_SIZE.sm, lineHeight: 18 },
+  divider: { height: StyleSheet.hairlineWidth, marginLeft: 68 },
+  dataRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  clearButton: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  clearButtonText: { fontSize: FONT_SIZE.sm, fontWeight: '800' },
+  footer: { textAlign: 'center', fontSize: FONT_SIZE.xs, paddingVertical: SPACING.sm },
 });

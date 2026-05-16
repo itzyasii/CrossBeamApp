@@ -38,7 +38,13 @@ export function AnalyticsScreen() {
 
   const load = async () => {
     setRefreshing(true);
-    try { setData(await getAnalyticsData()); } catch {} finally { setRefreshing(false); }
+    try {
+      setData(await getAnalyticsData());
+    } catch (error) {
+      console.error('Failed to load analytics', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
   useEffect(() => { void load(); }, []);
 

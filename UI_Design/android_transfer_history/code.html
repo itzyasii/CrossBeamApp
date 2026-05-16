@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CrossBeam | History</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Geist:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            backdrop-filter: blur(20px);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .beam-pulse {
+            position: relative;
+            overflow: hidden;
+        }
+        .beam-pulse::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.1), transparent);
+            animation: beam-sweep 3s infinite linear;
+        }
+        @keyframes beam-sweep {
+            0% { left: -100%; }
+            100% { left: 200%; }
+        }
+        body {
+            background-color: #020617;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        body::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "on-primary-fixed-variant": "#2f2ebe",
+                "surface-dim": "#0b1326",
+                "on-tertiary-fixed-variant": "#653e00",
+                "on-secondary-fixed": "#00201c",
+                "on-primary": "#1000a9",
+                "on-tertiary-container": "#3e2400",
+                "secondary-fixed-dim": "#4fdbc8",
+                "on-surface": "#dae2fd",
+                "on-primary-fixed": "#07006c",
+                "outline-variant": "#464554",
+                "surface-container": "#171f33",
+                "surface-container-high": "#222a3d",
+                "tertiary": "#ffb95f",
+                "on-error-container": "#ffdad6",
+                "inverse-surface": "#dae2fd",
+                "surface-container-highest": "#2d3449",
+                "primary-container": "#8083ff",
+                "inverse-primary": "#494bd6",
+                "inverse-on-surface": "#283044",
+                "on-secondary-container": "#003f38",
+                "on-background": "#dae2fd",
+                "surface-variant": "#2d3449",
+                "on-primary-container": "#0d0096",
+                "surface-tint": "#c0c1ff",
+                "surface-bright": "#31394d",
+                "surface": "#0b1326",
+                "primary-fixed": "#e1e0ff",
+                "on-surface-variant": "#c7c4d7",
+                "outline": "#908fa0",
+                "tertiary-container": "#ca8100",
+                "tertiary-fixed": "#ffddb8",
+                "secondary": "#4fdbc8",
+                "primary": "#c0c1ff",
+                "on-tertiary-fixed": "#2a1700",
+                "error": "#ffb4ab",
+                "tertiary-fixed-dim": "#ffb95f",
+                "secondary-container": "#04b4a2",
+                "error-container": "#93000a",
+                "primary-fixed-dim": "#c0c1ff",
+                "on-error": "#690005",
+                "on-secondary": "#003731",
+                "secondary-fixed": "#71f8e4",
+                "surface-container-low": "#131b2e",
+                "background": "#0b1326",
+                "on-tertiary": "#472a00",
+                "on-secondary-fixed-variant": "#005048",
+                "surface-container-lowest": "#060e20"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+              },
+              "spacing": {
+                "lg": "24px",
+                "xl": "40px",
+                "margin-desktop": "64px",
+                "md": "16px",
+                "gutter": "16px",
+                "margin-mobile": "20px",
+                "xs": "4px",
+                "sm": "8px",
+                "unit": "4px"
+              },
+              "fontFamily": {
+                "display-lg": ["Hanken Grotesk"],
+                "headline-lg": ["Hanken Grotesk"],
+                "headline-lg-mobile": ["Hanken Grotesk"],
+                "label-mono": ["Geist"],
+                "body-md": ["Hanken Grotesk"]
+              },
+              "fontSize": {
+                "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "label-mono": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- Top App Bar -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-margin-mobile h-16 bg-surface/80 backdrop-blur-xl border-b border-white/10 shadow-[0_0_15px_rgba(192,193,255,0.1)]">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-primary" data-icon="sensors">sensors</span>
+<h1 class="font-display-lg text-headline-lg-mobile text-primary tracking-tight">CrossBeam</h1>
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-white/5 transition-colors p-sm rounded-full" data-icon="search">search</button>
+<div class="w-8 h-8 rounded-full bg-primary-container/30 border border-primary/20 flex items-center justify-center overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional 3D avatar of a young male professional with modern glasses and a clean-cut look, rendered in a high-fidelity digital art style with soft studio lighting. The color palette features obsidian dark neutrals and soft indigo accents, matching a premium tech software aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnb6tqTD9DqceUftUexkwfAGOhibfUIzC6g9EGXZ9_RqizqNZIm_QTsJBDHuJb3Lr1L070PDl5kYGGJ-u3qwm1bUpx5mHIW4YYybBmhCWL7827LOjq5blC9IONgKBbYSkYsn2ZcIKH8w5EMKR_fJ86oTtsBbZXrT7iaKrsB71uAymWE2mIrPow_nihfY3HTAfi10CRosU-LcKjKKuX-I1KtrmyyW9cj_7mDp-OjjEIaNJ86uQBw6sGAswKkjiDL4dGJIh2l0P570U"/>
+</div>
+</div>
+</header>
+<!-- Sidebar (Desktop Only) -->
+<aside class="hidden lg:flex fixed left-0 top-0 h-full w-[280px] bg-surface-container-low/90 backdrop-blur-3xl border-r border-white/10 flex-col py-xl gap-sm z-40">
+<div class="font-display-lg text-primary mb-lg px-md">CrossBeam</div>
+<nav class="flex flex-col px-md gap-xs">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-white/10 hover:text-on-surface transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="radar">radar</span>
+                Discovery
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-white/10 hover:text-on-surface transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="swap_horiz">swap_horiz</span>
+                Active Transfers
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg bg-primary/10 text-primary border-l-4 border-primary font-bold shadow-[0_0_15px_rgba(192,193,255,0.2)] font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+                File Library
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-white/10 hover:text-on-surface transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                System Settings
+            </a>
+</nav>
+</aside>
+<!-- Main Canvas -->
+<main class="pt-24 pb-32 px-margin-mobile lg:ml-[280px] lg:px-margin-desktop max-w-5xl mx-auto">
+<!-- Header Section -->
+<section class="mb-lg">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile lg:font-headline-lg lg:text-headline-lg text-on-surface mb-md">Transfer History</h2>
+<!-- Search & Filter Area -->
+<div class="flex flex-col gap-md">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors" data-icon="search">search</span>
+<input class="w-full bg-black/20 border border-white/10 rounded-xl py-md pl-[48px] pr-md font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all backdrop-blur-md" placeholder="Search files or devices..." type="text"/>
+</div>
+<div class="flex items-center gap-sm overflow-x-auto pb-xs scrollbar-hide">
+<button class="px-md py-xs rounded-full bg-primary text-on-primary font-label-mono text-label-mono shadow-lg">All</button>
+<button class="px-md py-xs rounded-full bg-white/5 border border-white/10 text-on-surface-variant hover:bg-white/10 transition-colors font-label-mono text-label-mono">Sent</button>
+<button class="px-md py-xs rounded-full bg-white/5 border border-white/10 text-on-surface-variant hover:bg-white/10 transition-colors font-label-mono text-label-mono">Received</button>
+<div class="ml-auto flex items-center gap-xs">
+<button class="material-symbols-outlined text-on-surface-variant p-xs" data-icon="filter_list">filter_list</button>
+</div>
+</div>
+</div>
+</section>
+<!-- History List: Bento-ish Layout -->
+<div class="grid grid-cols-1 gap-md">
+<!-- Entry 1: Completed Video -->
+<div class="glass-card rounded-2xl p-md flex items-center gap-md beam-pulse active:scale-[0.98] transition-transform">
+<div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30 text-primary">
+<span class="material-symbols-outlined" data-icon="video_library">video_library</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface truncate">vacation_video_2024.mp4</h3>
+<p class="font-label-mono text-label-mono text-on-surface-variant/70">Pixel 8 Pro • 12:45 PM</p>
+</div>
+<div class="text-right flex flex-col items-end gap-xs">
+<span class="font-label-mono text-label-mono text-on-surface">1.2 GB</span>
+<div class="flex items-center gap-xs text-secondary">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-mono text-label-mono">Completed</span>
+</div>
+</div>
+</div>
+<!-- Entry 2: Failed Invoice -->
+<div class="glass-card rounded-2xl p-md flex items-center gap-md active:scale-[0.98] transition-transform">
+<div class="w-12 h-12 rounded-xl bg-error/10 flex items-center justify-center border border-error/20 text-error">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface truncate">invoice_july_v2.pdf</h3>
+<p class="font-label-mono text-label-mono text-on-surface-variant/70">MacBook Pro • 10:20 AM</p>
+</div>
+<div class="text-right flex flex-col items-end gap-xs">
+<span class="font-label-mono text-label-mono text-on-surface">452 KB</span>
+<div class="flex items-center gap-xs text-error">
+<span class="material-symbols-outlined text-[16px]" data-icon="error" style="font-variation-settings: 'FILL' 1;">error</span>
+<span class="font-label-mono text-label-mono">Failed</span>
+</div>
+</div>
+</div>
+<!-- Entry 3: Cancelled Archive -->
+<div class="glass-card rounded-2xl p-md flex items-center gap-md active:scale-[0.98] transition-transform">
+<div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="archive">archive</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface truncate">project_assets_final.zip</h3>
+<p class="font-label-mono text-label-mono text-on-surface-variant/70">XPS 15 • Yesterday</p>
+</div>
+<div class="text-right flex flex-col items-end gap-xs">
+<span class="font-label-mono text-label-mono text-on-surface">4.8 GB</span>
+<div class="flex items-center gap-xs text-on-surface-variant/50">
+<span class="material-symbols-outlined text-[16px]" data-icon="cancel">cancel</span>
+<span class="font-label-mono text-label-mono">Cancelled</span>
+</div>
+</div>
+</div>
+<!-- Entry 4: Completed Images -->
+<div class="glass-card rounded-2xl p-md flex items-center gap-md active:scale-[0.98] transition-transform">
+<div class="w-12 h-12 rounded-xl bg-tertiary/10 flex items-center justify-center border border-tertiary/20 text-tertiary">
+<span class="material-symbols-outlined" data-icon="photo_library">photo_library</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface truncate">Design_System_Screens.zip</h3>
+<p class="font-label-mono text-label-mono text-on-surface-variant/70">iPhone 15 Pro • Aug 14</p>
+</div>
+<div class="text-right flex flex-col items-end gap-xs">
+<span class="font-label-mono text-label-mono text-on-surface">85 MB</span>
+<div class="flex items-center gap-xs text-secondary">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-mono text-label-mono">Completed</span>
+</div>
+</div>
+</div>
+<!-- Visual Separator for Date -->
+<div class="py-md flex items-center gap-md">
+<span class="font-label-mono text-label-mono text-primary/60 whitespace-nowrap uppercase tracking-widest">August 12, 2024</span>
+<div class="h-px w-full bg-white/10"></div>
+</div>
+<!-- Entry 5: Completed Music -->
+<div class="glass-card rounded-2xl p-md flex items-center gap-md active:scale-[0.98] transition-transform">
+<div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30 text-primary">
+<span class="material-symbols-outlined" data-icon="audio_file">audio_file</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-body-md text-body-md text-on-surface truncate">ambient_study_mix.flac</h3>
+<p class="font-label-mono text-label-mono text-on-surface-variant/70">MacBook Pro • Aug 12</p>
+</div>
+<div class="text-right flex flex-col items-end gap-xs">
+<span class="font-label-mono text-label-mono text-on-surface">112 MB</span>
+<div class="flex items-center gap-xs text-secondary">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-mono text-label-mono">Completed</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-surface-container/60 backdrop-blur-2xl border-t border-white/15 rounded-t-xl shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="radar">radar</span>
+<span class="font-label-mono text-label-mono">Discover</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="swap_horiz">swap_horiz</span>
+<span class="font-label-mono text-label-mono">Transfers</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container/20 text-primary rounded-xl px-4 py-1.5 shadow-[0_0_10px_rgba(192,193,255,0.3)] active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open" style="font-variation-settings: 'FILL' 1;">folder_open</span>
+<span class="font-label-mono text-label-mono">Files</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-mono text-label-mono">Settings</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for active filter chips
+        const chips = document.querySelectorAll('.flex.items-center.gap-sm button');
+        chips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                chips.forEach(c => {
+                    c.classList.remove('bg-primary', 'text-on-primary');
+                    c.classList.add('bg-white/5', 'border-white/10', 'text-on-surface-variant');
+                });
+                chip.classList.remove('bg-white/5', 'border-white/10', 'text-on-surface-variant');
+                chip.classList.add('bg-primary', 'text-on-primary');
+            });
+        });
+
+        // Add visual feedback on click for history items
+        const historyItems = document.querySelectorAll('.glass-card');
+        historyItems.forEach(item => {
+            item.addEventListener('touchstart', () => {
+                item.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+            });
+            item.addEventListener('touchend', () => {
+                item.style.backgroundColor = '';
+            });
+        });
+    </script>
+</body></html>

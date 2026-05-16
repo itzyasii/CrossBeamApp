@@ -18,6 +18,18 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.BluetoothLeAdvertiser
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
+import android.bluetooth.le.ScanResult
+import android.os.ParcelUuid
+import android.content.Intent
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
@@ -32,8 +44,17 @@ class CrossBeamNativeModule : Module() {
   private var localServiceName: String? = null
   private val activeSockets = ConcurrentHashMap<String, Socket>()
   private val cancelledTransfers = ConcurrentHashMap.newKeySet<String>()
+  private val pausedTransfers = ConcurrentHashMap.newKeySet<String>()
   private val serviceType = "_crossbeam._tcp."
   private val protocolMagic = "CROSSBEAM1"
+
+  // BLE State
+  private var bluetoothAdapter: BluetoothAdapter? = null
+  private var bleAdvertiser: BluetoothLeAdvertiser? = null
+  private var bleScanner: BluetoothLeScanner? = null
+  private val bleServiceUuid = UUID.fromString("63626561-6d2d-7032-702d-646973636f76") // "cbeam-p2p-discov"
+  private var bleAdvertiseCallback: AdvertiseCallback? = null
+  private var bleScanCallback: ScanCallback? = null
 
   override fun definition() = ModuleDefinition {
     Name("CrossBeamNative")
@@ -49,7 +70,9 @@ class CrossBeamNativeModule : Module() {
         "local-network-discovery",
         "local-network-advertising",
         "socket-stream-transfer",
-        "sha256-integrity"
+        "sha256-integrity",
+        "ble-discovery",
+        "ble-advertising"
       )
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         capabilities.add("wifi-direct-api-available")
@@ -61,12 +84,14 @@ class CrossBeamNativeModule : Module() {
       startTransferServer()
       registerLocalService()
       startNsdDiscovery()
+      startBleDiscovery()
     }
 
     AsyncFunction("stopDiscovery") {
       stopNsdDiscovery()
       unregisterLocalService()
       stopTransferServer()
+      stopBleDiscovery()
     }
 
     AsyncFunction("getDiscoveredPeers") {
@@ -97,11 +122,16 @@ class CrossBeamNativeModule : Module() {
     }
 
     AsyncFunction("pauseTransfer") { transferId: String ->
-      throw IllegalStateException("Pause requires the chunk checkpoint transfer service.")
+      pausedTransfers.add(transferId)
+      emitTransfer(transferId, "unknown-peer", null, 0, 1, "paused", null)
     }
 
     AsyncFunction("resumeTransfer") { transferId: String ->
-      throw IllegalStateException("Resume requires the Android chunk checkpoint transfer service.")
+      pausedTransfers.remove(transferId)
+      // Resume logic: In this simple implementation, the user should re-trigger 
+      // the send, and the existing offset logic handles the rest.
+      // However, for an active socket, we can just let it spin or signal it.
+      emitTransfer(transferId, "unknown-peer", null, 0, 1, "in-progress", null)
     }
   }
 
@@ -326,6 +356,12 @@ class CrossBeamNativeModule : Module() {
                       if (cancelledTransfers.contains(transferId)) {
                         throw TransferCancelledException()
                       }
+                      
+                      while (pausedTransfers.contains(transferId)) {
+                        Thread.sleep(500)
+                        if (cancelledTransfers.contains(transferId)) throw TransferCancelledException()
+                      }
+
                       output.write(buffer, 0, read)
                       transferred += read
                       
@@ -511,6 +547,80 @@ class CrossBeamNativeModule : Module() {
           context.stopService(serviceIntent)
       }
     }
+  }
+
+  private fun startBleDiscovery() {
+    val context = appContext.reactContext ?: return
+    val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+    bluetoothAdapter = bluetoothManager?.adapter
+
+    if (bluetoothAdapter == null || bluetoothAdapter?.isEnabled == false) return
+
+    bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+    bleScanner = bluetoothAdapter?.bluetoothLeScanner
+
+    // --- Start Advertising ---
+    val settings = AdvertiseSettings.Builder()
+      .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
+      .setConnectable(true)
+      .setTimeout(0)
+      .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+      .build()
+
+    val data = AdvertiseData.Builder()
+      .setIncludeDeviceName(true)
+      .addServiceUuid(ParcelUuid(bleServiceUuid))
+      .build()
+
+    bleAdvertiseCallback = object : AdvertiseCallback() {
+      override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) = Unit
+      override fun onStartFailure(errorCode: Int) {
+        bleAdvertiseCallback = null
+      }
+    }
+
+    bleAdvertiser?.startAdvertising(settings, data, bleAdvertiseCallback)
+
+    // --- Start Scanning ---
+    val filter = ScanFilter.Builder()
+      .setServiceUuid(ParcelUuid(bleServiceUuid))
+      .build()
+
+    bleScanCallback = object : ScanCallback() {
+      override fun onScanResult(callbackType: Int, result: ScanResult) {
+        val device = result.device
+        val name = result.scanRecord?.deviceName ?: device.name ?: "Unknown BLE Peer"
+        val id = "ble-${device.address}"
+        
+        if (peers.containsKey(id)) return
+
+        val peer = mapOf(
+          "id" to id,
+          "name" to name,
+          "platform" to "android", // We assume android for now or determine via manufacturer data
+          "connection" to "ble",
+          "isTrusted" to false,
+          "lastSeenAt" to System.currentTimeMillis()
+        )
+        peers[id] = peer
+        sendEvent("onPeerFound", peer)
+      }
+
+      override fun onScanFailed(errorCode: Int) {
+        bleScanCallback = null
+      }
+    }
+
+    bleScanner?.startScan(listOf(filter), android.bluetooth.le.ScanSettings.Builder().build(), bleScanCallback)
+  }
+
+  private fun stopBleDiscovery() {
+    try {
+      bleAdvertiser?.stopAdvertising(bleAdvertiseCallback)
+      bleScanner?.stopScan(bleScanCallback)
+    } catch (_: Exception) {}
+    bleAdvertiseCallback = null
+    bleScanCallback = null
   }
 
   private fun calculateSha256(context: Context, uri: Uri): String {

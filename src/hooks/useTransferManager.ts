@@ -4,11 +4,13 @@ import * as DocumentPicker from "expo-document-picker";
 import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { SelectedFile, TransferJob, TransferHistory } from "@/types/domain";
 import { saveTransferHistory } from "@/store/database";
+import { usePermissions } from "./usePermissions";
 
 export const useTransferManager = () => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [transferError, setTransferError] = useState<string | null>(null);
+  const { requestStoragePermissions } = usePermissions();
 
   useEffect(() => {
     return nativeCrossBeam.addTransferProgressListener((event) => {
@@ -65,6 +67,13 @@ export const useTransferManager = () => {
 
   const pickFiles = async () => {
     setTransferError(null);
+    
+    const hasPermission = await requestStoragePermissions();
+    if (!hasPermission) {
+      setTransferError("Storage permission is required to select files.");
+      return;
+    }
+
     const result = await DocumentPicker.getDocumentAsync({
       multiple: true,
       copyToCacheDirectory: false,
@@ -161,10 +170,19 @@ export const useTransferManager = () => {
     }
   };
 
-  const togglePause = (_id: string) => {
-    setTransferError(
-      "Pause and resume are only available after the native streaming transfer engine is installed.",
-    );
+  const togglePause = async (id: string) => {
+    const job = transfers.find(j => j.id === id);
+    if (!job) return;
+
+    try {
+      if (job.status === "paused") {
+        await nativeCrossBeam.resumeTransfer(id);
+      } else {
+        await nativeCrossBeam.pauseTransfer(id);
+      }
+    } catch (error) {
+      setTransferError(String(error));
+    }
   };
 
   const cancelTransfer = async (id: string) => {

@@ -1,4 +1,4 @@
-export type ConnectionType = "wifi-direct" | "hotspot" | "lan" | "local-network" | "multipeer";
+export type ConnectionType = "wifi-direct" | "hotspot" | "lan" | "local-network" | "multipeer" | "ble";
 
 export type DevicePlatform = "android" | "ios" | "android-tv";
 

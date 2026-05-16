@@ -6,33 +6,26 @@
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
-
     "dev:android": "expo run:android",
     "dev:ios": "expo run:ios",
     "dev:web": "expo start --web",
-
     "prebuild:clean": "expo prebuild --clean",
     "prebuild:android": "expo prebuild --platform android",
     "prebuild:ios": "expo prebuild --platform ios",
-
     "build:android": "eas build --platform android --profile production",
     "build:ios": "eas build --platform ios --profile production",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:ios:preview": "eas build --platform ios --profile preview",
     "build:android:local": "eas build --platform android --local",
     "build:ios:local": "eas build --platform ios --local",
-
     "submit:android": "eas submit --platform android",
     "submit:ios": "eas submit --platform ios",
-
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
-
     "clean": "npx expo-modules-core clean",
     "reset": "npx expo start --clear && watchman watch-del-all",
     "doctor": "npx expo-doctor",
-
     "ins": "npm install --legacy-peer-deps"
   },
   "dependencies": {
@@ -49,6 +42,7 @@
     "expo-document-picker": "~55.0.13",
     "expo-file-system": "~55.0.20",
     "expo-linear-gradient": "~55.0.14",
+    "expo-media-library": "^55.0.17",
     "expo-network": "~55.0.14",
     "expo-notifications": "~55.0.23",
     "expo-share-intent": "^6.1.0",

@@ -26,6 +26,7 @@ import { useDeviceDiscovery } from '@/hooks/useDeviceDiscovery';
 import { useTheme } from '@/hooks/useTheme';
 import { useTransferManager } from '@/hooks/useTransferManager';
 import { useShareIntent } from '@/hooks/useShareIntent';
+import { nativeCrossBeam } from '@/native/crossbeamNative';
 import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -180,6 +181,18 @@ export default function App() {
   const { sharedFiles, setSharedFiles } = useShareIntent();
   const { transfers, selectedFiles, transferError, pickFiles, clearSelectedFiles,
     startTransfer, togglePause, cancelTransfer, addSelectedFiles } = useTransferManager();
+
+  useEffect(() => {
+    const checkCapabilities = async () => {
+      try {
+        const caps = await nativeCrossBeam.getCapabilities();
+        console.log("[CrossBeam] Native Capabilities:", caps);
+      } catch (e) {
+        console.error("[CrossBeam] Capability check failed:", e);
+      }
+    };
+    void checkCapabilities();
+  }, []);
 
   // Swipe pager ref
   const pagerRef = useRef<FlatList>(null);

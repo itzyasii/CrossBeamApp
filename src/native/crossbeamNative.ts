@@ -23,7 +23,9 @@ const toDevice = (peer: NativePeer): Device => ({
       ? 'multipeer'
       : peer.connection === 'local-network'
         ? 'local-network'
-        : 'wifi-direct',
+        : peer.connection === 'ble'
+          ? 'ble'
+          : 'wifi-direct',
   lastSeenAt: peer.lastSeenAt,
 });
 
@@ -72,6 +74,16 @@ export const nativeCrossBeam = {
       throw new Error('CrossBeam native transfer module is not installed in this runtime.');
     }
     await CrossBeamNative.cancelTransfer(transferId);
+  },
+
+  async pauseTransfer(transferId: string): Promise<void> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return;
+    await CrossBeamNative.pauseTransfer(transferId);
+  },
+
+  async resumeTransfer(transferId: string): Promise<void> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return;
+    await CrossBeamNative.resumeTransfer(transferId);
   },
 
   addPeerFoundListener(listener: (device: Device) => void): () => void {

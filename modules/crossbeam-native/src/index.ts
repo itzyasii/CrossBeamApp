@@ -1,7 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
 export type NativePeerPlatform = 'android' | 'android-tv' | 'ios';
-export type NativePeerConnection = 'wifi-direct' | 'local-network' | 'multipeer';
+export type NativePeerConnection = 'wifi-direct' | 'local-network' | 'multipeer' | 'ble';
 
 export type NativePeer = {
   id: string;

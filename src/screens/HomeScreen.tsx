@@ -1,49 +1,84 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, View, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Radio, Zap, Rocket } from 'lucide-react-native';
 import { GlassCard } from '@/components/GlassCard';
 import { useTheme } from '@/hooks/useTheme';
 import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 
 type Props = { deviceCount: number; transferCount: number; discoveryStatus: string };
 
-const PulseRing = ({ size, delay }: { size: number; delay: number }) => {
-  const a = useRef(new Animated.Value(0)).current;
+const OrbCore = () => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.delay(delay),
-      Animated.timing(a, { toValue: 1, duration: 2800, useNativeDriver: true }),
-      Animated.timing(a, { toValue: 0, duration: 0,    useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [a, delay]);
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(scale, { toValue: 1.12, duration: 2200, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1, duration: 2200, useNativeDriver: true }),
+        ]),
+        Animated.timing(spin, { toValue: 1, duration: 15000, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [scale, spin]);
+
   return (
-    <Animated.View style={{
-      position: 'absolute', width: size, height: size, borderRadius: size / 2,
-      borderWidth: 1, borderColor: 'rgba(99,102,241,0.4)',
-      opacity: a.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.9, 0.25, 0] }),
-      transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.6] }) }],
-    }} />
+    <View style={S.orbContainer}>
+      <Animated.View style={[S.orbGlow, { transform: [{ scale }] }]} />
+      <Animated.Image 
+        source={require('../../assets/icon.png')} 
+        style={[S.orbInner, { 
+          transform: [
+            { scale },
+            { rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }
+          ] 
+        }]} 
+      />
+    </View>
   );
 };
 
-const Stat = ({ value, label, color, delay }: { value: string; label: string; color: string; delay: number }) => {
+const BentoCard = ({ 
+  title, 
+  value, 
+  label, 
+  icon: Icon, 
+  color, 
+  flex = 1, 
+  delay = 0 
+}: { 
+  title: string; 
+  value: string; 
+  label: string; 
+  icon: any; 
+  color: string; 
+  flex?: number; 
+  delay?: number 
+}) => {
   const { colors } = useTheme();
   const fade = useRef(new Animated.Value(0)).current;
-  const y    = useRef(new Animated.Value(10)).current;
+  const slide = useRef(new Animated.Value(20)).current;
+
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 380, delay, useNativeDriver: true }),
-      Animated.spring(y,    { toValue: 0, tension: 70, friction: 10, delay, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 500, delay, useNativeDriver: true }),
+      Animated.spring(slide, { toValue: 0, tension: 50, friction: 8, delay, useNativeDriver: true }),
     ]).start();
-  }, [fade, y, delay]);
+  }, [fade, slide, delay]);
+
   return (
-    <Animated.View style={[S.statWrap, { opacity: fade, transform: [{ translateY: y }] }]}>
-      <GlassCard padding={SPACING.lg}>
-        <View style={[S.statDot, { backgroundColor: color }]} />
-        <Text style={[S.statValue, { color: colors.textPrimary }]}>{value}</Text>
-        <Text style={[S.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+    <Animated.View style={{ flex, opacity: fade, transform: [{ translateY: slide }] }}>
+      <GlassCard padding={SPACING.lg} style={S.bentoCard}>
+        <View style={S.bentoHeader}>
+          <View style={[S.bentoIconWrap, { backgroundColor: `${color}20` }]}>
+            <Icon size={16} color={color} strokeWidth={2.5} />
+          </View>
+          <Text style={[S.bentoTitle, { color: colors.textMuted }]}>{title}</Text>
+        </View>
+        <Text style={[S.bentoValue, { color: colors.textPrimary }]}>{value}</Text>
+        <Text style={[S.bentoLabel, { color: colors.textSecondary }]}>{label}</Text>
       </GlassCard>
     </Animated.View>
   );
@@ -54,50 +89,110 @@ export function HomeScreen({ deviceCount, transferCount, discoveryStatus }: Prop
 
   return (
     <View style={S.container}>
-      {/* Hero card */}
-      <GlassCard animate accentBorder>
-        <View style={S.heroInner}>
-          <View style={S.orbArea}>
-            <PulseRing size={150} delay={0} />
-            <PulseRing size={210} delay={900} />
-            <PulseRing size={270} delay={1800} />
-            <LinearGradient colors={gradients.primary} style={S.orb} />
-          </View>
-          <Text style={[S.heroTitle, { color: colors.textPrimary }]}>CrossBeam</Text>
-          <Text style={[S.heroSub, { color: colors.textSecondary }]}>
-            Instant peer-to-peer file sharing.{'\n'}No cloud. No limits. No ads.
-          </Text>
-          <View style={[S.badge, { backgroundColor: colors.accentHighlight, borderColor: colors.borderAccent }]}>
-            <View style={[S.badgeDot, { backgroundColor: deviceCount > 0 ? colors.success : colors.warning }]} />
-            <Text style={[S.badgeText, { color: colors.textSecondary }]}>{discoveryStatus}</Text>
+      {/* ── Header Area ── */}
+      <View style={S.welcomeArea}>
+        <Text style={[S.welcomeTitle, { color: colors.textPrimary }]}>Local Network</Text>
+        <View style={[S.statusBadge, { backgroundColor: colors.accentHighlight }]}>
+          <View style={[S.statusDot, { backgroundColor: deviceCount > 0 ? colors.success : colors.warning }]} />
+          <Text style={[S.statusText, { color: colors.textSecondary }]}>{discoveryStatus}</Text>
+        </View>
+      </View>
+
+      {/* ── Hero Mesh Section ── */}
+      <GlassCard animate accentBorder style={S.heroMesh}>
+        <LinearGradient
+          colors={['rgba(99, 102, 241, 0.15)', 'transparent', 'rgba(34, 211, 165, 0.05)']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <View style={S.heroContent}>
+          <OrbCore />
+          <View style={S.heroText}>
+            <Text style={[S.heroHeadline, { color: colors.textPrimary }]}>CrossBeam Node</Text>
+            <Text style={[S.heroSubline, { color: colors.textSecondary }]}>
+              Securely connected to your{'\n'}private local mesh.
+            </Text>
           </View>
         </View>
       </GlassCard>
 
-      {/* Stats */}
-      <View style={S.statsRow}>
-        <Stat value={String(deviceCount)} label="Nearby"    color={colors.accent}  delay={80}  />
-        <Stat value={String(transferCount)} label="Transfers" color={colors.success} delay={160} />
+      {/* ── Bento Grid ── */}
+      <View style={S.grid}>
+        <View style={S.row}>
+          <BentoCard 
+            title="PEERS" 
+            value={String(deviceCount)} 
+            label="Nearby Devices" 
+            icon={Radio} 
+            color="#6366F1" 
+            delay={100}
+          />
+          <BentoCard 
+            title="JOBS" 
+            value={String(transferCount)} 
+            label="Active Shifts" 
+            icon={Zap} 
+            color="#22D3A5" 
+            delay={200}
+          />
+        </View>
+
+        <View style={S.row}>
+          <Pressable style={{ flex: 1 }}>
+            <GlassCard padding={SPACING.lg} style={S.wideAction}>
+              <LinearGradient
+                colors={['#6366F1', '#4F46E5']}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              />
+              <View style={S.actionInner}>
+                <View>
+                  <Text style={S.actionTitle}>Start Discovery</Text>
+                  <Text style={S.actionSub}>Broadcast your presence</Text>
+                </View>
+                <Rocket size={24} color="#fff" strokeWidth={2} />
+              </View>
+            </GlassCard>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
 }
 
 const S = StyleSheet.create({
-  container: { gap: SPACING.md },
+  container: { gap: SPACING.lg },
 
-  heroInner: { alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.xs },
-  orbArea:   { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
-  orb:       { width: 52, height: 52, borderRadius: 26, shadowColor: '#6366f1', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 18, elevation: 10 },
-  heroTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '800', letterSpacing: -1 },
-  heroSub:   { fontSize: FONT_SIZE.base, textAlign: 'center', lineHeight: 23, maxWidth: 260 },
-  badge:     { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 1 },
-  badgeDot:  { width: 7, height: 7, borderRadius: 4 },
-  badgeText: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
+  welcomeArea: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
+  welcomeTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', letterSpacing: -0.5 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  statsRow:   { flexDirection: 'row', gap: SPACING.md },
-  statWrap:   { flex: 1 },
-  statDot:    { width: 8, height: 8, borderRadius: 4, marginBottom: SPACING.sm },
-  statValue:  { fontSize: 34, fontWeight: '800', letterSpacing: -1 },
-  statLabel:  { fontSize: FONT_SIZE.xs, fontWeight: '600', marginTop: 3 },
+  heroMesh: { height: 180, justifyContent: 'center' },
+  heroContent: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xl, paddingHorizontal: SPACING.lg },
+  heroText: { flex: 1, gap: 4 },
+  heroHeadline: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  heroSubline: { fontSize: FONT_SIZE.sm, lineHeight: 18 },
+
+  orbContainer: { width: 80, height: 80, alignItems: 'center', justifyContent: 'center' },
+  orbInner: { width: 56, height: 56, borderRadius: 14, overflow: 'hidden' },
+  orbGlow: { position: 'absolute', width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(99, 102, 241, 0.25)', filter: 'blur(15px)' } as any,
+
+  grid: { gap: SPACING.md },
+  row: { flexDirection: 'row', gap: SPACING.md },
+  
+  bentoCard: { minHeight: 120, justifyContent: 'space-between' },
+  bentoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  bentoIconWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 8, overflow: 'hidden' },
+  bentoTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  bentoValue: { fontSize: 32, fontWeight: '800', letterSpacing: -1, marginTop: SPACING.sm },
+  bentoLabel: { fontSize: 11, fontWeight: '600' },
+
+  wideAction: { height: 80, justifyContent: 'center', overflow: 'hidden' },
+  actionInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  actionTitle: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+  actionSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '500' },
 });

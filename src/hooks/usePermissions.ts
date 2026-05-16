@@ -3,38 +3,33 @@ import * as Device from 'expo-device';
 import * as MediaLibrary from 'expo-media-library';
 
 export const usePermissions = () => {
-  const requestStoragePermissions = async () => {
-    if (Platform.OS === 'ios') {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      return status === 'granted';
-    }
+  const requestStoragePermissions = async (): Promise<boolean> => {
+    try {
+      if (Platform.OS === 'ios') {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        return status === 'granted' || (status as any) === 'limited';
+      }
 
-    if (Platform.OS === 'android') {
-      const sdkInt = Device.osInternalBuildId ? parseInt(Device.osInternalBuildId, 10) : 0;
-      const osVersion = parseInt(Device.osVersion || '0', 10);
+      if (Platform.OS === 'android') {
+        const osVersion = parseInt(Device.osVersion || '0', 10);
 
-      // Android 14+ (SDK 34+)
-      if (osVersion >= 14) {
-        const { status, canAskAgain } = await MediaLibrary.requestPermissionsAsync();
-        // Handle partial access (User selected some photos)
+        // Android 13+ (SDK 33+) requires granular media permissions
+        // Expo Media Library handles this if plugins are configured in app.json
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        
         if (status === 'granted' || (status as any) === 'limited') {
           return true;
         }
+
+        console.warn(`[Permissions] Storage access ${status}. SDK Version: ${osVersion}`);
         return false;
       }
 
-      // Android 13 (SDK 33)
-      if (osVersion >= 13) {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        return status === 'granted';
-      }
-
-      // Android 12 and below
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      return status === 'granted';
+      return true;
+    } catch (error) {
+      console.error('[Permissions] Error requesting media permissions:', error);
+      return false;
     }
-
-    return true;
   };
 
   return {

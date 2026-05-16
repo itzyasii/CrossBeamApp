@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '@/components/GlassCard';
 import { useTheme } from '@/hooks/useTheme';
@@ -59,7 +59,7 @@ export function TransferScreen({
         {/* Big pick-files area when empty */}
         {!hasFiles && (
           <Pressable onPress={onPickFiles} style={[S.dropzone, { borderColor: colors.borderStrong }]}>
-            <Text style={S.dropzoneIcon}>📂</Text>
+            <Image source={require('../../assets/icon.png')} style={S.dropzoneImage} />
             <Text style={[S.dropzoneTitle, { color: colors.textPrimary }]}>Choose Files</Text>
             <Text style={[S.dropzoneSub, { color: colors.textSecondary }]}>
               Documents, photos, videos & more
@@ -171,7 +171,7 @@ const S = StyleSheet.create({
   sectionTitle: { fontSize: FONT_SIZE.md, fontWeight: '700', letterSpacing: -0.3, marginBottom: SPACING.md },
 
   dropzone: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: RADIUS.md, paddingVertical: SPACING.xxxl, alignItems: 'center', gap: SPACING.sm },
-  dropzoneIcon:  { fontSize: 40 },
+  dropzoneImage: { width: 64, height: 64, borderRadius: 16, marginBottom: SPACING.sm },
   dropzoneTitle: { fontSize: FONT_SIZE.md, fontWeight: '700' },
   dropzoneSub:   { fontSize: FONT_SIZE.sm, textAlign: 'center' },
 

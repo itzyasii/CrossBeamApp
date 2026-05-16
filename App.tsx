@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   FlatList,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -27,6 +28,14 @@ import { useTheme } from '@/hooks/useTheme';
 import { useTransferManager } from '@/hooks/useTransferManager';
 import { useShareIntent } from '@/hooks/useShareIntent';
 import { nativeCrossBeam } from '@/native/crossbeamNative';
+import { 
+  Home, 
+  Radio, 
+  Zap, 
+  Clock, 
+  BarChart2, 
+  Smartphone 
+} from 'lucide-react-native';
 import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -35,13 +44,13 @@ const TAB_BAR_H = 72;
 
 type Tab = 'home' | 'discover' | 'transfer' | 'history' | 'analytics' | 'devices';
 
-const TABS: { id: Tab; icon: string; label: string }[] = [
-  { id: 'home',      icon: '⌂',  label: 'Home' },
-  { id: 'discover',  icon: '📡', label: 'Discover' },
-  { id: 'transfer',  icon: '⚡', label: 'Transfer' },
-  { id: 'history',   icon: '🕑', label: 'History' },
-  { id: 'analytics', icon: '📊', label: 'Analytics' },
-  { id: 'devices',   icon: '🖥', label: 'Devices' },
+const TABS: { id: Tab; icon: any; label: string }[] = [
+  { id: 'home',      icon: Home,       label: 'Home' },
+  { id: 'discover',  icon: Radio,      label: 'Discover' },
+  { id: 'transfer',  icon: Zap,        label: 'Transfer' },
+  { id: 'history',   icon: Clock,      label: 'History' },
+  { id: 'analytics', icon: BarChart2,  label: 'Analytics' },
+  { id: 'devices',   icon: Smartphone, label: 'Devices' },
 ];
 
 // ─── Bottom Tab Item ──────────────────────────────────────────────────────────
@@ -67,11 +76,11 @@ function BottomTabItem({ tab, active, onPress }: { tab: typeof TABS[0]; active: 
       <Animated.View style={{ alignItems: 'center', transform: [{ scale }] }}>
         {active ? (
           <LinearGradient colors={gradients.primary} style={S.tabPillActive}>
-            <Text style={S.tabIcon}>{tab.icon}</Text>
+            <tab.icon size={20} color="#fff" strokeWidth={2.5} />
           </LinearGradient>
         ) : (
           <View style={S.tabPillInactive}>
-            <Text style={[S.tabIcon, { opacity: 0.38 }]}>{tab.icon}</Text>
+            <tab.icon size={20} color={colors.textSecondary} opacity={0.4} strokeWidth={2} />
           </View>
         )}
         {tooltip && (
@@ -95,7 +104,7 @@ function DrawerContent({ tab, onSelect, onClose, deviceCount, transferCount }: {
   return (
     <View style={[S.drawerInner, { backgroundColor: colors.backgroundElevated, paddingTop: insets.top + SPACING.lg }]}>
       <View style={S.drawerLogo}>
-        <LinearGradient colors={gradients.primary} style={S.drawerOrb} />
+        <Image source={require('./assets/icon.png')} style={S.drawerOrb} />
         <View>
           <Text style={[S.drawerAppName, { color: colors.textPrimary }]}>CrossBeam</Text>
           <Text style={[S.drawerAppSub,  { color: colors.textMuted    }]}>v0.1.0 · Local P2P</Text>
@@ -124,7 +133,7 @@ function DrawerContent({ tab, onSelect, onClose, deviceCount, transferCount }: {
             onPress={() => { onSelect(t.id); onClose(); }}
             style={[S.drawerItem, active && { backgroundColor: colors.accentHighlight }]}
           >
-            <Text style={[S.drawerIcon, { opacity: active ? 1 : 0.5 }]}>{t.icon}</Text>
+            <t.icon size={20} color={active ? colors.accent : colors.textSecondary} opacity={active ? 1 : 0.6} strokeWidth={active ? 2.5 : 2} />
             <Text style={[S.drawerLabel, { color: active ? colors.accentLight : colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
               {t.label}
             </Text>
@@ -147,7 +156,7 @@ function TVSidebar({ tab, onSelect }: { tab: Tab; onSelect: (t: Tab) => void }) 
   return (
     <View style={[S.tvSidebar, { backgroundColor: colors.backgroundElevated, borderRightColor: colors.border }]}>
       <View style={S.tvLogo}>
-        <LinearGradient colors={gradients.primary} style={S.drawerOrb} />
+        <Image source={require('./assets/icon.png')} style={S.drawerOrb} />
         <Text style={[S.drawerAppName, { color: colors.textPrimary }]}>CrossBeam</Text>
       </View>
       {TABS.map(t => {
@@ -157,7 +166,7 @@ function TVSidebar({ tab, onSelect }: { tab: Tab; onSelect: (t: Tab) => void }) 
             key={t.id} onPress={() => onSelect(t.id)} focusable
             style={[S.drawerItem, active && { backgroundColor: colors.accentHighlight }]}
           >
-            <Text style={[S.drawerIcon, { opacity: active ? 1 : 0.5 }]}>{t.icon}</Text>
+            <t.icon size={20} color={active ? colors.accent : colors.textSecondary} opacity={active ? 1 : 0.6} strokeWidth={active ? 2.5 : 2} />
             <Text style={[S.drawerLabel, { color: active ? colors.accentLight : colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
               {t.label}
             </Text>
@@ -299,7 +308,7 @@ export default function App() {
 
         {/* Logo */}
         <View style={S.headerCenter}>
-          <LinearGradient colors={gradients.primary} style={S.headerOrb} />
+          <Image source={require('./assets/icon.png')} style={S.headerOrb} />
           <Text style={[S.headerTitle, { color: colors.textPrimary }]}>CrossBeam</Text>
         </View>
 

@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Dimensions,
+  FlatList,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HistoryScreen } from '@/screens/HistoryScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
@@ -20,176 +26,396 @@ import { useDeviceDiscovery } from '@/hooks/useDeviceDiscovery';
 import { useTheme } from '@/hooks/useTheme';
 import { useTransferManager } from '@/hooks/useTransferManager';
 import { useShareIntent } from '@/hooks/useShareIntent';
-import { formatRelativeTime } from '@/utils/time';
+import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const DRAWER_W = 280;
+const TAB_BAR_H = 72;
 
 type Tab = 'home' | 'discover' | 'transfer' | 'history' | 'analytics' | 'devices';
 
-const TABS: Tab[] = ['home', 'discover', 'transfer', 'history', 'analytics', 'devices'];
+const TABS: { id: Tab; icon: string; label: string }[] = [
+  { id: 'home',      icon: '⌂',  label: 'Home' },
+  { id: 'discover',  icon: '📡', label: 'Discover' },
+  { id: 'transfer',  icon: '⚡', label: 'Transfer' },
+  { id: 'history',   icon: '🕑', label: 'History' },
+  { id: 'analytics', icon: '📊', label: 'Analytics' },
+  { id: 'devices',   icon: '🖥', label: 'Devices' },
+];
 
-export default function App() {
-  const { colors, isDark } = useTheme();
-  const [tab, setTab] = useState<Tab>('home');
-  const { devices, isRefreshing, lastRefreshAt, statusMessage, refreshDevices } =
-    useDeviceDiscovery();
-  const { sharedFiles, setSharedFiles } = useShareIntent();
-  const {
-    transfers,
-    selectedFiles,
-    transferError,
-    pickFiles,
-    clearSelectedFiles,
-    startTransfer,
-    togglePause,
-    cancelTransfer,
-    addSelectedFiles,
-  } = useTransferManager();
+// ─── Bottom Tab Item ──────────────────────────────────────────────────────────
+function BottomTabItem({ tab, active, onPress }: { tab: typeof TABS[0]; active: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+  const [tooltip, setTooltip] = useState(false);
 
-  React.useEffect(() => {
-    if (sharedFiles.length > 0) {
-      addSelectedFiles(sharedFiles);
-      setSharedFiles([]);
-      setTab('transfer'); // Auto navigate to transfer screen
-    }
-  }, [sharedFiles, addSelectedFiles, setSharedFiles]);
-
-  const targetDevice = devices[0] ?? null;
-  const isTV = Platform.isTV;
+  const pressIn  = () => Animated.spring(scale, { toValue: 0.82, useNativeDriver: true, tension: 250, friction: 8 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1,    useNativeDriver: true, tension: 250, friction: 8 }).start();
+  const longPress = () => { setTooltip(true); setTimeout(() => setTooltip(false), 1200); };
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: colors.background }]}
+    <Pressable
+      onPress={onPress}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      onLongPress={longPress}
+      accessibilityRole="button"
+      accessibilityLabel={tab.label}
+      style={S.tabItem}
     >
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-
-      <View style={isTV ? styles.tvLayout : styles.mobileLayout}>
-        <View style={isTV ? styles.tvSidebar : undefined}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>
-              CrossBeam
-            </Text>
-            {!isTV && (
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Private, local file sharing for phones and Android TV.
-              </Text>
-            )}
+      <Animated.View style={{ alignItems: 'center', transform: [{ scale }] }}>
+        {active ? (
+          <LinearGradient colors={gradients.primary} style={S.tabPillActive}>
+            <Text style={S.tabIcon}>{tab.icon}</Text>
+          </LinearGradient>
+        ) : (
+          <View style={S.tabPillInactive}>
+            <Text style={[S.tabIcon, { opacity: 0.38 }]}>{tab.icon}</Text>
           </View>
-
-          <View style={isTV ? styles.tvTabs : styles.mobileTabs}>
-            {TABS.map((item) => {
-              const selected = tab === item;
-              return (
-                <Pressable
-                  key={item}
-                  onPress={() => setTab(item)}
-                  style={[
-                    styles.tab,
-                    isTV && styles.tvTab,
-                    {
-                      backgroundColor: selected ? colors.accent : colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  focusable
-                >
-                  <Text
-                    style={[
-                      styles.tabLabel,
-                      { color: selected ? colors.textInverse : colors.textPrimary },
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </Pressable>
-              );
-            })}
+        )}
+        {tooltip && (
+          <View style={[S.tooltip, { backgroundColor: colors.backgroundElevated, borderColor: colors.borderStrong }]}>
+            <Text style={[S.tooltipText, { color: colors.textPrimary }]}>{tab.label}</Text>
           </View>
-        </View>
-
-        <ScrollView contentContainerStyle={[styles.content, isTV && styles.tvContent]}>
-          {tab === 'home' ? (
-            <HomeScreen
-              deviceCount={devices.length}
-              transferCount={transfers.length}
-              discoveryStatus={statusMessage}
-            />
-          ) : null}
-          {tab === 'discover' ? (
-            <DiscoverScreen
-              devices={devices}
-              onRefresh={() => void refreshDevices()}
-              isRefreshing={isRefreshing}
-              statusMessage={statusMessage}
-            />
-          ) : null}
-          {tab === 'transfer' ? (
-            <TransferScreen
-              transfers={transfers}
-              selectedFiles={selectedFiles}
-              transferError={transferError}
-              onPickFiles={() => void pickFiles()}
-              onClearSelectedFiles={clearSelectedFiles}
-              onStartTransfer={() =>
-                void startTransfer(targetDevice?.id ?? null, targetDevice?.name ?? 'No peer selected')
-              }
-              onPauseResume={togglePause}
-              onCancel={(id) => void cancelTransfer(id)}
-            />
-          ) : null}
-          {tab === 'history' ? <HistoryScreen transfers={transfers as any} /> : null}
-          {tab === 'analytics' ? <AnalyticsScreen /> : null}
-          {tab === 'devices' ? <DevicesScreen /> : null}
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+        )}
+      </Animated.View>
+    </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  tvLayout: { flex: 1, flexDirection: 'row' },
-  mobileLayout: { flex: 1, flexDirection: 'column' },
-  tvSidebar: { width: 250, borderRightWidth: 1, borderColor: '#333', padding: 16 },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    gap: 4,
-    marginBottom: 10,
-  },
-  title: { fontSize: 28, fontWeight: '800' },
-  subtitle: { fontSize: 15 },
-  mobileTabs: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  tvTabs: {
-    flexDirection: 'column',
-    gap: 12,
-  },
-  tab: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  tvTab: {
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  tabLabel: {
-    textTransform: 'capitalize',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingBottom: 28,
-    gap: 12,
-  },
-  tvContent: {
-    padding: 32,
+// ─── Drawer ──────────────────────────────────────────────────────────────────
+function DrawerContent({ tab, onSelect, onClose, deviceCount, transferCount }: {
+  tab: Tab; onSelect: (t: Tab) => void; onClose: () => void;
+  deviceCount: number; transferCount: number;
+}) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={[S.drawerInner, { backgroundColor: colors.backgroundElevated, paddingTop: insets.top + SPACING.lg }]}>
+      <View style={S.drawerLogo}>
+        <LinearGradient colors={gradients.primary} style={S.drawerOrb} />
+        <View>
+          <Text style={[S.drawerAppName, { color: colors.textPrimary }]}>CrossBeam</Text>
+          <Text style={[S.drawerAppSub,  { color: colors.textMuted    }]}>v0.1.0 · Local P2P</Text>
+        </View>
+      </View>
+
+      <View style={[S.drawerStats, { backgroundColor: colors.accentHighlight, borderColor: colors.borderAccent }]}>
+        <View style={S.drawerStat}>
+          <Text style={[S.drawerStatVal,   { color: colors.accent }]}>{deviceCount}</Text>
+          <Text style={[S.drawerStatLabel, { color: colors.textSecondary }]}>Nearby</Text>
+        </View>
+        <View style={[S.drawerDivLine, { backgroundColor: colors.border }]} />
+        <View style={S.drawerStat}>
+          <Text style={[S.drawerStatVal,   { color: colors.success }]}>{transferCount}</Text>
+          <Text style={[S.drawerStatLabel, { color: colors.textSecondary }]}>Transfers</Text>
+        </View>
+      </View>
+
+      <Text style={[S.drawerSectionLabel, { color: colors.textMuted }]}>NAVIGATION</Text>
+
+      {TABS.map(t => {
+        const active = t.id === tab;
+        return (
+          <Pressable
+            key={t.id}
+            onPress={() => { onSelect(t.id); onClose(); }}
+            style={[S.drawerItem, active && { backgroundColor: colors.accentHighlight }]}
+          >
+            <Text style={[S.drawerIcon, { opacity: active ? 1 : 0.5 }]}>{t.icon}</Text>
+            <Text style={[S.drawerLabel, { color: active ? colors.accentLight : colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
+              {t.label}
+            </Text>
+            {active && <View style={[S.drawerActiveDot, { backgroundColor: colors.accent }]} />}
+          </Pressable>
+        );
+      })}
+
+      <View style={{ flex: 1 }} />
+      <Text style={[S.drawerFooter, { color: colors.textMuted, paddingBottom: insets.bottom + SPACING.sm }]}>
+        Private · Local · Ad-free
+      </Text>
+    </View>
+  );
+}
+
+// ─── TV Sidebar ───────────────────────────────────────────────────────────────
+function TVSidebar({ tab, onSelect }: { tab: Tab; onSelect: (t: Tab) => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[S.tvSidebar, { backgroundColor: colors.backgroundElevated, borderRightColor: colors.border }]}>
+      <View style={S.tvLogo}>
+        <LinearGradient colors={gradients.primary} style={S.drawerOrb} />
+        <Text style={[S.drawerAppName, { color: colors.textPrimary }]}>CrossBeam</Text>
+      </View>
+      {TABS.map(t => {
+        const active = t.id === tab;
+        return (
+          <Pressable
+            key={t.id} onPress={() => onSelect(t.id)} focusable
+            style={[S.drawerItem, active && { backgroundColor: colors.accentHighlight }]}
+          >
+            <Text style={[S.drawerIcon, { opacity: active ? 1 : 0.5 }]}>{t.icon}</Text>
+            <Text style={[S.drawerLabel, { color: active ? colors.accentLight : colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
+              {t.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── App Root ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [tabIndex, setTabIndex] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const tab = TABS[tabIndex].id;
+
+  const { devices, isRefreshing, statusMessage, refreshDevices } = useDeviceDiscovery();
+  const { sharedFiles, setSharedFiles } = useShareIntent();
+  const { transfers, selectedFiles, transferError, pickFiles, clearSelectedFiles,
+    startTransfer, togglePause, cancelTransfer, addSelectedFiles } = useTransferManager();
+
+  // Swipe pager ref
+  const pagerRef = useRef<FlatList>(null);
+
+  const goToTab = useCallback((idx: number) => {
+    setTabIndex(idx);
+    pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+  }, []);
+
+  const handleTabPress = (idx: number) => goToTab(idx);
+
+  const handleMomentumScrollEnd = useCallback((e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    setTabIndex(idx);
+  }, []);
+
+  // Drawer animation
+  const drawerX = useRef(new Animated.Value(-DRAWER_W)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  const openDrawer = () => {
+    setDrawerOpen(true);
+    Animated.parallel([
+      Animated.spring(drawerX,       { toValue: 0,         tension: 65, friction: 11, useNativeDriver: true }),
+      Animated.timing(overlayOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const closeDrawer = () => {
+    Animated.parallel([
+      Animated.spring(drawerX,       { toValue: -DRAWER_W, tension: 85, friction: 13, useNativeDriver: true }),
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => setDrawerOpen(false));
+  };
+
+  useEffect(() => {
+    if (sharedFiles.length > 0) {
+      addSelectedFiles(sharedFiles);
+      setSharedFiles([]);
+      goToTab(TABS.findIndex(t => t.id === 'transfer'));
+    }
+  }, [sharedFiles, addSelectedFiles, setSharedFiles, goToTab]);
+
+  const targetDevice = devices[0] ?? null;
+  const screenProps = {
+    devices, isRefreshing, statusMessage,
+    refreshDevices: () => void refreshDevices(),
+    transfers, selectedFiles, transferError,
+    pickFiles, clearSelectedFiles, startTransfer, togglePause, cancelTransfer, targetDevice,
+  };
+
+  // Heights for layout
+  const headerH  = 52 + insets.top;
+  const contentPB = TAB_BAR_H + insets.bottom + SPACING.lg;
+
+  if (Platform.isTV) {
+    return (
+      <View style={[S.root, { backgroundColor: colors.background }]}>
+        <StatusBar style="light" />
+        <View style={[S.tvLayout, { paddingTop: insets.top }]}>
+          <TVSidebar tab={tab} onSelect={id => setTabIndex(TABS.findIndex(t => t.id === id))} />
+          <ScrollView contentContainerStyle={{ padding: SPACING.xxl, gap: SPACING.md }}>
+            {renderScreen(tab, screenProps, contentPB)}
+          </ScrollView>
+        </View>
+      </View>
+    );
   }
+
+  return (
+    <View style={[S.root, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} translucent />
+
+      {/* Overlay for drawer */}
+      {drawerOpen && (
+        <Animated.View style={[S.overlay, { opacity: overlayOpacity }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeDrawer} />
+        </Animated.View>
+      )}
+
+      {/* Slide-in Drawer */}
+      <Animated.View style={[S.drawer, { transform: [{ translateX: drawerX }] }]}>
+        <DrawerContent
+          tab={tab}
+          onSelect={id => { goToTab(TABS.findIndex(t => t.id === id)); }}
+          onClose={closeDrawer}
+          deviceCount={devices.length}
+          transferCount={transfers.length}
+        />
+      </Animated.View>
+
+      {/* Header — sits on top of status bar */}
+      <BlurView
+        intensity={isDark ? 28 : 48}
+        tint={isDark ? 'dark' : 'light'}
+        style={[S.header, { paddingTop: insets.top, borderBottomColor: colors.border }]}
+      >
+        {/* Hamburger */}
+        <Pressable onPress={openDrawer} style={S.menuBtn} accessibilityLabel="Open menu">
+          <View style={[S.menuLine, { backgroundColor: colors.textPrimary }]} />
+          <View style={[S.menuLine, S.menuLineShort, { backgroundColor: colors.textPrimary }]} />
+          <View style={[S.menuLine, { backgroundColor: colors.textPrimary }]} />
+        </Pressable>
+
+        {/* Logo */}
+        <View style={S.headerCenter}>
+          <LinearGradient colors={gradients.primary} style={S.headerOrb} />
+          <Text style={[S.headerTitle, { color: colors.textPrimary }]}>CrossBeam</Text>
+        </View>
+
+        {/* Online indicator */}
+        <View style={S.headerRight}>
+          <View style={[S.onlineDot, { backgroundColor: devices.length > 0 ? colors.success : colors.textMuted }]} />
+        </View>
+      </BlurView>
+
+      {/* ── Swipeable Pager ─────────────────────────────────────────────────── */}
+      <FlatList
+        ref={pagerRef}
+        data={TABS}
+        keyExtractor={t => t.id}
+        horizontal
+        pagingEnabled
+        scrollEventThrottle={16}
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        getItemLayout={(_, index) => ({ length: SCREEN_W, offset: SCREEN_W * index, index })}
+        initialScrollIndex={0}
+        renderItem={({ item: t }) => (
+          <ScrollView
+            style={{ width: SCREEN_W }}
+            contentContainerStyle={[S.pageContent, { paddingTop: headerH, paddingBottom: contentPB }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {renderScreen(t.id, screenProps, contentPB)}
+          </ScrollView>
+        )}
+      />
+
+      {/* ── Bottom Tab Bar ───────────────────────────────────────────────────── */}
+      <BlurView
+        intensity={isDark ? 42 : 62}
+        tint={isDark ? 'dark' : 'light'}
+        style={[S.tabBarWrap, { paddingBottom: insets.bottom }]}
+      >
+        <View style={[S.tabBar, { borderTopColor: colors.border }]}>
+          {TABS.map((t, i) => (
+            <BottomTabItem
+              key={t.id}
+              tab={t}
+              active={tabIndex === i}
+              onPress={() => handleTabPress(i)}
+            />
+          ))}
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+// ─── Screen Factory ───────────────────────────────────────────────────────────
+function renderScreen(tab: Tab, p: any, _contentPB: number) {
+  switch (tab) {
+    case 'home':
+      return <HomeScreen deviceCount={p.devices.length} transferCount={p.transfers.length} discoveryStatus={p.statusMessage} />;
+    case 'discover':
+      return <DiscoverScreen devices={p.devices} onRefresh={p.refreshDevices} isRefreshing={p.isRefreshing} statusMessage={p.statusMessage} />;
+    case 'transfer':
+      return (
+        <TransferScreen
+          transfers={p.transfers}
+          selectedFiles={p.selectedFiles}
+          transferError={p.transferError}
+          onPickFiles={() => void p.pickFiles()}
+          onClearSelectedFiles={p.clearSelectedFiles}
+          onStartTransfer={() => void p.startTransfer(p.targetDevice?.id ?? null, p.targetDevice?.name ?? 'No peer')}
+          onPauseResume={p.togglePause}
+          onCancel={(id: string) => void p.cancelTransfer(id)}
+        />
+      );
+    case 'history':   return <HistoryScreen transfers={p.transfers as any} />;
+    case 'analytics': return <AnalyticsScreen />;
+    case 'devices':   return <DevicesScreen />;
+  }
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const S = StyleSheet.create({
+  root: { flex: 1 },
+
+  // TV
+  tvLayout: { flex: 1, flexDirection: 'row' },
+  tvSidebar: { width: 236, borderRightWidth: StyleSheet.hairlineWidth, paddingTop: SPACING.lg },
+  tvLogo: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, padding: SPACING.lg, marginBottom: SPACING.sm },
+
+  // Overlay + Drawer
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.58)', zIndex: 50 },
+  drawer: { position: 'absolute', top: 0, bottom: 0, left: 0, width: DRAWER_W, zIndex: 100 },
+  drawerInner: { flex: 1, paddingHorizontal: SPACING.lg, gap: SPACING.xs, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: 'rgba(255,255,255,0.06)' },
+  drawerLogo: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.lg },
+  drawerOrb: { width: 38, height: 38, borderRadius: RADIUS.sm + 2 },
+  drawerAppName: { fontSize: FONT_SIZE.md, fontWeight: '800', letterSpacing: -0.4 },
+  drawerAppSub: { fontSize: FONT_SIZE.xs, fontWeight: '500', marginTop: 1 },
+  drawerStats: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, borderWidth: 1, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md, marginBottom: SPACING.md, gap: SPACING.sm },
+  drawerStat: { flex: 1, alignItems: 'center', gap: 2 },
+  drawerStatVal: { fontSize: FONT_SIZE.xl, fontWeight: '800', letterSpacing: -0.5 },
+  drawerStatLabel: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
+  drawerDivLine: { width: 1, height: 28 },
+  drawerSectionLabel: { fontSize: FONT_SIZE.xs, fontWeight: '700', letterSpacing: 1.2, marginVertical: SPACING.xs, marginLeft: SPACING.xs },
+  drawerItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: 13, paddingHorizontal: SPACING.sm, borderRadius: RADIUS.md },
+  drawerIcon: { fontSize: 18 },
+  drawerLabel: { fontSize: FONT_SIZE.base, flex: 1 },
+  drawerActiveDot: { width: 5, height: 5, borderRadius: 3 },
+  drawerFooter: { fontSize: FONT_SIZE.xs, textAlign: 'center' },
+
+  // Header
+  header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  menuBtn: { padding: SPACING.xs, gap: 5, justifyContent: 'center', width: 36 },
+  menuLine: { width: 20, height: 2, borderRadius: 1 },
+  menuLineShort: { width: 13 },
+  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, justifyContent: 'center' },
+  headerOrb: { width: 26, height: 26, borderRadius: 8 },
+  headerTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', letterSpacing: -0.5 },
+  headerRight: { width: 36, alignItems: 'center' },
+  onlineDot: { width: 8, height: 8, borderRadius: 4 },
+
+  // Swipe Pager
+  pageContent: { paddingHorizontal: SPACING.lg, gap: SPACING.md },
+
+  // Tab Bar
+  tabBarWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  tabBar: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: SPACING.sm, paddingHorizontal: SPACING.xs, justifyContent: 'space-evenly', height: TAB_BAR_H },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tabPillActive: { width: 46, height: 38, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  tabPillInactive: { width: 46, height: 38, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  tabIcon: { fontSize: 20, lineHeight: 24 },
+  tooltip: { position: 'absolute', bottom: 46, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: RADIUS.sm, borderWidth: 1, minWidth: 56, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8 },
+  tooltipText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
 });

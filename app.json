@@ -17,7 +17,8 @@
           "_crossbeam._tcp"
         ],
         "NSPhotoLibraryUsageDescription": "CrossBeam lets you choose photos and videos to share with nearby devices.",
-        "NSDocumentsFolderUsageDescription": "CrossBeam lets you choose documents to share with nearby devices."
+        "NSDocumentsFolderUsageDescription": "CrossBeam lets you choose documents to share with nearby devices.",
+        "NSBluetoothAlwaysUsageDescription": "CrossBeam uses Bluetooth to discover nearby devices for file sharing."
       }
     },
     "android": {
@@ -45,10 +46,21 @@
         "expo-share-intent",
         {
           "customScheme": "crossbeamapp",
-          "iosNetworkUsageDescription": "CrossBeam needs access to network to share files."
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+            "NSExtensionActivationSupportsImageWithMaxCount": 10,
+            "NSExtensionActivationSupportsMovieWithMaxCount": 10,
+            "NSExtensionActivationSupportsFileWithMaxCount": 10
+          }
         }
       ]
     ],
-    "scheme": "crossbeamapp"
+    "scheme": "crossbeamapp",
+    "extra": {
+      "eas": {
+        "projectId": "836c5026-ba9d-4b10-b6a8-983f39238357"
+      }
+    }
   }
 }

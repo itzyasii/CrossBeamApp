@@ -1,23 +1,39 @@
-import React, { PropsWithChildren } from 'react';
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import React from 'react';
+import { View, ViewProps, StyleSheet } from 'react-native';
+import { useTheme } from '@/hooks/useTheme';
 
-import { Colors, Radius, Shadows } from '@/constants/theme';
+export const GlassCard = ({ style, children, ...props }: ViewProps) => {
+  const { colors, isDark } = useTheme();
 
-type GlassCardProps = PropsWithChildren<{
-  style?: StyleProp<ViewStyle>;
-  elevation?: keyof typeof Shadows;
-}>;
-
-export function GlassCard({ children, style, elevation = 'sm' }: GlassCardProps) {
-  return <View style={[styles.card, Shadows[elevation], style]}>{children}</View>;
-}
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: isDark ? 'rgba(30, 34, 45, 0.65)' : 'rgba(255, 255, 255, 0.65)',
+          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)',
+          shadowColor: isDark ? '#000' : '#888',
+        },
+        style,
+      ]}
+      {...props}
+    >
+      {children}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.glass.strong,
-    borderColor: Colors.gray[100],
-    borderRadius: Radius.lg,
+    borderRadius: 24,
     borderWidth: 1,
+    overflow: 'hidden',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
   },
 });
-

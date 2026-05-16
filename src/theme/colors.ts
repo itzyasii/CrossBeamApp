@@ -7,41 +7,43 @@ export type ThemePalette = {
   textSecondary: string;
   textInverse: string;
   accent: string;
+  accentHighlight: string;
   success: string;
+  error: string;
   warning: string;
-  danger: string;
-  badge: string;
 };
 
-export const lightColors: ThemePalette = {
-  background: '#F4F7FC',
-  surface: '#FFFFFF',
-  surfaceAlt: '#EEF3FB',
-  border: '#D7E2F4',
-  textPrimary: '#0D1B33',
-  textSecondary: '#506385',
+export const lightColors = {
+  background: '#EAEBEF',
+  surface: 'rgba(255, 255, 255, 0.4)',
+  surfaceHighlight: 'rgba(255, 255, 255, 0.6)',
+  border: 'rgba(200, 205, 215, 0.5)',
+  textPrimary: '#1E2024',
+  textSecondary: '#626875',
   textInverse: '#FFFFFF',
-  accent: '#1D6FFF',
-  success: '#1F9D69',
-  warning: '#B07800',
-  danger: '#CC3A33',
-  badge: '#E7F0FF',
+  accent: '#185BFF',
+  accentHighlight: 'rgba(24, 91, 255, 0.1)',
+  success: '#10B981',
+  error: '#EF4444',
+  warning: '#F59E0B',
 };
 
-export const darkColors: ThemePalette = {
-  background: '#070E1B',
-  surface: '#101B30',
-  surfaceAlt: '#172844',
-  border: '#27406C',
-  textPrimary: '#F4F7FF',
-  textSecondary: '#A8B8D9',
-  textInverse: '#021126',
-  accent: '#5AA9FF',
-  success: '#35D399',
-  warning: '#F4C760',
-  danger: '#FF7B73',
-  badge: '#213457',
+export const darkColors = {
+  background: '#0B0D12',
+  surface: 'rgba(30, 34, 45, 0.4)',
+  surfaceHighlight: 'rgba(40, 45, 58, 0.6)',
+  border: 'rgba(60, 68, 85, 0.5)',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#949BAE',
+  textInverse: '#000000',
+  accent: '#3B82F6',
+  accentHighlight: 'rgba(59, 130, 246, 0.15)',
+  success: '#34D399',
+  error: '#F87171',
+  warning: '#FBBF24',
 };
+
+export type ThemeColors = typeof lightColors;
 
 // Backward-compatible export for older code paths.
 export const colors = darkColors;

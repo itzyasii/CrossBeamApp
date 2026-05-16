@@ -8,7 +8,10 @@ export type Device = {
   platform: DevicePlatform;
   connection: ConnectionType;
   lastSeenAt: number;
+  isTrusted?: boolean;
 };
+
+export type TransferHistory = TransferJob;
 
 export type TransferStatus =
   | "blocked"

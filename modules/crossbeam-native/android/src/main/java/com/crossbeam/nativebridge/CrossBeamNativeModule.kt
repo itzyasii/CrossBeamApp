@@ -259,6 +259,15 @@ class CrossBeamNativeModule : Module() {
     files: List<Map<String, Any?>>
   ) {
     val context = appContext.reactContext ?: return
+    
+    // Start Foreground Service
+    val serviceIntent = Intent(context, CrossBeamTransferService::class.java)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(serviceIntent)
+    } else {
+        context.startService(serviceIntent)
+    }
+
     thread(name = "CrossBeamOutgoingTransfer", isDaemon = true) {
       val totalBytes = files.sumOf { (it["sizeBytes"] as? Number)?.toLong() ?: 0L }
       var transferred = 0L
@@ -301,6 +310,18 @@ class CrossBeamNativeModule : Module() {
                     }
                     output.write(buffer, 0, read)
                     transferred += read
+                    
+                    // Throttle notification updates somewhat (e.g. updating UI progress)
+                    if (transferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || transferred == totalBytes) {
+                        CrossBeamTransferService.updateNotification(
+                            context,
+                            "Sending to $peerId",
+                            "Progress: ${(transferred * 100 / max(totalBytes, 1L))}%",
+                            transferred.toInt(),
+                            totalBytes.toInt()
+                        )
+                    }
+
                     emitTransfer(
                       transferId,
                       peerId,
@@ -332,6 +353,8 @@ class CrossBeamNativeModule : Module() {
       } catch (error: Exception) {
         activeSockets.remove(transferId)
         emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "failed", error.message)
+      } finally {
+          context.stopService(serviceIntent)
       }
     }
   }
@@ -339,6 +362,15 @@ class CrossBeamNativeModule : Module() {
   private fun receiveFilesFromPeer(socket: Socket) {
     val context = appContext.reactContext ?: return
     val peerId = socket.inetAddress.hostAddress ?: "unknown-peer"
+    
+    // Start Foreground Service
+    val serviceIntent = Intent(context, CrossBeamTransferService::class.java)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(serviceIntent)
+    } else {
+        context.startService(serviceIntent)
+    }
+
     socket.use { client ->
       try {
         DataInputStream(BufferedInputStream(client.getInputStream())).use { input ->
@@ -378,6 +410,18 @@ class CrossBeamNativeModule : Module() {
                 digest.update(buffer, 0, read)
                 remaining -= read
                 batchTransferred += read
+                
+                // Throttle notification updates
+                if (batchTransferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || batchTransferred == batchTotal) {
+                    CrossBeamTransferService.updateNotification(
+                        context,
+                        "Receiving from $peerId",
+                        "Progress: ${(batchTransferred * 100 / max(batchTotal, 1L))}%",
+                        batchTransferred.toInt(),
+                        batchTotal.toInt()
+                    )
+                }
+
                 emitTransfer(
                   transferId,
                   peerId,
@@ -401,6 +445,8 @@ class CrossBeamNativeModule : Module() {
         }
       } catch (error: Exception) {
         emitTransfer(UUID.randomUUID().toString(), peerId, null, 0, 1, "failed", error.message)
+      } finally {
+          context.stopService(serviceIntent)
       }
     }
   }

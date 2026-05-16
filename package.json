@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "build:android": "eas build --platform android",
-    "build:ios": "eas build --platform ios"
+    "build:ios": "eas build --platform ios",
+    "ins": "npm install --legacy-peer-deps"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -29,6 +30,7 @@
     "expo-network": "~55.0.14",
     "expo-notifications": "~55.0.23",
     "expo-sharing": "~55.0.19",
+    "expo-sqlite": "~55.0.16",
     "expo-status-bar": "~55.0.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",

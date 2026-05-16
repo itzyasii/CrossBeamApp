@@ -86,7 +86,7 @@ export const TransferHistoryScreen: React.FC = () => {
         style={styles.historyItem}
         onLongPress={() => handleDeleteHistoryItem(item.id)}
       >
-        <GlassCard style={styles.card} elevation="sm">
+        <GlassCard style={styles.card}>
           <View style={styles.historyHeader}>
             <View
               style={[

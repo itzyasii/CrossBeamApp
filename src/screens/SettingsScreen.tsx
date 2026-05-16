@@ -37,7 +37,7 @@ export const SettingsScreen: React.FC = () => {
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Notifications Section */}
-        <GlassCard style={styles.section} elevation="md">
+        <GlassCard style={styles.section}>
           <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
             Notifications
           </Text>
@@ -56,7 +56,7 @@ export const SettingsScreen: React.FC = () => {
         </GlassCard>
 
         {/* Transfer Settings Section */}
-        <GlassCard style={styles.section} elevation="md">
+        <GlassCard style={styles.section}>
           <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
             Transfer
           </Text>
@@ -98,7 +98,7 @@ export const SettingsScreen: React.FC = () => {
         </GlassCard>
 
         {/* About Section */}
-        <GlassCard style={styles.section} elevation="md">
+        <GlassCard style={styles.section}>
           <Text style={[styles.sectionTitle, { fontWeight: Typography.fontWeight.semibold }]}>
             About
           </Text>

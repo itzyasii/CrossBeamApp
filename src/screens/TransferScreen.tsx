@@ -101,8 +101,8 @@ export function TransferScreen({
       )}
 
       {transferError ? (
-        <View style={[styles.errorCard, { borderColor: colors.danger }]}>
-          <Text style={[styles.fileName, { color: colors.danger }]}>
+        <View style={[styles.errorCard, { borderColor: colors.error }]}>
+          <Text style={[styles.fileName, { color: colors.error }]}>
             Transfer unavailable
           </Text>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>
@@ -114,7 +114,7 @@ export function TransferScreen({
       {transfers.map((job) => (
         <View
           key={job.id}
-          style={[styles.jobCard, { backgroundColor: colors.surfaceAlt }]}
+          style={[styles.jobCard, { backgroundColor: colors.surfaceHighlight }]}
         >
           <Text style={[styles.fileName, { color: colors.textPrimary }]}>
             {job.fileNames.join(', ')}

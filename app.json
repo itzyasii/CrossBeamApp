@@ -33,6 +33,9 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
       ]
-    }
+    },
+    "plugins": [
+      "expo-sqlite"
+    ]
   }
 }

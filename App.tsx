@@ -19,6 +19,7 @@ import { DevicesScreen } from '@/screens/DevicesScreen';
 import { useDeviceDiscovery } from '@/hooks/useDeviceDiscovery';
 import { useTheme } from '@/hooks/useTheme';
 import { useTransferManager } from '@/hooks/useTransferManager';
+import { useShareIntent } from '@/hooks/useShareIntent';
 import { formatRelativeTime } from '@/utils/time';
 
 type Tab = 'home' | 'discover' | 'transfer' | 'history' | 'analytics' | 'devices';
@@ -30,6 +31,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const { devices, isRefreshing, lastRefreshAt, statusMessage, refreshDevices } =
     useDeviceDiscovery();
+  const { sharedFiles, setSharedFiles } = useShareIntent();
   const {
     transfers,
     selectedFiles,
@@ -39,7 +41,16 @@ export default function App() {
     startTransfer,
     togglePause,
     cancelTransfer,
+    addSelectedFiles,
   } = useTransferManager();
+
+  React.useEffect(() => {
+    if (sharedFiles.length > 0) {
+      addSelectedFiles(sharedFiles);
+      setSharedFiles([]);
+      setTab('transfer'); // Auto navigate to transfer screen
+    }
+  }, [sharedFiles, addSelectedFiles, setSharedFiles]);
 
   const targetDevice = devices[0] ?? null;
   const isTV = Platform.isTV;

@@ -83,6 +83,11 @@ export const useTransferManager = () => {
     );
   };
 
+  const addSelectedFiles = (files: SelectedFile[]) => {
+    setSelectedFiles(current => [...current, ...files.filter(f => !current.some(c => c.id === f.id))]);
+    setTransferError(null);
+  };
+
   const clearSelectedFiles = () => {
     setSelectedFiles([]);
     setTransferError(null);
@@ -190,6 +195,7 @@ export const useTransferManager = () => {
     selectedFiles,
     transferError,
     pickFiles,
+    addSelectedFiles,
     clearSelectedFiles,
     startTransfer,
     togglePause,

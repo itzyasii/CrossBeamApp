@@ -23,6 +23,7 @@ import {
   SettingsScreen,
   QRPairingScreen
 } from '@/screens';
+import { CrossBeamLogo } from '@/components/CrossBeamLogo';
 import { useDeviceDiscovery } from '@/hooks/useDeviceDiscovery';
 import { useTheme } from '@/hooks/useTheme';
 import { useTransferManager } from '@/hooks/useTransferManager';
@@ -138,7 +139,10 @@ export default function App() {
           <View style={[S.menuDot, { backgroundColor: colors.textPrimary }]} />
           <View style={[S.menuDot, { backgroundColor: colors.textPrimary }]} />
         </Pressable>
-        <Text style={[S.headerTitle, { color: colors.textPrimary }]}>CROSSBEAM</Text>
+        <View style={S.headerCenter}>
+          <CrossBeamLogo size={24} />
+          <Text style={[S.headerTitle, { color: colors.textPrimary }]}>CROSSBEAM</Text>
+        </View>
         <Pressable onPress={handleDiscoveryPress} style={S.headerIcon}>
            <Radar size={22} color={devices.length > 0 ? colors.accent : colors.textPrimary} strokeWidth={1.5} />
         </Pressable>
@@ -206,7 +210,7 @@ export default function App() {
       <Animated.View style={[S.drawer, { transform: [{ translateX: drawerX }] }]}>
         <View style={[S.drawerInner, { backgroundColor: colors.backgroundElevated, paddingTop: insets.top + 20 }]}>
            <View style={S.drawerHeader}>
-              <Box size={32} color={colors.accent} strokeWidth={1} />
+              <CrossBeamLogo size={40} />
               <Text style={[S.drawerBrand, { color: colors.textPrimary }]}>CROSSBEAM</Text>
             </View>
             <View style={S.drawerList}>
@@ -227,6 +231,7 @@ const S = StyleSheet.create({
   root: { flex: 1 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 100 },
   header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.xl },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuIcon: { width: 32, height: 32, justifyContent: 'center', gap: 4 },
   menuDot: { width: 4, height: 4, borderRadius: 2 },
   headerTitle: { fontSize: 12, fontWeight: '900', letterSpacing: 3 },

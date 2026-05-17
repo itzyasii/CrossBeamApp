@@ -16,6 +16,8 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as NavigationBar from 'expo-navigation-bar';
+import * as SystemUI from 'expo-system-ui';
 
 import { HistoryScreen } from '@/screens/HistoryScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
@@ -28,6 +30,7 @@ import { useDeviceDiscovery } from '@/hooks/useDeviceDiscovery';
 import { useTheme } from '@/hooks/useTheme';
 import { useTransferManager } from '@/hooks/useTransferManager';
 import { useShareIntent } from '@/hooks/useShareIntent';
+import { useAppStore } from '@/store';
 import { nativeCrossBeam } from '@/native/crossbeamNative';
 import { 
   Home, 
@@ -36,9 +39,14 @@ import {
   Clock, 
   BarChart2, 
   Smartphone,
-  Settings
+  Settings,
+  Lock
 } from 'lucide-react-native';
 import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
+import { haptics } from '@/services/haptics';
+import { useBiometrics } from '@/hooks/useBiometrics';
+import { QRPairingScreen } from '@/screens/QRPairingScreen';
+import { PinVerificationModal } from '@/components/PinVerificationModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const DRAWER_W = 280;
@@ -62,9 +70,16 @@ function BottomTabItem({ tab, active, onPress }: { tab: typeof TABS[0]; active: 
   const scale = useRef(new Animated.Value(1)).current;
   const [tooltip, setTooltip] = useState(false);
 
-  const pressIn  = () => Animated.spring(scale, { toValue: 0.82, useNativeDriver: true, tension: 250, friction: 8 }).start();
+  const pressIn  = () => {
+    void haptics.light();
+    Animated.spring(scale, { toValue: 0.82, useNativeDriver: true, tension: 250, friction: 8 }).start();
+  };
   const pressOut = () => Animated.spring(scale, { toValue: 1,    useNativeDriver: true, tension: 250, friction: 8 }).start();
-  const longPress = () => { setTooltip(true); setTimeout(() => setTooltip(false), 1200); };
+  const longPress = () => {
+    void haptics.medium();
+    setTooltip(true);
+    setTimeout(() => setTooltip(false), 1200);
+  };
 
   return (
     <Pressable
@@ -183,7 +198,32 @@ function TVSidebar({ tab, onSelect }: { tab: Tab; onSelect: (t: Tab) => void }) 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const { colors, isDark } = useTheme();
+  const { biometricLockEnabled } = useAppStore();
+  const { authenticate } = useBiometrics();
+  const [isLocked, setIsLocked] = useState(false);
+  const [showQrPairing, setShowQrPairing] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+
+  useEffect(() => {
+    if (biometricLockEnabled) {
+      setIsLocked(true);
+      void (async () => {
+        const success = await authenticate();
+        if (success) setIsLocked(false);
+      })();
+    }
+  }, [biometricLockEnabled]);
+
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      void NavigationBar.setBackgroundColorAsync(colors.background);
+      void NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+    }
+    void SystemUI.setBackgroundColorAsync(colors.background);
+  }, [colors.background, isDark]);
+
   const [tabIndex, setTabIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -227,6 +267,7 @@ export default function App() {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   const openDrawer = () => {
+    void haptics.light();
     setDrawerOpen(true);
     Animated.parallel([
       Animated.spring(drawerX,       { toValue: 0,         tension: 65, friction: 11, useNativeDriver: true }),
@@ -324,9 +365,36 @@ export default function App() {
 
         {/* Online indicator */}
         <View style={S.headerRight}>
-          <View style={[S.onlineDot, { backgroundColor: devices.length > 0 ? colors.success : colors.textMuted }]} />
+          <Pressable onPress={() => setShowQrPairing(true)}>
+            <Radio size={22} color={devices.length > 0 ? colors.success : colors.textMuted} />
+          </Pressable>
         </View>
       </BlurView>
+
+      {showQrPairing && (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
+          <QRPairingScreen onBack={() => setShowQrPairing(false)} />
+        </View>
+      )}
+
+      {isLocked && (
+        <View style={[S.lockScreen, { backgroundColor: colors.background }]}>
+          <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+          <Lock size={48} color={colors.accent} />
+          <Text style={[S.lockTitle, { color: colors.textPrimary }]}>CrossBeam Locked</Text>
+          <Pressable style={[S.unlockBtn, { backgroundColor: colors.accent }]} onPress={async () => {
+            if (await authenticate()) setIsLocked(false);
+          }}>
+            <Text style={S.unlockText}>Unlock with Biometrics</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <PinVerificationModal
+        visible={showPinModal}
+        onConfirm={() => setShowPinModal(false)}
+        onCancel={() => setShowPinModal(false)}
+      />
 
       {/* ── Swipeable Pager ─────────────────────────────────────────────────── */}
       <FlatList
@@ -447,6 +515,10 @@ const S = StyleSheet.create({
   tabBarWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   tabBar: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: SPACING.sm, paddingHorizontal: SPACING.xs, justifyContent: 'space-evenly', height: TAB_BAR_H },
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  lockScreen: { ...StyleSheet.absoluteFillObject, zIndex: 2000, justifyContent: 'center', alignItems: 'center', gap: 20 },
+  lockTitle: { fontSize: 20, fontWeight: '800' },
+  unlockBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: RADIUS.full },
+  unlockText: { color: '#FFF', fontWeight: '700' },
   tabPillActive: { width: 46, height: 38, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   tabPillInactive: { width: 46, height: 38, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   tabIcon: { fontSize: 20, lineHeight: 24 },

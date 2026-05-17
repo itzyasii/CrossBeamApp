@@ -25,10 +25,14 @@ interface AppState {
   loadTransferHistory: () => Promise<void>;
 
   // Settings
+  themePreference: 'system' | 'light' | 'dark';
+  biometricLockEnabled: boolean;
   enableNotifications: boolean;
   autoTransfer: boolean;
   enableMeteredNetworks: boolean;
   updateSettings: (key: string, value: any) => Promise<void>;
+  setThemePreference: (pref: 'system' | 'light' | 'dark') => Promise<void>;
+  setBiometricLock: (enabled: boolean) => Promise<void>;
 
   // Loading states
   isScanning: boolean;
@@ -80,12 +84,22 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   // Settings
+  themePreference: 'system',
+  biometricLockEnabled: false,
   enableNotifications: true,
   autoTransfer: false,
   enableMeteredNetworks: false,
   updateSettings: async (key, value) => {
     await storage.updateSetting(key, value);
     set({ [key]: value } as any);
+  },
+  setThemePreference: async (pref) => {
+    await storage.updateSetting('themePreference', pref);
+    set({ themePreference: pref });
+  },
+  setBiometricLock: async (enabled) => {
+    await storage.updateSetting('biometricLockEnabled', enabled);
+    set({ biometricLockEnabled: enabled });
   },
 
   // Loading states
@@ -99,6 +113,8 @@ export const useAppStore = create<AppState>((set) => ({
   try {
     const settings = await storage.getSettings();
     useAppStore.setState({
+      themePreference: settings.themePreference ?? 'system',
+      biometricLockEnabled: (settings as any).biometricLockEnabled ?? false,
       enableNotifications: settings.enableNotifications ?? true,
       autoTransfer: settings.autoTransfer ?? false,
       enableMeteredNetworks: settings.enableMeteredNetworks ?? false,

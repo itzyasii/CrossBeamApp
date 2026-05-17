@@ -97,6 +97,7 @@ export type NetworkState = {
 };
 
 export type AppSettings = {
+  themePreference?: 'system' | 'light' | 'dark';
   enableNotifications: boolean;
   autoTransfer: boolean;
   enableMeteredNetworks: boolean;

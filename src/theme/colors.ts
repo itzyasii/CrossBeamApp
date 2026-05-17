@@ -11,6 +11,7 @@ export const SPACING = {
 } as const;
 
 export const RADIUS = {
+  xs: 6,
   sm: 10,
   md: 16,
   lg: 20,
@@ -34,57 +35,65 @@ export const FONT_SIZE = {
 export type ThemeColors = typeof darkColors;
 
 export const darkColors = {
-  background: '#0A0A0F',
-  backgroundElevated: '#111118',
-  surface: 'rgba(22, 22, 32, 0.85)',
-  surfaceHover: 'rgba(36, 36, 50, 0.90)',
+  background: '#09090B',
+  backgroundElevated: '#121217',
+  surface: 'rgba(24, 24, 27, 0.7)',
+  surfaceHover: 'rgba(39, 39, 42, 0.8)',
 
-  border: 'rgba(255, 255, 255, 0.07)',
-  borderStrong: 'rgba(255, 255, 255, 0.14)',
-  borderAccent: 'rgba(99, 102, 241, 0.5)',
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderStrong: 'rgba(255, 255, 255, 0.16)',
+  borderAccent: 'rgba(99, 102, 241, 0.4)',
 
-  textPrimary: '#F4F4F6',
-  textSecondary: '#9898B0',
-  textMuted: '#56566A',
-  textInverse: '#FFFFFF',
+  textPrimary: '#FAFAFA',
+  textSecondary: '#A1A1AA',
+  textMuted: '#52525B',
+  textInverse: '#09090B',
 
   accent: '#6366F1',
   accentLight: '#818CF8',
-  accentHighlight: 'rgba(99, 102, 241, 0.12)',
+  accentHighlight: 'rgba(99, 102, 241, 0.15)',
 
-  success: '#22D3A5',
-  successMuted: 'rgba(34, 211, 165, 0.12)',
-  error: '#F87171',
-  errorMuted: 'rgba(248, 113, 113, 0.12)',
-  warning: '#FBBF24',
-  warningMuted: 'rgba(251, 191, 36, 0.12)',
+  success: '#10B981',
+  successMuted: 'rgba(16, 185, 129, 0.15)',
+  error: '#EF4444',
+  errorMuted: 'rgba(239, 68, 68, 0.15)',
+  warning: '#F59E0B',
+  warningMuted: 'rgba(245, 158, 11, 0.15)',
+
+  elevation1: '#18181B',
+  elevation2: '#27272A',
+  elevation3: '#3F3F46',
 };
 
 export const lightColors: ThemeColors = {
-  background: '#F0F0F8',
-  backgroundElevated: '#FAFAFE',
-  surface: 'rgba(255, 255, 255, 0.80)',
-  surfaceHover: 'rgba(255, 255, 255, 0.95)',
+  background: '#FAFAFA',
+  backgroundElevated: '#F4F4F5',
+  surface: 'rgba(255, 255, 255, 0.7)',
+  surfaceHover: 'rgba(244, 244, 245, 0.8)',
 
-  border: 'rgba(0, 0, 0, 0.06)',
-  borderStrong: 'rgba(0, 0, 0, 0.12)',
-  borderAccent: 'rgba(99, 102, 241, 0.4)',
+  border: 'rgba(0, 0, 0, 0.08)',
+  borderStrong: 'rgba(0, 0, 0, 0.16)',
+  borderAccent: 'rgba(79, 70, 229, 0.3)',
 
-  textPrimary: '#12121E',
-  textSecondary: '#4E4E6A',
-  textMuted: '#8E8EAA',
-  textInverse: '#FFFFFF',
+  textPrimary: '#09090B',
+  textSecondary: '#52525B',
+  textMuted: '#A1A1AA',
+  textInverse: '#FAFAFA',
 
-  accent: '#4F52E8',
+  accent: '#4F46E5',
   accentLight: '#6366F1',
-  accentHighlight: 'rgba(79, 82, 232, 0.10)',
+  accentHighlight: 'rgba(79, 70, 229, 0.1)',
 
-  success: '#0EBA90',
-  successMuted: 'rgba(14, 186, 144, 0.10)',
-  error: '#E55353',
-  errorMuted: 'rgba(229, 83, 83, 0.10)',
-  warning: '#E0A020',
-  warningMuted: 'rgba(224, 160, 32, 0.10)',
+  success: '#059669',
+  successMuted: 'rgba(5, 150, 105, 0.1)',
+  error: '#DC2626',
+  errorMuted: 'rgba(220, 38, 38, 0.1)',
+  warning: '#D97706',
+  warningMuted: 'rgba(217, 119, 6, 0.1)',
+
+  elevation1: '#FFFFFF',
+  elevation2: '#F4F4F5',
+  elevation3: '#E4E4E7',
 };
 
 // ─── Gradient Presets ─────────────────────────────────────────────────────────
@@ -92,17 +101,17 @@ export const lightColors: ThemeColors = {
 export const gradients = {
   primary: ['#6366F1', '#8B5CF6'] as const,
   primaryLight: ['#818CF8', '#A78BFA'] as const,
-  success: ['#22D3A5', '#06B6D4'] as const,
-  error: ['#F87171', '#FB923C'] as const,
-  dark: ['rgba(22,22,32,0.95)', 'rgba(10,10,15,0.98)'] as const,
-  surface: ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.02)'] as const,
+  success: ['#10B981', '#06B6D4'] as const,
+  error: ['#EF4444', '#F97316'] as const,
+  dark: ['#18181B', '#09090B'] as const,
+  surface: ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)'] as const,
 };
 
 // ─── Glass Tokens ─────────────────────────────────────────────────────────────
 
 export const glass = {
-  blurIntensity: 35,
-  blurIntensityLight: 50,
+  blurIntensity: 25,
+  blurIntensityLight: 40,
 };
 
 // Backward-compatible

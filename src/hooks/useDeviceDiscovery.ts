@@ -9,6 +9,7 @@ import {
 } from '@/services/deviceDiscovery';
 import { Device } from '@/types/domain';
 import { nativeCrossBeam } from '@/native/crossbeamNative';
+import { haptics } from '@/services/haptics';
 
 const AUTO_REFRESH_MS = 12_000;
 
@@ -60,6 +61,10 @@ export const useDeviceDiscovery = () => {
 
     const removeFound = addNearbyDeviceFoundListener((device) => {
       setDevices((current) => {
+        const alreadyFound = current.some((item) => item.id === device.id);
+        if (!alreadyFound) {
+          void haptics.light();
+        }
         const existing = current.filter((item) => item.id !== device.id);
         return [device, ...existing];
       });

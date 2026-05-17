@@ -11,22 +11,45 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0F"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.crossbeam.app",
+      "associatedDomains": [
+        "applinks:crossbeam.app",
+        "webcredentials:crossbeam.app"
+      ],
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.crossbeam.app"],
+        "com.apple.developer.icloud-container-identifiers": [
+          "iCloud.com.crossbeam.app"
+        ],
+        "com.apple.developer.ubiquity-container-identifiers": [
+          "iCloud.com.crossbeam.app"
+        ],
+        "com.apple.security.keychain-access-groups": [
+          "$(AppIdentifierPrefix)com.crossbeam.app"
+        ]
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "CrossBeam uses the camera to scan QR codes for device pairing.",
         "NSFaceIDUsageDescription": "CrossBeam uses FaceID to secure your transfers and privacy.",
         "NSLocalNetworkUsageDescription": "CrossBeam uses the local network to discover and connect to nearby devices for private file sharing.",
-        "NSBonjourServices": [
-          "_crossbeam._tcp"
-        ],
+        "NSBonjourServices": ["_crossbeam._tcp"],
         "NSPhotoLibraryUsageDescription": "CrossBeam lets you choose photos and videos to share with nearby devices.",
         "NSDocumentsFolderUsageDescription": "CrossBeam lets you choose documents to share with nearby devices.",
-        "NSBluetoothAlwaysUsageDescription": "CrossBeam uses Bluetooth to discover nearby devices for file sharing."
+        "NSBluetoothAlwaysUsageDescription": "CrossBeam uses Bluetooth to discover nearby devices for file sharing.",
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "NSUbiquitousContainers": {
+          "iCloud.com.crossbeam.app": {
+            "NSUbiquitousContainerIsDocumentScopePublic": false,
+            "NSUbiquitousContainerSupportsFolderLevelEncryption": true
+          }
+        }
+      },
+      "infoPlistExtras": {
+        "LSApplicationQueriesSchemes": ["files", "sharemenow"]
       }
     },
     "android": {

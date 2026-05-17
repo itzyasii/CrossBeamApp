@@ -112,8 +112,8 @@ CrossBeam is in active development. We believe in radical transparency about wha
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/crossbeam.git
-cd crossbeam
+git clone https://github.com/itzyasii/CrossBeamApp.git
+cd CrossBeamApp
 
 # Install JavaScript dependencies
 npm install

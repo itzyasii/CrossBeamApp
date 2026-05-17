@@ -1,224 +1,211 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View, Pressable, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet, Text, View, Pressable, Platform, Dimensions, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Radio, Zap, Rocket, ShieldCheck } from 'lucide-react-native';
+import { Camera, Send, History, Settings, Shield, Plus, X, Laptop, Smartphone, Tv } from 'lucide-react-native';
 import { GlassCard } from '@/components/GlassCard';
 import { useTheme } from '@/hooks/useTheme';
 import { FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 import { haptics } from '@/services/haptics';
+import { formatSize } from '@/services/transferService';
+
+const { width: SCREEN_W } = Dimensions.get('window');
 
 type Props = {
-  deviceCount: number;
-  transferCount: number;
-  discoveryStatus: string;
-  onStartDiscovery?: () => void;
+  devices: any[];
+  transfers: any[];
+  selectedFiles: any[];
+  onStartDiscovery: () => void;
+  onPickFiles: () => void;
+  onStartTransfer: () => void;
+  onOpenScanner: () => void;
+  onGoToTab: (tab: string) => void;
+  onClearFiles: () => void;
 };
 
-const OrbCore = () => {
-  const scale = useRef(new Animated.Value(1)).current;
-  const spin = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(scale, { toValue: 1.08, duration: 2500, useNativeDriver: true }),
-          Animated.timing(scale, { toValue: 1, duration: 2500, useNativeDriver: true }),
-        ]),
-        Animated.timing(spin, { toValue: 1, duration: 20000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [scale, spin]);
-
-  return (
-    <View style={S.orbContainer}>
-      <Animated.View style={[S.orbGlow, { transform: [{ scale }] }]} />
-      <Animated.Image 
-        source={require('../../assets/icon.png')} 
-        style={[S.orbInner, { 
-          transform: [
-            { scale },
-            { rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }
-          ] 
-        }]} 
-      />
-    </View>
-  );
+const DeviceIcon = ({ platform }: { platform: string }) => {
+  if (platform === 'android-tv') return <Tv size={20} color="#FFF" />;
+  if (platform === 'laptop' || platform === 'web') return <Laptop size={20} color="#FFF" />;
+  return <Smartphone size={20} color="#FFF" />;
 };
 
-const BentoCard = ({ 
-  title, 
-  value, 
-  label, 
-  icon: Icon, 
-  color, 
-  flex = 1, 
-  delay = 0 
-}: { 
-  title: string; 
-  value: string; 
-  label: string; 
-  icon: any; 
-  color: string; 
-  flex?: number; 
-  delay?: number 
-}) => {
-  const { colors } = useTheme();
-  const fade = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(20)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
-      Animated.spring(slide, { toValue: 0, tension: 40, friction: 8, delay, useNativeDriver: true }),
-    ]).start();
-  }, [fade, slide, delay]);
-
-  return (
-    <Animated.View style={{ flex, opacity: fade, transform: [{ translateY: slide }] }}>
-      <GlassCard padding={SPACING.lg} style={S.bentoCard}>
-        <View style={S.bentoHeader}>
-          <View style={[S.bentoIconWrap, { backgroundColor: `${color}15` }]}>
-            <Icon size={18} color={color} strokeWidth={2.5} />
-          </View>
-          <Text style={[S.bentoTitle, { color: colors.textMuted }]}>{title}</Text>
-        </View>
-        <View>
-          <Text style={[S.bentoValue, { color: colors.textPrimary }]}>{value}</Text>
-          <Text style={[S.bentoLabel, { color: colors.textSecondary }]}>{label}</Text>
-        </View>
-      </GlassCard>
-    </Animated.View>
-  );
-};
-
-export function HomeScreen({ deviceCount, transferCount, discoveryStatus, onStartDiscovery }: Props) {
+export function HomeScreen({
+  devices,
+  transfers,
+  selectedFiles,
+  onStartDiscovery,
+  onPickFiles,
+  onStartTransfer,
+  onOpenScanner,
+  onGoToTab,
+  onClearFiles
+}: Props) {
   const { colors, isDark } = useTheme();
 
-  const handleStartDiscovery = () => {
-    void haptics.medium();
-    onStartDiscovery?.();
-  };
+  const hasFiles = selectedFiles.length > 0;
+  const activeTransfers = transfers.filter(t => t.status === 'in-progress' || t.status === 'queued');
 
   return (
-    <View style={S.container}>
-      {/* ── Header Area ── */}
-      <View style={S.welcomeArea}>
-        <View>
-          <Text style={[S.welcomeTitle, { color: colors.textPrimary }]}>Local Mesh</Text>
-          <Text style={[S.welcomeSub, { color: colors.textSecondary }]}>Secure P2P Network</Text>
-        </View>
-        <View style={[S.statusBadge, { backgroundColor: colors.accentHighlight }]}>
-          <View style={[S.statusDot, { backgroundColor: deviceCount > 0 ? colors.success : colors.warning }]} />
-          <Text style={[S.statusText, { color: colors.accent }]}>{deviceCount > 0 ? 'ACTIVE' : 'IDLE'}</Text>
-        </View>
-      </View>
+    <ScrollView style={S.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-      {/* ── Hero Section ── */}
-      <GlassCard animate accentBorder style={S.heroMesh} elevation={2}>
-        <LinearGradient
-          colors={isDark ? ['rgba(99, 102, 241, 0.12)', 'transparent'] : ['rgba(99, 102, 241, 0.05)', 'transparent']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
-        <View style={S.heroContent}>
-          <OrbCore />
-          <View style={S.heroText}>
-            <View style={S.heroTitleRow}>
-              <Text style={[S.heroHeadline, { color: colors.textPrimary }]}>Local Node</Text>
-              <ShieldCheck size={16} color={colors.success} strokeWidth={2.5} />
+      {/* ── Main Action Hub ── */}
+      <View style={S.actionHub}>
+        <View style={S.mainButtons}>
+          <Pressable
+            onPress={onPickFiles}
+            style={({ pressed }) => [S.bigBtn, { backgroundColor: colors.accent }, pressed && S.pressed]}
+          >
+            <View style={S.btnIcon}>
+              <Plus size={32} color="#FFF" strokeWidth={2.5} />
             </View>
-            <Text style={[S.heroSubline, { color: colors.textSecondary }]}>
-              {discoveryStatus || 'Ready to discover nearby peers securely.'}
-            </Text>
-          </View>
-        </View>
-      </GlassCard>
+            <Text style={S.btnLabel}>Send Files</Text>
+          </Pressable>
 
-      {/* ── Bento Grid ── */}
-      <View style={S.grid}>
-        <View style={S.row}>
-          <BentoCard 
-            title="PEERS" 
-            value={String(deviceCount)} 
-            label="Nearby Devices" 
-            icon={Radio} 
-            color={colors.accent}
-            delay={100}
-          />
-          <BentoCard 
-            title="JOBS" 
-            value={String(transferCount)} 
-            label="Active Transfers"
-            icon={Zap} 
-            color={colors.success}
-            delay={200}
-          />
-        </View>
-
-        <View style={S.row}>
-          <Pressable onPress={handleStartDiscovery} style={{ flex: 1 }} accessibilityRole="button">
-            {({ pressed }) => (
-              <GlassCard padding={0} style={[S.wideAction, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]} elevation={2}>
-                <LinearGradient
-                  colors={['#6366F1', '#4F46E5']}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                />
-                <View style={S.actionInner}>
-                  <View>
-                    <Text style={S.actionTitle}>Start Discovery</Text>
-                    <Text style={S.actionSub}>Broadcast presence to mesh</Text>
-                  </View>
-                  <View style={S.actionIconCircle}>
-                    <Rocket size={22} color="#6366F1" strokeWidth={2.5} />
-                  </View>
-                </View>
-              </GlassCard>
-            )}
+          <Pressable
+            onPress={onOpenScanner}
+            style={({ pressed }) => [S.bigBtn, { backgroundColor: colors.surfaceHover, borderWidth: 1, borderColor: colors.borderStrong }, pressed && S.pressed]}
+          >
+            <View style={S.btnIcon}>
+              <Camera size={32} color={colors.textPrimary} strokeWidth={2} />
+            </View>
+            <Text style={[S.btnLabel, { color: colors.textPrimary }]}>Scan QR</Text>
           </Pressable>
         </View>
+
+        {hasFiles && (
+          <GlassCard animate style={S.selectionCard} accentBorder>
+            <View style={S.selectionHeader}>
+              <Text style={[S.selectionTitle, { color: colors.textPrimary }]}>
+                {selectedFiles.length} item{selectedFiles.length > 1 ? 's' : ''} ready
+              </Text>
+              <Pressable onPress={onClearFiles}>
+                <X size={18} color={colors.error} />
+              </Pressable>
+            </View>
+            <Text style={[S.selectionSub, { color: colors.textSecondary }]}>
+              Total size: {formatSize(selectedFiles.reduce((a, b) => a + b.sizeBytes, 0))}
+            </Text>
+            <Pressable onPress={onStartTransfer} style={[S.sendNowBtn, { backgroundColor: colors.success }]}>
+              <Send size={18} color="#FFF" />
+              <Text style={S.sendNowText}>Send Now</Text>
+            </Pressable>
+          </GlassCard>
+        )}
       </View>
-    </View>
+
+      {/* ── Quick Discovery ── */}
+      <View style={S.section}>
+        <View style={S.sectionHeader}>
+          <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>Nearby Devices</Text>
+          <Pressable onPress={onStartDiscovery}>
+            <Text style={[S.actionLink, { color: colors.accent }]}>Refresh</Text>
+          </Pressable>
+        </View>
+
+        {devices.length === 0 ? (
+          <GlassCard style={S.emptyCard}>
+            <Text style={[S.emptyText, { color: colors.textSecondary }]}>Looking for devices nearby...</Text>
+          </GlassCard>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.deviceList}>
+            {devices.map((device) => (
+              <Pressable key={device.id} style={S.deviceCard}>
+                <View style={[S.deviceAvatar, { backgroundColor: colors.accent }]}>
+                  <DeviceIcon platform={device.platform} />
+                </View>
+                <Text style={[S.deviceName, { color: colors.textPrimary }]} numberOfLines={1}>{device.name}</Text>
+                <Text style={[S.deviceStatus, { color: colors.textMuted }]}>{device.isTrusted ? 'Trusted' : 'New'}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
+      {/* ── Active Work ── */}
+      {activeTransfers.length > 0 && (
+        <View style={S.section}>
+          <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>Active Transfers</Text>
+          {activeTransfers.map((job) => (
+            <GlassCard key={job.id} style={S.jobCard}>
+              <View style={S.jobInfo}>
+                <Text style={[S.jobName, { color: colors.textPrimary }]} numberOfLines={1}>{job.fileNames[0]}</Text>
+                <Text style={[S.jobProgress, { color: colors.accent }]}>{job.progress}%</Text>
+              </View>
+              <View style={S.progressTrack}>
+                <View style={[S.progressFill, { width: `${job.progress}%`, backgroundColor: colors.accent }]} />
+              </View>
+            </GlassCard>
+          ))}
+        </View>
+      )}
+
+      {/* ── Quick Links ── */}
+      <View style={S.quickLinks}>
+        <Pressable onPress={() => onGoToTab('history')} style={S.linkItem}>
+          <View style={[S.linkIcon, { backgroundColor: colors.surfaceHover }]}>
+            <History size={20} color={colors.textPrimary} />
+          </View>
+          <Text style={[S.linkLabel, { color: colors.textSecondary }]}>History</Text>
+        </Pressable>
+
+        <Pressable onPress={() => onGoToTab('settings')} style={S.linkItem}>
+          <View style={[S.linkIcon, { backgroundColor: colors.surfaceHover }]}>
+            <Settings size={20} color={colors.textPrimary} />
+          </View>
+          <Text style={[S.linkLabel, { color: colors.textSecondary }]}>Settings</Text>
+        </Pressable>
+
+        <View style={S.linkItem}>
+          <View style={[S.linkIcon, { backgroundColor: colors.successMuted }]}>
+            <Shield size={20} color={colors.success} />
+          </View>
+          <Text style={[S.linkLabel, { color: colors.textSecondary }]}>Secure</Text>
+        </View>
+      </View>
+
+    </ScrollView>
   );
 }
 
 const S = StyleSheet.create({
-  container: { gap: SPACING.lg },
+  container: { flex: 1, paddingTop: SPACING.md },
+  pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
 
-  welcomeArea: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
-  welcomeTitle: { fontSize: FONT_SIZE.xl, fontWeight: '900', letterSpacing: -1 },
-  welcomeSub: { fontSize: FONT_SIZE.xs, fontWeight: '700', marginTop: -2 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  actionHub: { gap: SPACING.md, marginBottom: SPACING.xl },
+  mainButtons: { flexDirection: 'row', gap: SPACING.md },
+  bigBtn: { flex: 1, height: 140, borderRadius: RADIUS.lg, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  btnIcon: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  btnLabel: { fontSize: 16, fontWeight: '800', color: '#FFF' },
 
-  heroMesh: { height: 160, justifyContent: 'center' },
-  heroContent: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, paddingHorizontal: SPACING.lg },
-  heroText: { flex: 1, gap: 2 },
-  heroTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  heroHeadline: { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
-  heroSubline: { fontSize: FONT_SIZE.sm, lineHeight: 18, fontWeight: '500' },
+  selectionCard: { gap: 8 },
+  selectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  selectionTitle: { fontSize: 16, fontWeight: '800' },
+  selectionSub: { fontSize: 13, fontWeight: '600' },
+  sendNowBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: RADIUS.md, marginTop: 8 },
+  sendNowText: { color: '#FFF', fontWeight: '800', fontSize: 15 },
 
-  orbContainer: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
-  orbInner: { width: 52, height: 52, borderRadius: 12, overflow: 'hidden' },
-  orbGlow: { position: 'absolute', width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(99, 102, 241, 0.2)', ...Platform.select({ ios: { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 15 }, android: { elevation: 0 } }) } as any,
+  section: { gap: SPACING.md, marginBottom: SPACING.xl },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
+  actionLink: { fontSize: 14, fontWeight: '700' },
 
-  grid: { gap: SPACING.md },
-  row: { flexDirection: 'row', gap: SPACING.md },
-  
-  bentoCard: { minHeight: 130, justifyContent: 'space-between' },
-  bentoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  bentoIconWrap: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm },
-  bentoTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  bentoValue: { fontSize: 32, fontWeight: '900', letterSpacing: -1.5 },
-  bentoLabel: { fontSize: 11, fontWeight: '700', marginTop: -2 },
+  emptyCard: { height: 100, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
+  emptyText: { fontSize: 14, fontWeight: '600' },
 
-  wideAction: { height: 84, justifyContent: 'center', overflow: 'hidden' },
-  actionInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.xl },
-  actionTitle: { color: '#fff', fontSize: 19, fontWeight: '900', letterSpacing: -0.5 },
-  actionSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
-  actionIconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  deviceList: { marginHorizontal: -SPACING.xl, paddingHorizontal: SPACING.xl },
+  deviceCard: { width: 100, alignItems: 'center', gap: 6, marginRight: SPACING.md },
+  deviceAvatar: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  deviceName: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  deviceStatus: { fontSize: 11, fontWeight: '600' },
+
+  jobCard: { gap: 8, marginBottom: SPACING.sm },
+  jobInfo: { flexDirection: 'row', justifyContent: 'space-between' },
+  jobName: { fontSize: 14, fontWeight: '700', flex: 1 },
+  jobProgress: { fontSize: 14, fontWeight: '800' },
+  progressTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
+
+  quickLinks: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: SPACING.md },
+  linkItem: { alignItems: 'center', gap: 8 },
+  linkIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  linkLabel: { fontSize: 11, fontWeight: '700' },
 });

@@ -1,86 +1,71 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
+import Svg, { Path, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import { useTheme } from '@/hooks/useTheme';
 
-type CrossBeamLogoProps = {
-  compact?: boolean;
-};
-
-export function CrossBeamLogo({ compact = false }: CrossBeamLogoProps) {
-  const { colors } = useTheme();
-
-  return (
-    <View style={[styles.container, compact && styles.compactContainer]}>
-      <View style={styles.mark}>
-        <View style={[styles.beam, styles.beamA, { backgroundColor: '#6FF8F2' }]} />
-        <View style={[styles.beam, styles.beamB, { backgroundColor: '#9B63FF' }]} />
-        <View style={[styles.centerNode, { borderColor: colors.textInverse, backgroundColor: colors.surface }]}>
-          <View style={[styles.centerPulse, { backgroundColor: colors.accent }]} />
-        </View>
-      </View>
-      <Text style={[styles.wordmark, { color: colors.textPrimary }, compact && styles.compactWordmark]}>
-        CrossBeamApp
-      </Text>
-      {!compact ? (
-        <Text style={[styles.tagline, { color: colors.textSecondary }]}>Elegant UI • Less Ads • Faster • Offline Sharing</Text>
-      ) : null}
-    </View>
-  );
+interface Props {
+  size?: number;
+  animate?: boolean;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    gap: 10,
-  },
-  compactContainer: {
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  mark: {
-    width: 112,
-    height: 112,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  beam: {
-    position: 'absolute',
-    width: 96,
-    height: 28,
-    borderRadius: 14,
-    opacity: 0.95,
-  },
-  beamA: {
-    transform: [{ rotate: '45deg' }],
-  },
-  beamB: {
-    transform: [{ rotate: '-45deg' }],
-  },
-  centerNode: {
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerPulse: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-  },
-  wordmark: {
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: 0.2,
-  },
-  compactWordmark: {
-    fontSize: 24,
-  },
-  tagline: {
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-});
+export const CrossBeamLogo = ({ size = 100, animate = true }: Props) => {
+  const { colors } = useTheme();
+  const rotation = React.useRef(new Animated.Value(0)).current;
+  const pulse = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (animate) {
+      Animated.loop(
+        Animated.parallel([
+          Animated.timing(rotation, { toValue: 1, duration: 20000, useNativeDriver: true }),
+          Animated.sequence([
+            Animated.timing(pulse, { toValue: 1.1, duration: 2000, useNativeDriver: true }),
+            Animated.timing(pulse, { toValue: 1, duration: 2000, useNativeDriver: true }),
+          ])
+        ])
+      ).start();
+    }
+  }, [animate]);
+
+  const spin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={{ transform: [{ rotate: spin }, { scale: pulse }] }}>
+        <Svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+          <Defs>
+            <LinearGradient id="logoGrad" x1="0" y1="0" x2="100" y2="100">
+              <Stop offset="0%" stopColor={colors.accent} />
+              <Stop offset="100%" stopColor={colors.accentLight} />
+            </LinearGradient>
+          </Defs>
+
+          {/* Outer Rings */}
+          <Circle cx="50" cy="50" r="48" stroke={colors.border} strokeWidth="0.5" strokeDasharray="4 4" />
+
+          {/* Main "X" Beams */}
+          <Path
+            d="M30 30 L70 70 M70 30 L30 70"
+            stroke="url(#logoGrad)"
+            strokeWidth="8"
+            strokeLinecap="round"
+            opacity="0.8"
+          />
+
+          {/* Central Core */}
+          <Circle cx="50" cy="50" r="12" fill={colors.background} stroke={colors.accent} strokeWidth="2" />
+          <Circle cx="50" cy="50" r="6" fill={colors.accent} />
+
+          {/* Accent Nodes */}
+          <Circle cx="30" cy="30" r="3" fill={colors.accent} />
+          <Circle cx="70" cy="70" r="3" fill={colors.accent} />
+          <Circle cx="70" cy="30" r="3" fill={colors.accent} />
+          <Circle cx="30" cy="70" r="3" fill={colors.accent} />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+};

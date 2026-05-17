@@ -10,3 +10,4 @@ export { HomeScreen } from './HomeScreen';
 export { DiscoverScreen } from './DiscoverScreen';
 export { AnalyticsScreen } from './AnalyticsScreen';
 export { DevicesScreen } from './DevicesScreen';
+export { QRPairingScreen } from './QRPairingScreen';

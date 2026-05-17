@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Platform, Pressable, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { BarCodeScanner } from 'expo-barcode-scanner';
-import { Camera, X, RefreshCcw, ShieldCheck } from 'lucide-react-native';
+import { Camera, CameraView } from 'expo-camera';
+import { X, RefreshCcw, ShieldCheck } from 'lucide-react-native';
 import { GlassCard } from '@/components/GlassCard';
 import { useTheme } from '@/hooks/useTheme';
 import { SPACING, FONT_SIZE, RADIUS } from '@/theme/colors';
@@ -18,7 +18,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
   useEffect(() => {
     if (Platform.OS !== 'web' && !Platform.isTV) {
       (async () => {
-        const { status } = await BarCodeScanner.requestPermissionsAsync();
+        const { status } = await Camera.requestCameraPermissionsAsync();
         setHasPermission(status === 'granted');
       })();
     }
@@ -39,6 +39,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
   }, []);
 
   const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (scanned) return;
     setScanned(true);
     void haptics.success();
     console.log('[QR] Scanned data:', data);
@@ -92,10 +93,21 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
         {hasPermission === null ? (
           <ActivityIndicator size="large" color={colors.accent} />
         ) : hasPermission === false ? (
-          <Text style={{ color: colors.error }}>No camera permission</Text>
+          <View style={S.errorContainer}>
+            <Text style={[S.errorText, { color: colors.error }]}>No camera permission</Text>
+            <Pressable style={[S.retryBtn, { backgroundColor: colors.accent, marginTop: 20 }]} onPress={async () => {
+              const { status } = await Camera.requestCameraPermissionsAsync();
+              setHasPermission(status === 'granted');
+            }}>
+              <Text style={S.retryText}>Grant Permission</Text>
+            </Pressable>
+          </View>
         ) : (
-          <BarCodeScanner
-            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+          <CameraView
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ['qr'],
+            }}
             style={StyleSheet.absoluteFillObject}
           />
         )}
@@ -115,10 +127,10 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
           Align the QR code on the TV screen within the frame to pair.
         </Text>
         {scanned && (
-          <Pressable style={[S.retryBtn, { backgroundColor: colors.accent }]} onPress={() => setScanned(false)}>
-            <RefreshCcw size={18} color="#FFF" />
-            <Text style={S.retryText}>Rescan</Text>
-          </Pressable>
+          <View style={[S.successBadge, { backgroundColor: colors.successMuted }]}>
+            <ShieldCheck size={18} color={colors.success} />
+            <Text style={[S.successText, { color: colors.success }]}>Paired Successfully</Text>
+          </View>
         )}
       </View>
     </View>
@@ -135,7 +147,7 @@ const S = StyleSheet.create({
   tvFooter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   footerText: { fontSize: FONT_SIZE.sm, fontWeight: '600' },
 
-  header: { padding: SPACING.lg, paddingTop: 50, flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  header: { padding: SPACING.lg, paddingTop: 50, flexDirection: 'row', alignItems: 'center', gap: SPACING.md, zIndex: 10 },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800' },
   scannerContainer: { flex: 1, overflow: 'hidden' },
@@ -143,8 +155,12 @@ const S = StyleSheet.create({
   unfocusedContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   focusedRow: { flexDirection: 'row', height: 260 },
   focusedContainer: { flex: 1, borderWidth: 2, borderRadius: 20 },
-  footer: { padding: SPACING.xl, alignItems: 'center', gap: SPACING.md },
+  footer: { padding: SPACING.xl, alignItems: 'center', gap: SPACING.md, backgroundColor: '#000' },
   footerHint: { fontSize: FONT_SIZE.sm, textAlign: 'center' },
   retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: RADIUS.full },
   retryText: { color: '#FFF', fontWeight: '800' },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  errorText: { textAlign: 'center', fontSize: FONT_SIZE.base, fontWeight: '600' },
+  successBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: RADIUS.full },
+  successText: { fontWeight: '800', fontSize: FONT_SIZE.sm },
 });

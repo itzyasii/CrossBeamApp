@@ -61,6 +61,9 @@ export type CrossBeamNativeModule = {
   cancelTransfer(transferId: string): Promise<void>;
   pauseTransfer(transferId: string): Promise<void>;
   resumeTransfer(transferId: string): Promise<void>;
+  // Phase B: Authentication & Security
+  storeSecureValue(alias: String, value: string): Promise<string>;
+  retrieveSecureValue(alias: String, encryptedValue: string): Promise<string>;
 };
 
 const nativeModule = requireOptionalNativeModule<CrossBeamNativeModule>('CrossBeamNative');

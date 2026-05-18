@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 
 import {
   CrossBeamNative,
@@ -6,32 +6,40 @@ import {
   NativePeer,
   NativeTransferRequest,
   NativeTransferEvent,
-} from 'crossbeam-native';
-import { Device } from '@/types/domain';
+} from "crossbeam-native";
+
+export {
+  CrossBeamNative,
+  CrossBeamNativeEvents,
+  NativePeer,
+  NativeTransferRequest,
+  NativeTransferEvent,
+};
+import { Device } from "@/types/domain";
 
 const toDevice = (peer: NativePeer): Device => ({
   id: peer.id,
   name: peer.name,
   platform:
-    peer.platform === 'android-tv'
-      ? 'android-tv'
-      : peer.platform === 'ios'
-        ? 'ios'
-        : 'android',
+    peer.platform === "android-tv"
+      ? "android-tv"
+      : peer.platform === "ios"
+        ? "ios"
+        : "android",
   connection:
-    peer.connection === 'multipeer'
-      ? 'multipeer'
-      : peer.connection === 'local-network'
-        ? 'local-network'
-        : peer.connection === 'ble'
-          ? 'ble'
-          : 'wifi-direct',
+    peer.connection === "multipeer"
+      ? "multipeer"
+      : peer.connection === "local-network"
+        ? "local-network"
+        : peer.connection === "ble"
+          ? "ble"
+          : "wifi-direct",
   lastSeenAt: peer.lastSeenAt,
 });
 
 export const nativeCrossBeam = {
   isRuntimeSupported(): boolean {
-    return Platform.OS === 'android' || Platform.OS === 'ios';
+    return Platform.OS === "android" || Platform.OS === "ios";
   },
 
   async isAvailable(): Promise<boolean> {
@@ -46,7 +54,9 @@ export const nativeCrossBeam = {
 
   async startDiscovery(): Promise<void> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) {
-      throw new Error('CrossBeam native discovery module is not installed in this runtime.');
+      throw new Error(
+        "CrossBeam native discovery module is not installed in this runtime.",
+      );
     }
     await CrossBeamNative.startDiscovery();
   },
@@ -62,16 +72,22 @@ export const nativeCrossBeam = {
     return peers.map(toDevice);
   },
 
-  async sendFiles(request: NativeTransferRequest): Promise<{ transferId: string }> {
+  async sendFiles(
+    request: NativeTransferRequest,
+  ): Promise<{ transferId: string }> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) {
-      throw new Error('CrossBeam native transfer module is not installed in this runtime.');
+      throw new Error(
+        "CrossBeam native transfer module is not installed in this runtime.",
+      );
     }
     return CrossBeamNative.sendFiles(request);
   },
 
   async cancelTransfer(transferId: string): Promise<void> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) {
-      throw new Error('CrossBeam native transfer module is not installed in this runtime.');
+      throw new Error(
+        "CrossBeam native transfer module is not installed in this runtime.",
+      );
     }
     await CrossBeamNative.cancelTransfer(transferId);
   },
@@ -87,15 +103,18 @@ export const nativeCrossBeam = {
   },
 
   addPeerFoundListener(listener: (device: Device) => void): () => void {
-    const subscription = CrossBeamNativeEvents?.addListener('onPeerFound', (peer: NativePeer) => {
-      listener(toDevice(peer));
-    });
+    const subscription = CrossBeamNativeEvents?.addListener(
+      "onPeerFound",
+      (peer: NativePeer) => {
+        listener(toDevice(peer));
+      },
+    );
     return () => subscription?.remove();
   },
 
   addPeerLostListener(listener: (id: string) => void): () => void {
     const subscription = CrossBeamNativeEvents?.addListener(
-      'onPeerLost',
+      "onPeerLost",
       (event: { id: string }) => {
         listener(event.id);
       },
@@ -103,8 +122,13 @@ export const nativeCrossBeam = {
     return () => subscription?.remove();
   },
 
-  addTransferProgressListener(listener: (event: NativeTransferEvent) => void): () => void {
-    const subscription = CrossBeamNativeEvents?.addListener('onTransferProgress', listener);
+  addTransferProgressListener(
+    listener: (event: NativeTransferEvent) => void,
+  ): () => void {
+    const subscription = CrossBeamNativeEvents?.addListener(
+      "onTransferProgress",
+      listener,
+    );
     return () => subscription?.remove();
   },
 };

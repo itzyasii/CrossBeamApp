@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useShareIntent as useExpoShareIntent } from 'expo-share-intent';
+import AndroidShareService from '../services/AndroidShareService';
 
 export const useShareIntent = () => {
   const { hasShareIntent, shareIntent, resetShareIntent } = useExpoShareIntent();
@@ -11,15 +12,15 @@ export const useShareIntent = () => {
         const newFiles = (shareIntent.files || []).map((file, idx) => ({
           id: `shared-${Date.now()}-${idx}`,
           name: file.fileName ?? `shared-file-${idx}`,
-          sizeBytes: 0, // Usually need to Stat it to get size, but we'll default to 0 and native module handles reading it
+          sizeBytes: 0,
           uri: file.path,
           mimeType: file.mimeType,
         }));
         
         setSharedFiles(current => [...current, ...newFiles]);
+        AndroidShareService.handleIncomingFiles(newFiles);
         resetShareIntent();
       } else if (shareIntent.type === 'text') {
-        // Handle shared text (like URLs) if necessary in the future
         resetShareIntent();
       }
     }

@@ -1,28 +1,55 @@
+# Dependencies
 node_modules/
+
+# Expo
 .expo/
 .expo-shared/
 dist/
 build/
-*.log
-.DS_Store
+
+# Android
+android/build/
+**/.gradle/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+*.hprof
+android/.cxx/
+
+# iOS
+ios/build/
+ios/Pods/
+ios/.xcode.env.local
+ios/*.xcworkspace/
+ios/*.xcodeproj/project.xcworkspace/
+ios/*.xcodeproj/xcuserdata/
+
+# Environment
 .env
 *.env
-*.expo
-*.expo-shared
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# System files
+.DS_Store
 .idea/
 .vscode/
-*.iml
-coverage/
+*.log
+*.cache
 *.tsbuildinfo
 *.bak
 *.tmp
 *.swp
 *.swo
+
+# Project specific
+coverage/
 *.zip
 *.tar.gz
 *.tgz
-*.log
-*.cache
 *.pid
 *.seed
 *.pid.lock

@@ -35,7 +35,33 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
 import kotlin.math.max
 
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
+import android.util.Base64
+
+import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pManager
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+
 class CrossBeamNativeModule : Module() {
+  private var wifiP2pManager: WifiP2pManager? = null
+  private var wifiP2pChannel: WifiP2pManager.Channel? = null
+  private var wifiP2pReceiver: BroadcastReceiver? = null
+  private val wifiP2pIntentFilter = IntentFilter().apply {
+    addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+    addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
+    addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+    addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
+  }
+  private val KEYSTORE_PROVIDER = "AndroidKeyStore"
+  private val AES_MODE = "AES/GCM/NoPadding"
   private val peers = ConcurrentHashMap<String, Map<String, Any?>>()
   private var discoveryListener: NsdManager.DiscoveryListener? = null
   private var registrationListener: NsdManager.RegistrationListener? = null
@@ -81,13 +107,16 @@ class CrossBeamNativeModule : Module() {
     }
 
     AsyncFunction("startDiscovery") {
+      initWifiP2p()
       startTransferServer()
       registerLocalService()
       startNsdDiscovery()
       startBleDiscovery()
+      startWifiP2pDiscovery()
     }
 
     AsyncFunction("stopDiscovery") {
+      stopWifiP2pDiscovery()
       stopNsdDiscovery()
       unregisterLocalService()
       stopTransferServer()
@@ -133,7 +162,127 @@ class CrossBeamNativeModule : Module() {
       // However, for an active socket, we can just let it spin or signal it.
       emitTransfer(transferId, "unknown-peer", null, 0, 1, "in-progress", null)
     }
+
+    // Phase B: Authentication & Security (Keystore)
+    AsyncFunction("storeSecureValue") { alias: String, value: String ->
+      val key = getOrCreateSecretKey(alias)
+      val cipher = Cipher.getInstance(AES_MODE)
+      cipher.init(Cipher.ENCRYPT_MODE, key)
+      val iv = cipher.iv
+      val encryption = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+      
+      val combined = ByteArray(iv.size + encryption.size)
+      System.arraycopy(iv, 0, combined, 0, iv.size)
+      System.arraycopy(encryption, 0, combined, iv.size, encryption.size)
+      
+      Base64.encodeToString(combined, Base64.DEFAULT)
+    }
+
+    AsyncFunction("retrieveSecureValue") { alias: String, encryptedValue: String ->
+      val key = getSecretKey(alias) ?: throw Exception("Key not found")
+      val combined = Base64.decode(encryptedValue, Base64.DEFAULT)
+      
+      val ivSize = 12 // GCM default IV size
+      val iv = combined.sliceArray(0 until ivSize)
+      val encryption = combined.sliceArray(ivSize until combined.size)
+      
+      val cipher = Cipher.getInstance(AES_MODE)
+      val spec = GCMParameterSpec(128, iv)
+      cipher.init(Cipher.DECRYPT_MODE, key, spec)
+      
+      val decrypted = cipher.doFinal(encryption)
+      String(decrypted, Charsets.UTF_8)
+    }
   }
+
+  private fun getOrCreateSecretKey(alias: String): SecretKey {
+    val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
+    if (keyStore.containsAlias(alias)) {
+      return (keyStore.getEntry(alias, null) as KeyStore.SecretKeyEntry).secretKey
+    }
+
+    val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER)
+    val spec = KeyGenParameterSpec.Builder(
+      alias,
+      KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+    )
+      .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+      .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+      .setRandomizedEncryptionRequired(true)
+      .build()
+
+    keyGenerator.init(spec)
+    return keyGenerator.generateKey()
+  }
+
+  private fun getSecretKey(alias: String): SecretKey? {
+    val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
+    if (!keyStore.containsAlias(alias)) return null
+    return (keyStore.getEntry(alias, null) as KeyStore.SecretKeyEntry).secretKey
+  }
+
+  private fun initWifiP2p() {
+    val context = appContext.reactContext ?: return
+    if (wifiP2pManager != null) return
+
+    wifiP2pManager = context.getSystemService(Context.WIFI_P2P_SERVICE) as? WifiP2pManager
+    wifiP2pChannel = wifiP2pManager?.initialize(context, context.mainLooper, null)
+    
+    wifiP2pReceiver = object : BroadcastReceiver() {
+      override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+          WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
+            wifiP2pManager?.requestPeers(wifiP2pChannel) { peersList ->
+              val peerMapList = peersList.deviceList.map { device ->
+                mapOf(
+                  "id" to device.deviceAddress,
+                  "name" to device.deviceName,
+                  "status" to when (device.status) {
+                    WifiP2pDevice.AVAILABLE -> "available"
+                    WifiP2pDevice.INVITED -> "invited"
+                    WifiP2pDevice.CONNECTED -> "connected"
+                    WifiP2pDevice.FAILED -> "failed"
+                    WifiP2pDevice.UNAVAILABLE -> "unavailable"
+                    else -> "unknown"
+                  }
+                )
+              }
+              sendEvent("onWiFiDirectPeersChanged", peerMapList)
+            }
+          }
+          WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
+            // Handle connection change
+          }
+        }
+      }
+    }
+    context.registerReceiver(wifiP2pReceiver, wifiP2pIntentFilter)
+  }
+
+  private fun startWifiP2pDiscovery() {
+    wifiP2pManager?.discoverPeers(wifiP2pChannel, object : WifiP2pManager.ActionListener {
+      override fun onSuccess() = Unit
+      override fun onFailure(reason: Int) = Unit
+    })
+  }
+
+  private fun stopWifiP2pDiscovery() {
+    wifiP2pManager?.stopPeerDiscovery(wifiP2pChannel, object : WifiP2pManager.ActionListener {
+      override fun onSuccess() = Unit
+      override fun onFailure(reason: Int) = Unit
+    })
+    
+    val context = appContext.reactContext ?: return
+    wifiP2pReceiver?.let {
+      try {
+        context.unregisterReceiver(it)
+      } catch (_: Exception) {}
+    }
+    wifiP2pReceiver = null
+    wifiP2pManager = null
+    wifiP2pChannel = null
+  }
+}
 
   private fun startTransferServer() {
     if (serverSocket != null) return

@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Clock3,
   FileText,
+  Folder,
+  Gauge,
   Search,
   Trash2,
   XCircle,
@@ -25,6 +27,11 @@ import { clearTransferHistory, getTransferHistory } from "@/store/database";
 import { TransferJob } from "@/types/domain";
 import { formatBytes, formatDate } from "@/utils/helpers";
 import { FONT_SIZE, RADIUS, SPACING } from "@/theme/colors";
+import {
+  IntegrityReport,
+  platformFeatureService,
+  TransferCollection,
+} from "@/services/platformFeatureService";
 
 type HistoryScreenProps = {
   transfers: TransferJob[];
@@ -54,11 +61,14 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "sent" | "received">("all");
+  const [collections, setCollections] = useState<TransferCollection[]>([]);
+  const [reports, setReports] = useState<Record<string, IntegrityReport>>({});
 
   const loadHistory = useCallback(async () => {
     setRefreshing(true);
     try {
       setStoredTransfers(await getTransferHistory());
+      setCollections(await platformFeatureService.getCollections());
     } finally {
       setRefreshing(false);
     }
@@ -73,6 +83,20 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
     [...transfers, ...storedTransfers].forEach((job) => byId.set(job.id, job));
     return Array.from(byId.values()).sort((a, b) => b.updatedAt - a.updatedAt);
   }, [storedTransfers, transfers]);
+
+  useEffect(() => {
+    const syncReports = async () => {
+      const completed = mergedTransfers.filter((job) => job.status === "completed");
+      const entries = await Promise.all(
+        completed.map(async (job) => [
+          job.id,
+          await platformFeatureService.ensureIntegrityReport(job),
+        ] as const),
+      );
+      setReports(Object.fromEntries(entries));
+    };
+    if (mergedTransfers.length > 0) void syncReports();
+  }, [mergedTransfers]);
 
   const filteredTransfers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -196,6 +220,37 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
         </View>
       )}
 
+      {collections.length > 0 && (
+        <View style={S.collectionStrip}>
+          <Text style={[S.listHeader, { color: colors.textMuted }]}>
+            TRANSFER COLLECTIONS
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {collections.map((collection) => (
+              <GlassCard key={collection.id} padding={SPACING.md} style={S.collectionCard}>
+                <View style={S.collectionHead}>
+                  <Folder size={18} color={colors.accent} strokeWidth={2.4} />
+                  <Text
+                    style={[S.collectionName, { color: colors.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {collection.name}
+                  </Text>
+                </View>
+                <Text style={[S.collectionMeta, { color: colors.textSecondary }]}>
+                  {collection.fileNames.length} files - {formatBytes(collection.totalBytes)}
+                </Text>
+                <Text style={[S.date, { color: colors.textMuted }]}>
+                  {collection.lastSentAt
+                    ? `Last sent ${formatDate(collection.lastSentAt)}`
+                    : `Created ${formatDate(collection.createdAt)}`}
+                </Text>
+              </GlassCard>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {mergedTransfers.length === 0 ? (
         <GlassCard animate>
           <View style={S.empty}>
@@ -245,6 +300,18 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
                     <Text style={[S.date, { color: colors.textMuted }]}>
                       {formatDate(job.updatedAt)}
                     </Text>
+                    {reports[job.id] && (
+                      <View style={S.integrityRow}>
+                        <Gauge size={12} color={colors.success} strokeWidth={2.5} />
+                        <Text
+                          style={[S.integrityText, { color: colors.success }]}
+                          numberOfLines={1}
+                        >
+                          SHA {reports[job.id].checksum.slice(0, 12)} -{" "}
+                          {formatBytes(reports[job.id].averageBytesPerSecond)}/s
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <View
                     style={[
@@ -289,6 +356,12 @@ const S = StyleSheet.create({
   },
   clearText: { fontSize: FONT_SIZE.sm, fontWeight: "800" },
   searchArea: { gap: SPACING.sm },
+  collectionStrip: { gap: SPACING.sm },
+  listHeader: { fontSize: FONT_SIZE.xs, fontWeight: "900", letterSpacing: 1.2 },
+  collectionCard: { width: 220, marginRight: SPACING.sm },
+  collectionHead: { flexDirection: "row", alignItems: "center", gap: SPACING.xs },
+  collectionName: { flex: 1, fontSize: FONT_SIZE.base, fontWeight: "900" },
+  collectionMeta: { fontSize: FONT_SIZE.sm, fontWeight: "700", marginTop: SPACING.sm },
   searchBox: {
     minHeight: 48,
     borderWidth: 1,
@@ -329,6 +402,13 @@ const S = StyleSheet.create({
   name: { fontSize: FONT_SIZE.base, fontWeight: "800" },
   route: { fontSize: FONT_SIZE.sm, marginTop: 3 },
   date: { fontSize: FONT_SIZE.xs, marginTop: 5, fontWeight: "700" },
+  integrityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  integrityText: { fontSize: 10, fontWeight: "900" },
   statusPill: {
     borderWidth: 1,
     borderRadius: RADIUS.full,

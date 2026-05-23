@@ -1,11 +1,12 @@
 import React from "react";
-import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   Camera,
   History,
   Laptop,
   Plus,
   Radio,
+  Save,
   Send,
   Settings,
   Shield,
@@ -22,6 +23,7 @@ import { formatSize } from "@/services/transferService";
 import { RADIUS, SPACING } from "@/theme/colors";
 import { Device, SelectedFile, TransferJob } from "@/types/domain";
 import { getRuntimePlatformLabel } from "@/utils/platform";
+import { IncomingApprovalRequest } from "@/services/platformFeatureService";
 
 type Props = {
   devices: Device[];
@@ -35,6 +37,13 @@ type Props = {
   onClearFiles: () => void;
   statusMessage?: string;
   isRefreshing?: boolean;
+  approvals?: IncomingApprovalRequest[];
+  onApprovalAction?: (
+    id: string,
+    action: "accepted" | "rejected" | "trusted",
+  ) => void;
+  onCreateClipboardBeam?: (text: string) => void;
+  onSaveCollection?: () => void;
 };
 
 const DeviceIcon = ({ platform }: { platform: string }) => {
@@ -57,8 +66,13 @@ export function HomeScreen({
   onClearFiles,
   statusMessage,
   isRefreshing,
+  approvals = [],
+  onApprovalAction,
+  onCreateClipboardBeam,
+  onSaveCollection,
 }: Props) {
   const { colors } = useTheme();
+  const [clipboardText, setClipboardText] = React.useState("");
   const hasFiles = selectedFiles.length > 0;
   const activeTransfers = transfers.filter(
     (t) => t.status === "in-progress" || t.status === "queued",
@@ -215,9 +229,118 @@ export function HomeScreen({
               <Send size={18} color="#FFF" />
               <Text style={S.sendNowText}>Send Now</Text>
             </FocusablePressable>
+            <FocusablePressable
+              onPress={onSaveCollection}
+              style={[S.saveCollectionBtn, { borderColor: colors.border }]}
+            >
+              <Save size={16} color={colors.textSecondary} />
+              <Text style={[S.saveCollectionText, { color: colors.textSecondary }]}>
+                Save as collection
+              </Text>
+            </FocusablePressable>
           </GlassCard>
         )}
       </View>
+
+      <GlassCard style={S.clipboardCard}>
+        <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
+          Clipboard Beam
+        </Text>
+        <View
+          style={[
+            S.clipboardInputWrap,
+            { borderColor: colors.border, backgroundColor: colors.surface },
+          ]}
+        >
+          <TextInput
+            value={clipboardText}
+            onChangeText={setClipboardText}
+            placeholder="Paste text or a link to beam..."
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={[S.clipboardInput, { color: colors.textPrimary }]}
+          />
+        </View>
+        <FocusablePressable
+          onPress={() => {
+            onCreateClipboardBeam?.(clipboardText);
+            setClipboardText("");
+          }}
+          style={[S.clipboardBtn, { backgroundColor: colors.accent }]}
+        >
+          <Send size={15} color="#FFF" />
+          <Text style={S.clipboardBtnText}>Add to transfer</Text>
+        </FocusablePressable>
+      </GlassCard>
+
+      {approvals.length > 0 && (
+        <View style={S.section}>
+          <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
+            Transfer Approval Queue
+          </Text>
+          {approvals.map((approval) => {
+            const pending = approval.status === "pending";
+            return (
+              <GlassCard key={approval.id} style={S.approvalCard} accentBorder={pending}>
+                <View style={S.approvalTop}>
+                  <View style={S.approvalCopy}>
+                    <Text style={[S.approvalTitle, { color: colors.textPrimary }]}>
+                      {approval.fromDevice.name}
+                    </Text>
+                    <Text style={[S.approvalMeta, { color: colors.textSecondary }]}>
+                      {approval.fileNames.join(", ")} - {formatSize(approval.sizeBytes)}
+                    </Text>
+                    <Text
+                      style={[
+                        S.approvalStorage,
+                        {
+                          color: approval.storageOk === false
+                            ? colors.error
+                            : colors.success,
+                        },
+                      ]}
+                    >
+                      {approval.storageOk === false
+                        ? "Receiver storage guard: not enough free space"
+                        : "Receiver storage guard: space looks OK"}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      S.approvalStatus,
+                      { color: pending ? colors.warning : colors.success },
+                    ]}
+                  >
+                    {approval.status}
+                  </Text>
+                </View>
+                {pending && (
+                  <View style={S.approvalActions}>
+                    <FocusablePressable
+                      onPress={() => onApprovalAction?.(approval.id, "accepted")}
+                      style={[S.approvalBtn, { backgroundColor: colors.success }]}
+                    >
+                      <Text style={S.approvalBtnText}>Accept</Text>
+                    </FocusablePressable>
+                    <FocusablePressable
+                      onPress={() => onApprovalAction?.(approval.id, "trusted")}
+                      style={[S.approvalBtn, { backgroundColor: colors.accent }]}
+                    >
+                      <Text style={S.approvalBtnText}>Always trust</Text>
+                    </FocusablePressable>
+                    <FocusablePressable
+                      onPress={() => onApprovalAction?.(approval.id, "rejected")}
+                      style={[S.approvalBtn, { backgroundColor: colors.error }]}
+                    >
+                      <Text style={S.approvalBtnText}>Reject</Text>
+                    </FocusablePressable>
+                  </View>
+                )}
+              </GlassCard>
+            );
+          })}
+        </View>
+      )}
 
       <View style={S.section}>
         <View style={S.sectionHeader}>
@@ -430,6 +553,58 @@ const S = StyleSheet.create({
     marginTop: 8,
   },
   sendNowText: { color: "#FFF", fontWeight: "800", fontSize: 15 },
+  saveCollectionBtn: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+  },
+  saveCollectionText: { fontSize: 13, fontWeight: "800" },
+
+  clipboardCard: { gap: SPACING.md, marginBottom: SPACING.xl },
+  clipboardInputWrap: {
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    minHeight: 84,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  clipboardInput: {
+    minHeight: 60,
+    fontSize: 14,
+    fontWeight: "600",
+    textAlignVertical: "top",
+  },
+  clipboardBtn: {
+    height: 44,
+    borderRadius: RADIUS.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+  },
+  clipboardBtnText: { color: "#FFF", fontSize: 13, fontWeight: "900" },
+
+  approvalCard: { gap: SPACING.md },
+  approvalTop: { flexDirection: "row", gap: SPACING.md },
+  approvalCopy: { flex: 1 },
+  approvalTitle: { fontSize: 15, fontWeight: "900" },
+  approvalMeta: { fontSize: 12, lineHeight: 18, marginTop: 3 },
+  approvalStorage: { fontSize: 11, fontWeight: "800", marginTop: 5 },
+  approvalStatus: { fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
+  approvalActions: { flexDirection: "row", gap: SPACING.xs, flexWrap: "wrap" },
+  approvalBtn: {
+    minHeight: 38,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approvalBtnText: { color: "#FFF", fontSize: 12, fontWeight: "900" },
 
   section: { gap: SPACING.md, marginBottom: SPACING.xl },
   sectionHeader: {

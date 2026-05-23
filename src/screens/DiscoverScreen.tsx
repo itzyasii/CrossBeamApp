@@ -119,6 +119,13 @@ const DeviceRow = ({
     ]).start();
   }, [fade, tx, index]);
 
+  const capabilityChips =
+    device.platform === 'ios'
+      ? ['Multipeer', 'QR Pairing']
+      : device.platform === 'android-tv'
+        ? ['Wi-Fi Direct', 'BLE', 'TV Receiver']
+        : ['Wi-Fi Direct', 'BLE', 'LAN'];
+
   return (
     <Animated.View style={{ opacity: fade, transform: [{ translateX: tx }] }}>
       <GlassCard padding={SPACING.md}>
@@ -139,6 +146,23 @@ const DeviceRow = ({
             <Text style={[S.deviceMeta, { color: colors.textSecondary }]} numberOfLines={1}>
               {platformLabel[device.platform]} - {device.connection.toUpperCase()}
             </Text>
+            <View style={S.capabilityRow}>
+              {capabilityChips.map((capability) => (
+                <Text
+                  key={capability}
+                  style={[
+                    S.capabilityChip,
+                    {
+                      color: colors.textMuted,
+                      backgroundColor: colors.surfaceHover,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  {capability}
+                </Text>
+              ))}
+            </View>
           </View>
           <PulseDot active />
           <Pressable
@@ -193,7 +217,9 @@ export function DiscoverScreen({ devices, onRefresh, isRefreshing, statusMessage
             <Wifi size={42} color={colors.accentLight} strokeWidth={2.1} />
             <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>No Devices Found</Text>
             <Text style={[S.emptySub, { color: colors.textSecondary }]}>
-              Make sure both devices share the same Wi-Fi, or have Bluetooth enabled.
+              {devices.length === 0
+                ? 'Show this QR on TV, or scan a TV or nearby phone from another device.'
+                : 'Make sure both devices share the same Wi-Fi, or have Bluetooth enabled.'}
             </Text>
           </View>
         </GlassCard>
@@ -267,6 +293,16 @@ const S = StyleSheet.create({
   nameLine: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   deviceName: { fontSize: FONT_SIZE.base, fontWeight: '800', flexShrink: 1 },
   deviceMeta: { fontSize: FONT_SIZE.xs, marginTop: 3, fontWeight: '700' },
+  capabilityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  capabilityChip: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    fontSize: 9,
+    fontWeight: '900',
+  },
   trusted: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: RADIUS.full, borderWidth: 1 },
   trustedText: { fontSize: 9, fontWeight: '900' },
   sendButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: SPACING.sm },

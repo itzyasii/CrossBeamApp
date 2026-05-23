@@ -22,6 +22,8 @@ import {
   HistoryScreen,
   SettingsScreen,
   QRPairingScreen,
+  DiscoverScreen,
+  DevicesScreen,
 } from "@/screens";
 import { CrossBeamLogo } from "@/components/CrossBeamLogo";
 import { useDeviceDiscovery } from "@/hooks/useDeviceDiscovery";
@@ -49,6 +51,8 @@ import {
   Lock,
   FileText,
   X,
+  Smartphone,
+  Users,
 } from "lucide-react-native";
 import { SPACING } from "@/theme/colors";
 import {
@@ -60,10 +64,12 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const DRAWER_W = 300;
 const TAB_BAR_H = 76;
 
-type Tab = "home" | "history" | "settings";
+type Tab = "home" | "discover" | "devices" | "history" | "settings";
 
 const TABS: { id: Tab; icon: any; label: string }[] = [
   { id: "home", icon: Home, label: "HOME" },
+  { id: "discover", icon: Radar, label: "RADAR" },
+  { id: "devices", icon: Users, label: "TRUST" },
   { id: "history", icon: HistoryIcon, label: "HISTORY" },
   { id: "settings", icon: SettingsIcon, label: "SETTINGS" },
 ];
@@ -71,6 +77,11 @@ const TABS: { id: Tab; icon: any; label: string }[] = [
 import { Modal, Linking, BackHandler } from "react-native";
 import { FocusablePressable } from "@/components/FocusablePressable";
 import * as KeepAwake from "expo-keep-awake";
+import {
+  IncomingApprovalRequest,
+  platformFeatureService,
+} from "@/services/platformFeatureService";
+import { Device } from "@/types/domain";
 
 export default function App() {
   const { colors, isDark } = useTheme();
@@ -80,6 +91,9 @@ export default function App() {
   const [showQrPairing, setShowQrPairing] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showDevicePicker, setShowDevicePicker] = useState(false);
+  const [targetDevice, setTargetDevice] = useState<Device | null>(null);
+  const [approvals, setApprovals] = useState<IncomingApprovalRequest[]>([]);
   const insets = useSafeAreaInsets();
   const [tabIndex, setTabIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -100,6 +114,10 @@ export default function App() {
 
   const tab = TABS[tabIndex].id;
 
+  const loadApprovals = useCallback(async () => {
+    setApprovals(await platformFeatureService.getApprovals());
+  }, []);
+
   // Handle Back Button for TV and Android
   useEffect(() => {
     const backAction = () => {
@@ -115,6 +133,10 @@ export default function App() {
         setShowQrPairing(false);
         return true;
       }
+      if (showDevicePicker) {
+        setShowDevicePicker(false);
+        return true;
+      }
       if (drawerOpen) {
         closeDrawer();
         return true;
@@ -128,7 +150,7 @@ export default function App() {
     );
 
     return () => backHandler.remove();
-  }, [drawerOpen, showQrPairing, showPrivacyModal, showTermsModal]);
+  }, [drawerOpen, showDevicePicker, showQrPairing, showPrivacyModal, showTermsModal]);
 
   // Keep screen on during active transfers (especially for TV)
   useEffect(() => {
@@ -155,6 +177,10 @@ export default function App() {
       })();
     }
   }, []);
+
+  useEffect(() => {
+    void loadApprovals();
+  }, [loadApprovals, transfers.length]);
 
   const pagerRef = useRef<FlatList>(null);
   const goToTab = useCallback((idx: number) => {
@@ -218,6 +244,52 @@ export default function App() {
       "mailto:yasirpechuho1@gmail.com?subject=CrossBeam Support Request",
     );
   };
+
+  const sendToDevice = useCallback(
+    (device: Device) => {
+      setTargetDevice(device);
+      setShowDevicePicker(false);
+      void startTransfer(device.id, device.name);
+    },
+    [startTransfer],
+  );
+
+  const handleStartTransferRequest = useCallback(() => {
+    if (devices.length > 1) {
+      setShowDevicePicker(true);
+      return;
+    }
+    if (devices.length === 1) {
+      sendToDevice(devices[0]);
+      return;
+    }
+    void startTransfer(null, "Device");
+  }, [devices, sendToDevice, startTransfer]);
+
+  const handleCreateClipboardBeam = useCallback(
+    async (text: string) => {
+      const file = await platformFeatureService.createClipboardBeamFile(text);
+      if (file) addSelectedFiles([file]);
+    },
+    [addSelectedFiles],
+  );
+
+  const handleSaveCollection = useCallback(async () => {
+    await platformFeatureService.saveCollection(
+      `Batch ${new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`,
+      selectedFiles,
+    );
+  }, [selectedFiles]);
+
+  const handleApprovalAction = useCallback(
+    async (id: string, action: "accepted" | "rejected" | "trusted") => {
+      setApprovals(await platformFeatureService.updateApproval(id, action));
+    },
+    [],
+  );
 
   const onGestureEvent = (event: any) => {
     if (isLocked) return;
@@ -322,21 +394,34 @@ export default function App() {
                       selectedFiles={selectedFiles}
                       statusMessage={statusMessage}
                       isRefreshing={isRefreshing}
+                      approvals={approvals}
+                      onApprovalAction={handleApprovalAction}
+                      onCreateClipboardBeam={handleCreateClipboardBeam}
+                      onSaveCollection={handleSaveCollection}
                       onStartDiscovery={refreshDevices}
                       onPickFiles={pickFiles}
-                      onStartTransfer={() => {
-                        const target = devices[0];
-                        void startTransfer(
-                          target?.id ?? null,
-                          target?.name ?? "Device",
-                        );
-                      }}
+                      onStartTransfer={handleStartTransferRequest}
                       onOpenScanner={() => setShowQrPairing(true)}
                       onGoToTab={(id) =>
                         goToTab(TABS.findIndex((x) => x.id === id))
                       }
                       onClearFiles={clearSelectedFiles}
                     />
+                  )}
+                  {t.id === "discover" && (
+                    <DiscoverScreen
+                      devices={devices}
+                      isRefreshing={isRefreshing}
+                      statusMessage={statusMessage}
+                      onRefresh={refreshDevices}
+                      onSelectDevice={(id) => {
+                        const device = devices.find((item) => item.id === id);
+                        if (device) sendToDevice(device);
+                      }}
+                    />
+                  )}
+                  {t.id === "devices" && (
+                    <DevicesScreen onPairDevice={() => setShowQrPairing(true)} />
                   )}
                   {t.id === "history" && (
                     <HistoryScreen transfers={transfers} />
@@ -407,6 +492,69 @@ export default function App() {
           )}
 
           {/* ── Drawer ── */}
+          <Modal visible={showDevicePicker} animationType="slide" transparent>
+            <BlurView intensity={80} tint="dark" style={S.modalContainer}>
+              <View
+                style={[
+                  S.modalContent,
+                  { backgroundColor: colors.backgroundElevated },
+                ]}
+              >
+                <View style={S.modalHeader}>
+                  <Smartphone size={24} color={colors.accent} />
+                  <Text style={[S.modalTitle, { color: colors.textPrimary }]}>
+                    Choose Device
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowDevicePicker(false)}
+                    style={S.modalClose}
+                  >
+                    <X size={24} color={colors.textSecondary} />
+                  </Pressable>
+                </View>
+                <View style={S.devicePickerList}>
+                  {devices.map((device) => (
+                    <FocusablePressable
+                      key={device.id}
+                      onPress={() => sendToDevice(device)}
+                      style={[
+                        S.devicePickerItem,
+                        {
+                          borderColor:
+                            targetDevice?.id === device.id
+                              ? colors.accent
+                              : colors.border,
+                          backgroundColor: colors.surface,
+                        },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            S.devicePickerName,
+                            { color: colors.textPrimary },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {device.name}
+                        </Text>
+                        <Text
+                          style={[
+                            S.devicePickerMeta,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {device.platform} - {device.connection}
+                        </Text>
+                      </View>
+                      <ChevronRight size={18} color={colors.accent} />
+                    </FocusablePressable>
+                  ))}
+                </View>
+              </View>
+            </BlurView>
+          </Modal>
+
           <Animated.View
             style={[S.drawer, { transform: [{ translateX: drawerX }] }]}
           >
@@ -850,5 +998,22 @@ const S = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
+  },
+  devicePickerList: { gap: 10 },
+  devicePickerItem: {
+    minHeight: 62,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  devicePickerName: { fontSize: 15, fontWeight: "900" },
+  devicePickerMeta: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 4,
+    textTransform: "capitalize",
   },
 });

@@ -5,6 +5,8 @@ import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { SelectedFile, TransferJob } from "@/types/domain";
 import { saveTransferHistory } from "@/store/database";
 import { usePermissions } from "./usePermissions";
+import { platformFeatureService } from "@/services/platformFeatureService";
+import { chunkedTransferService } from "@/services/chunkedTransferService";
 
 export const useTransferManager = () => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
@@ -58,6 +60,23 @@ export const useTransferManager = () => {
         void saveTransferHistory(newJob as any);
 
         if (!existing) {
+          void (async () => {
+            const freeDiskBytes = await platformFeatureService.getFreeDiskBytes();
+            await platformFeatureService.queueApproval({
+              fromDevice: {
+                id: event.peerId,
+                name: event.peerId,
+                platform: "android",
+                connection: "local-network",
+                lastSeenAt: Date.now(),
+                isTrusted: false,
+              },
+              fileNames: event.fileName ? [event.fileName] : ["Incoming transfer"],
+              sizeBytes: event.totalBytes,
+              storageOk: freeDiskBytes <= 0 || freeDiskBytes > event.totalBytes,
+            });
+          })();
+
           return [newJob, ...current];
         }
         return current.map((job) => (job.id === event.transferId ? newJob : job));
@@ -176,9 +195,9 @@ export const useTransferManager = () => {
 
     try {
       if (job.status === "paused") {
-        await nativeCrossBeam.resumeTransfer(id);
+        await chunkedTransferService.resume(id);
       } else {
-        await nativeCrossBeam.pauseTransfer(id);
+        await chunkedTransferService.pause(id);
       }
     } catch (error) {
       setTransferError(String(error));

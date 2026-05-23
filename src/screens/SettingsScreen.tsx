@@ -9,8 +9,10 @@ import {
   View,
 } from "react-native";
 import {
+  Activity,
   Bell,
   Database,
+  Eye,
   LockKeyhole,
   ShieldCheck,
   Smartphone,
@@ -29,6 +31,12 @@ import { StorageService } from "@/utils/storage";
 import { clearTransferHistory } from "@/store/database";
 import { useAppStore } from "@/store";
 import { haptics } from "@/services/haptics";
+import {
+  DiagnosticsReport,
+  platformFeatureService,
+} from "@/services/platformFeatureService";
+import { formatBytes } from "@/utils/helpers";
+import { chunkedTransferService } from "@/services/chunkedTransferService";
 
 type SettingsState = {
   notifications: boolean;
@@ -95,12 +103,15 @@ export const SettingsScreen: React.FC = () => {
     useAppStore();
   const [settings, setSettings] = useState<SettingsState>(DEFAULTS);
   const [storageBytes, setStorageBytes] = useState(0);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsReport | null>(null);
+  const chunkPlan = chunkedTransferService.getPlan();
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       const saved = await StorageService.getSettings();
       const storage = await StorageService.getStorageInfo();
+      const report = await platformFeatureService.getDiagnostics();
       if (!mounted) return;
       setSettings({
         notifications: saved.enableNotifications ?? DEFAULTS.notifications,
@@ -113,6 +124,7 @@ export const SettingsScreen: React.FC = () => {
           (saved as any).verifyChecksum ?? DEFAULTS.verifyChecksum,
       });
       setStorageBytes(storage.used);
+      setDiagnostics(report);
     };
     void load();
     return () => {
@@ -329,6 +341,128 @@ export const SettingsScreen: React.FC = () => {
         </GlassCard>
       </View>
 
+      <View style={S.section}>
+        <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
+          LAN DIAGNOSTICS
+        </Text>
+        <GlassCard padding={0}>
+          <View style={S.diagnosticsGrid}>
+            {[
+              {
+                label: "Wi-Fi",
+                value: diagnostics?.isWifiConnected ? "Connected" : "Check",
+                color: diagnostics?.isWifiConnected ? colors.success : colors.warning,
+                icon: Wifi,
+              },
+              {
+                label: "Native bridge",
+                value: diagnostics?.nativeAvailable ? "Ready" : "Unavailable",
+                color: diagnostics?.nativeAvailable ? colors.success : colors.error,
+                icon: Activity,
+              },
+              {
+                label: "Local IP",
+                value: diagnostics?.ipAddress || "Unknown",
+                color: colors.accent,
+                icon: Smartphone,
+              },
+              {
+                label: "Free disk",
+                value: formatBytes(diagnostics?.freeDiskBytes ?? 0),
+                color: colors.accent,
+                icon: Database,
+              },
+            ].map((item) => (
+              <View key={item.label} style={S.diagnosticItem}>
+                <View style={[S.iconBox, { backgroundColor: colors.accentHighlight }]}>
+                  <item.icon size={17} color={item.color} strokeWidth={2.4} />
+                </View>
+                <View style={S.settingCopy}>
+                  <Text style={[S.settingDescription, { color: colors.textMuted }]}>
+                    {item.label}
+                  </Text>
+                  <Text style={[S.settingTitle, { color: item.color }]}>
+                    {item.value}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+          <View style={[S.divider, { backgroundColor: colors.border, marginLeft: 0 }]} />
+          <View style={S.capabilityWrap}>
+            {(diagnostics?.capabilities ?? []).slice(0, 8).map((capability) => (
+              <Text
+                key={capability}
+                style={[
+                  S.capabilityPill,
+                  {
+                    color: colors.textSecondary,
+                    backgroundColor: colors.surfaceHover,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                {capability}
+              </Text>
+            ))}
+          </View>
+          {(diagnostics?.blockedPermissions.length ?? 0) > 0 && (
+            <View style={S.blockedList}>
+              {diagnostics?.blockedPermissions.map((item) => (
+                <Text key={item} style={[S.blockedText, { color: colors.warning }]}>
+                  {item}
+                </Text>
+              ))}
+            </View>
+          )}
+        </GlassCard>
+      </View>
+
+      <View style={S.section}>
+        <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
+          CHUNKED TRANSFER PROTOCOL
+        </Text>
+        <GlassCard>
+          <View style={S.protocolGrid}>
+            {[
+              ["Protocol", chunkPlan.protocol],
+              ["Chunk size", formatBytes(chunkPlan.chunkSizeBytes)],
+              ["Pause", chunkPlan.supportsPause ? "Supported" : "Platform limited"],
+              ["Resume", chunkPlan.supportsResume ? "Supported" : "Retry only"],
+              ["Retry", `${chunkPlan.retryCount} attempts`],
+            ].map(([label, value]) => (
+              <View key={label} style={S.protocolItem}>
+                <Text style={[S.footerLabel, { color: colors.textMuted }]}>{label}</Text>
+                <Text style={[S.footerValue, { color: colors.textPrimary }]}>{value}</Text>
+              </View>
+            ))}
+          </View>
+        </GlassCard>
+      </View>
+
+      <View style={S.section}>
+        <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
+          PRIVACY AUDIT
+        </Text>
+        <GlassCard padding={0}>
+          {[
+            "Files transfer locally between devices; CrossBeam does not require a cloud relay.",
+            "Discovery uses local network transports exposed by the current platform.",
+            "Secure storage uses Android Keystore or iOS Keychain when the native bridge is available.",
+            "Transfer history, trusted devices, collections, and diagnostics stay on this device.",
+          ].map((line) => (
+            <View key={line} style={S.auditRow}>
+              <View style={[S.iconBox, { backgroundColor: colors.successMuted }]}>
+                <Eye size={17} color={colors.success} strokeWidth={2.4} />
+              </View>
+              <Text style={[S.auditText, { color: colors.textSecondary }]}>
+                {line}
+              </Text>
+            </View>
+          ))}
+        </GlassCard>
+      </View>
+
       <GlassCard>
         <View style={S.dataRow}>
           <View style={[S.iconBox, { backgroundColor: colors.warningMuted }]}>
@@ -429,6 +563,48 @@ const S = StyleSheet.create({
     paddingVertical: SPACING.sm,
     fontWeight: "600",
   },
+  diagnosticsGrid: { padding: SPACING.md, gap: SPACING.sm },
+  diagnosticItem: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
+  capabilityWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.xs,
+    padding: SPACING.md,
+  },
+  capabilityPill: {
+    overflow: "hidden",
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 5,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: "800",
+  },
+  blockedList: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.md, gap: 4 },
+  blockedText: { fontSize: FONT_SIZE.xs, fontWeight: "800" },
+  auditRow: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+  },
+  auditText: { flex: 1, fontSize: FONT_SIZE.sm, lineHeight: 19, fontWeight: "600" },
+  protocolGrid: { gap: SPACING.sm },
+  protocolItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING.md,
+  },
+  footerLabel: { fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
+  footerValue: { fontSize: FONT_SIZE.sm, fontWeight: "800", textAlign: "right" },
 
   appearanceRow: {
     flexDirection: "row",

@@ -18,6 +18,8 @@ type Props = {
   onStartTransfer: () => void;
   onPauseResume: (id: string) => void;
   onCancel: (id: string) => void;
+  onRetryDiscovery?: () => void;
+  onOpenSettings?: () => void;
   targetDeviceName?: string | null;
 };
 
@@ -63,6 +65,8 @@ export function TransferScreen({
   onStartTransfer,
   onPauseResume,
   onCancel,
+  onRetryDiscovery,
+  onOpenSettings,
   targetDeviceName,
 }: Props) {
   const { colors } = useTheme();
@@ -131,6 +135,17 @@ export function TransferScreen({
             <View style={{ flex: 1 }}>
               <Text style={[S.errorTitle, { color: colors.error }]}>Transfer blocked</Text>
               <Text style={[S.errorMsg, { color: colors.textSecondary }]}>{transferError}</Text>
+              <View style={S.errorActions}>
+                <Pressable onPress={onRetryDiscovery} style={[S.recoveryBtn, { borderColor: colors.border }]}>
+                  <Text style={[S.recoveryText, { color: colors.textSecondary }]}>Retry discovery</Text>
+                </Pressable>
+                <Pressable onPress={onPickFiles} style={[S.recoveryBtn, { borderColor: colors.border }]}>
+                  <Text style={[S.recoveryText, { color: colors.textSecondary }]}>Reselect files</Text>
+                </Pressable>
+                <Pressable onPress={onOpenSettings} style={[S.recoveryBtn, { borderColor: colors.border }]}>
+                  <Text style={[S.recoveryText, { color: colors.textSecondary }]}>Settings</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </GlassCard>
@@ -225,6 +240,9 @@ const S = StyleSheet.create({
   errorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
   errorTitle: { fontSize: FONT_SIZE.base, fontWeight: '800', marginBottom: 3 },
   errorMsg: { fontSize: FONT_SIZE.sm, lineHeight: 20 },
+  errorActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, marginTop: SPACING.sm },
+  recoveryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: SPACING.sm, paddingVertical: 7 },
+  recoveryText: { fontSize: FONT_SIZE.xs, fontWeight: '900' },
   listHeader: { fontSize: FONT_SIZE.xs, fontWeight: '900', letterSpacing: 1.5 },
   jobHead: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md, alignItems: 'center' },
   peerIcon: { width: 48, height: 48, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

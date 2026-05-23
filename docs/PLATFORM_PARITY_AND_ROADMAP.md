@@ -6,21 +6,21 @@
 | --- | --- | --- | --- |
 | Shared React Native UI | Yes | Yes | Yes, with TV focus states |
 | Local peer discovery | NSD, BLE, Wi-Fi Direct API | Multipeer Connectivity | NSD, BLE, Wi-Fi Direct API |
-| File transfer | Socket stream transfer | Multipeer resource transfer | Socket stream transfer |
-| Integrity checks | SHA-256 native path | Multipeer encrypted session; checksum work remains | SHA-256 native path |
+| File transfer | `crossbeam-chunk-v2` socket stream | `crossbeam-chunk-v2` Multipeer stream | `crossbeam-chunk-v2` socket stream |
+| Integrity checks | SHA-256 file and chunk checks | SHA-256 file and chunk checks | SHA-256 file and chunk checks |
 | Secure storage | Android Keystore | Keychain | Android Keystore |
 | Share intake | Android/iOS share intent module | Android/iOS share intent module | Receive-first flow |
 | QR pairing | Scan and pair | Scan and pair | Display receiver QR |
 | Background/long transfer UX | Keep-awake during active transfer | Keep-awake during active transfer | Keep-awake and receiver status |
-| Pause/resume | Basic transfer state controls | Not available with MCSession resources | Basic transfer state controls |
+| Pause/resume | Chunk checkpoint controls | Chunk checkpoint controls | Chunk checkpoint controls |
 
 ## Important Platform Notes
 
-- iOS Multipeer Connectivity does not expose arbitrary pause/resume for resource transfers. True parity requires an app-managed chunked stream protocol on iOS.
+- iOS uses an app-managed Multipeer stream for core transfers so pause/resume/retry can share the same chunk checkpoint model as Android and TV. The legacy MCSession resource delegate remains only as a compatibility fallback for older incoming resource transfers.
 - Android TV should be treated as Android plus receiver-first UX, remote focus, Leanback launcher support, and conservative background behavior.
 - Platform-specific features such as Siri Shortcuts, Handoff, and iCloud should remain additive iOS enhancements, not required core parity.
 
-## Recommended Next Features
+## Implemented Feature Set
 
 1. Device trust center: show paired devices, last seen, transport used, and revoke trust.
 2. Transfer approval queue: receiver can accept, reject, or always trust a sender.
@@ -41,4 +41,3 @@
 - Add TV-specific large typography for transfer progress and remote-friendly spacing.
 - Replace generic errors with actionable recovery buttons: retry discovery, open settings, reselect files.
 - Add empty states that reflect platform: "Show this QR on TV" vs "Scan a TV or nearby phone".
-

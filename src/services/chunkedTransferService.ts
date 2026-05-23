@@ -8,19 +8,29 @@ export type ChunkedTransferPlan = {
   supportsResume: boolean;
   supportsRetry: boolean;
   retryCount: number;
-  protocol: "socket-chunks" | "multipeer-resource" | "tv-socket-chunks";
+  protocol: "crossbeam-chunk-v2";
+  transport: "local-network-socket" | "multipeer-stream" | "tv-local-network-socket";
+  supportsChunkAck: boolean;
 };
 
 export const chunkedTransferService = {
   getPlan(): ChunkedTransferPlan {
+    const transport = Platform.OS === "ios"
+      ? "multipeer-stream"
+      : Platform.isTV
+        ? "tv-local-network-socket"
+        : "local-network-socket";
+
     if (Platform.OS === "ios") {
       return {
         chunkSizeBytes: 1024 * 1024,
-        supportsPause: false,
-        supportsResume: false,
+        supportsPause: true,
+        supportsResume: true,
         supportsRetry: true,
+        supportsChunkAck: true,
         retryCount: 3,
-        protocol: "multipeer-resource",
+        protocol: "crossbeam-chunk-v2",
+        transport,
       };
     }
 
@@ -29,8 +39,26 @@ export const chunkedTransferService = {
       supportsPause: true,
       supportsResume: true,
       supportsRetry: true,
+      supportsChunkAck: true,
       retryCount: 3,
-      protocol: Platform.isTV ? "tv-socket-chunks" : "socket-chunks",
+      protocol: "crossbeam-chunk-v2",
+      transport,
+    };
+  },
+
+  async getNativePlan(): Promise<ChunkedTransferPlan> {
+    const fallback = this.getPlan();
+    const nativePlan = await nativeCrossBeam.getChunkProtocol();
+    if (!nativePlan) return fallback;
+
+    return {
+      ...fallback,
+      chunkSizeBytes: nativePlan.chunkSizeBytes,
+      supportsPause: nativePlan.supportsPause,
+      supportsResume: nativePlan.supportsResume,
+      supportsRetry: nativePlan.supportsRetry,
+      supportsChunkAck: nativePlan.supportsChunkAck,
+      protocol: nativePlan.protocol,
     };
   },
 
@@ -46,4 +74,3 @@ export const chunkedTransferService = {
     await nativeCrossBeam.resumeTransfer(transferId);
   },
 };
-

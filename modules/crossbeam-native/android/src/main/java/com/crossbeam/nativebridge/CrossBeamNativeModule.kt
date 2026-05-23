@@ -13,7 +13,7 @@ import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
-import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -74,6 +74,8 @@ class CrossBeamNativeModule : Module() {
   private val pausedTransfers = ConcurrentHashMap.newKeySet<String>()
   private val serviceType = "_crossbeam._tcp."
   private val protocolMagic = "CROSSBEAM1"
+  private val chunkedProtocolVersion = 2
+  private val transferChunkSize = 1024 * 1024
 
   // BLE State
   private var bluetoothAdapter: BluetoothAdapter? = null
@@ -103,6 +105,8 @@ class CrossBeamNativeModule : Module() {
         "local-network-discovery",
         "local-network-advertising",
         "socket-stream-transfer",
+        "app-managed-chunk-stream",
+        "chunk-ack-resume",
         "sha256-integrity",
         "ble-discovery",
         "ble-advertising"
@@ -117,6 +121,18 @@ class CrossBeamNativeModule : Module() {
         capabilities.add("tv-receiver-mode")
       }
       capabilities
+    }
+
+    AsyncFunction("getChunkProtocol") {
+      mapOf(
+        "protocol" to "crossbeam-chunk-v2",
+        "version" to chunkedProtocolVersion,
+        "chunkSizeBytes" to transferChunkSize,
+        "supportsChunkAck" to true,
+        "supportsPause" to true,
+        "supportsResume" to true,
+        "supportsRetry" to true
+      )
     }
 
     AsyncFunction("startDiscovery") {
@@ -504,6 +520,7 @@ class CrossBeamNativeModule : Module() {
           DataOutputStream(BufferedOutputStream(socket.getOutputStream())).use { output ->
             DataInputStream(BufferedInputStream(socket.getInputStream())).use { socketInput ->
               output.writeUTF(protocolMagic)
+              output.writeInt(chunkedProtocolVersion)
               output.writeUTF(transferId)
               output.writeInt(outgoingFiles.size)
 
@@ -518,9 +535,8 @@ class CrossBeamNativeModule : Module() {
               outgoingFiles.forEach { file ->
                 val name = file.name
                 
-                // Block until receiver tells us where to start (Pause/Resume support)
                 val requestedOffset = socketInput.readLong()
-                
+                 
                 if (requestedOffset >= file.size) {
                     transferred += file.size
                     return@forEach
@@ -538,7 +554,8 @@ class CrossBeamNativeModule : Module() {
                   }
 
                   BufferedInputStream(rawInput).use { input ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    val buffer = ByteArray(transferChunkSize)
+                    var fileOffset = requestedOffset
                     var read = input.read(buffer)
                     while (read >= 0) {
                       if (cancelledTransfers.contains(transferId)) {
@@ -550,8 +567,26 @@ class CrossBeamNativeModule : Module() {
                         if (cancelledTransfers.contains(transferId)) throw TransferCancelledException()
                       }
 
+                      val chunkOffset = fileOffset
+                      val chunkChecksum = sha256(buffer, read)
+
+                      output.writeLong(chunkOffset)
+                      output.writeInt(read)
+                      output.writeUTF(chunkChecksum)
                       output.write(buffer, 0, read)
+                      output.flush()
+
+                      val ack = socketInput.readBoolean()
+                      val nextOffset = socketInput.readLong()
+                      if (!ack) {
+                        throw IllegalStateException("Receiver rejected chunk at offset $chunkOffset for $name")
+                      }
+                      if (nextOffset < chunkOffset + read) {
+                        throw IllegalStateException("Receiver checkpoint did not advance for $name")
+                      }
+
                       transferred += read
+                      fileOffset += read
                       
                       // Throttle notification updates somewhat (e.g. updating UI progress)
                       if (transferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || transferred == totalBytes) {
@@ -619,9 +654,14 @@ class CrossBeamNativeModule : Module() {
         DataInputStream(BufferedInputStream(client.getInputStream())).use { input ->
           DataOutputStream(BufferedOutputStream(client.getOutputStream())).use { output ->
             val magic = input.readUTF()
-            if (magic != protocolMagic) throw IllegalArgumentException("Unsupported CrossBeam protocol")
+              if (magic != protocolMagic) throw IllegalArgumentException("Unsupported CrossBeam protocol")
 
-            val transferId = input.readUTF()
+              val protocolVersion = input.readInt()
+              if (protocolVersion < chunkedProtocolVersion) {
+                throw IllegalArgumentException("Unsupported CrossBeam chunk protocol version")
+              }
+
+              val transferId = input.readUTF()
             val fileCount = input.readInt()
             val downloadsRoot =
               context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
@@ -652,15 +692,16 @@ class CrossBeamNativeModule : Module() {
             }
 
             pendingFiles.forEach { header ->
-              val destination = File(outputDir, header.name)
-              val existingSize = if (destination.exists() && destination.isFile) destination.length() else 0L
-              
+              val destination = uniqueDestination(outputDir, header.name)
+              val partial = File(outputDir, "${destination.name}.crossbeam-part")
+              val existingSize = if (partial.exists() && partial.isFile) partial.length() else 0L
+               
               // Ensure we don't start at an offset greater than the file itself or corrupt it
               val offset = if (existingSize <= header.size) existingSize else 0L
-              
+               
               // If we are starting from scratch because it was larger or invalid, delete it
-              if (offset == 0L && destination.exists()) {
-                  destination.delete()
+              if (offset == 0L && partial.exists()) {
+                  partial.delete()
               }
 
               // Tell sender where to start
@@ -669,28 +710,43 @@ class CrossBeamNativeModule : Module() {
 
               batchTransferred += offset
 
-              if (offset >= header.size) {
-                  // Already completed
-                  return@forEach
-              }
+              if (offset < header.size) {
+                RandomAccessFile(partial, "rw").use { fileOutput ->
+                  fileOutput.seek(offset)
+                  var remaining = header.size - offset
+                  while (remaining > 0) {
+                  val chunkOffset = input.readLong()
+                  val chunkLength = input.readInt()
+                  val chunkChecksum = input.readUTF()
+                  if (chunkOffset != fileOutput.filePointer) {
+                    output.writeBoolean(false)
+                    output.writeLong(fileOutput.filePointer)
+                    output.flush()
+                    throw IllegalStateException("Unexpected chunk offset for ${header.name}")
+                  }
+                  if (chunkLength <= 0 || chunkLength > transferChunkSize) {
+                    output.writeBoolean(false)
+                    output.writeLong(fileOutput.filePointer)
+                    output.flush()
+                    throw IllegalStateException("Invalid chunk length for ${header.name}")
+                  }
 
-              val digest = MessageDigest.getInstance("SHA-256")
-              
-              // If resuming, we technically need to digest the existing part first, 
-              // but to save CPU, a true resume protocol might rely on block-by-block hashes.
-              // For now, we will skip the full hash verification if resuming, or we can just read it.
-              // We'll trust the offset for now.
-              
-              FileOutputStream(destination, true).use { fileOutput ->
-                var remaining = header.size - offset
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (remaining > 0) {
-                  val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
-                  if (read < 0) throw IllegalStateException("Connection closed during transfer")
-                  fileOutput.write(buffer, 0, read)
-                  digest.update(buffer, 0, read)
-                  remaining -= read
-                  batchTransferred += read
+                  val chunk = ByteArray(chunkLength)
+                  input.readFully(chunk)
+                  val actualChunkChecksum = sha256(chunk, chunkLength)
+                  if (actualChunkChecksum != chunkChecksum) {
+                    output.writeBoolean(false)
+                    output.writeLong(fileOutput.filePointer)
+                    output.flush()
+                    throw IllegalStateException("Chunk checksum mismatch for ${header.name}")
+                  }
+
+                  fileOutput.write(chunk)
+                  remaining -= chunkLength
+                  batchTransferred += chunkLength
+                  output.writeBoolean(true)
+                  output.writeLong(fileOutput.filePointer)
+                  output.flush()
                   
                   // Throttle notification updates
                   if (batchTransferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || batchTransferred == batchTotal) {
@@ -712,18 +768,20 @@ class CrossBeamNativeModule : Module() {
                     "in-progress",
                     null
                   )
+                  }
                 }
               }
 
-              // Hash verification might fail on resume because we didn't digest the first part.
-              // In a real prod environment, we would digest the existing file bytes first before appending.
-              if (offset == 0L) {
-                  val actualChecksum = digest.digest().joinToString("") { "%02x".format(it) }
-                  if (header.checksum.isNotBlank() && header.checksum != actualChecksum) {
-                    destination.delete()
-                    throw IllegalStateException("Checksum mismatch for ${header.name}")
-                  }
+              if (!partial.exists()) {
+                partial.createNewFile()
               }
+              val actualChecksum = calculateSha256(partial)
+              if (header.checksum.isNotBlank() && header.checksum != actualChecksum) {
+                partial.delete()
+                throw IllegalStateException("Checksum mismatch for ${header.name}")
+              }
+              if (destination.exists()) destination.delete()
+              partial.renameTo(destination)
             }
 
             emitTransfer(transferId, peerId, null, batchTotal, batchTotal, "completed", null)
@@ -823,6 +881,25 @@ class CrossBeamNativeModule : Module() {
         }
       }
     } ?: throw IllegalArgumentException("Unable to read file for checksum")
+    return digest.digest().joinToString("") { "%02x".format(it) }
+  }
+
+  private fun calculateSha256(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    BufferedInputStream(file.inputStream()).use { input ->
+      val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+      var read = input.read(buffer)
+      while (read >= 0) {
+        digest.update(buffer, 0, read)
+        read = input.read(buffer)
+      }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+  }
+
+  private fun sha256(bytes: ByteArray, length: Int): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    digest.update(bytes, 0, length)
     return digest.digest().joinToString("") { "%02x".format(it) }
   }
 

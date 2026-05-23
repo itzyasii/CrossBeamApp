@@ -426,7 +426,9 @@ export const SettingsScreen: React.FC = () => {
           <View style={S.protocolGrid}>
             {[
               ["Protocol", chunkPlan.protocol],
+              ["Transport", chunkPlan.transport],
               ["Chunk size", formatBytes(chunkPlan.chunkSizeBytes)],
+              ["Chunk ACK", chunkPlan.supportsChunkAck ? "Verified" : "Unavailable"],
               ["Pause", chunkPlan.supportsPause ? "Supported" : "Platform limited"],
               ["Resume", chunkPlan.supportsResume ? "Supported" : "Retry only"],
               ["Retry", `${chunkPlan.retryCount} attempts`],

@@ -37,6 +37,16 @@ export type NativeTransferEvent = {
   errorMessage?: string;
 };
 
+export type NativeChunkProtocol = {
+  protocol: 'crossbeam-chunk-v2';
+  version: number;
+  chunkSizeBytes: number;
+  supportsChunkAck: boolean;
+  supportsPause: boolean;
+  supportsResume: boolean;
+  supportsRetry: boolean;
+};
+
 export type NativeBackgroundTransferConfig = {
   url: string;
   method: 'GET' | 'POST' | 'PUT';
@@ -71,6 +81,7 @@ export type CrossBeamNativeModule = {
   ): NativeEventSubscription;
   isAvailable(): Promise<boolean>;
   getPlatformCapabilities(): Promise<string[]>;
+  getChunkProtocol(): Promise<NativeChunkProtocol>;
   startDiscovery(): Promise<void>;
   stopDiscovery(): Promise<void>;
   getDiscoveredPeers(): Promise<NativePeer[]>;

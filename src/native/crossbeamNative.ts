@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import {
   CrossBeamNative,
   CrossBeamNativeEvents,
+  NativeChunkProtocol,
   NativePeer,
   NativeTransferRequest,
   NativeTransferEvent,
@@ -14,6 +15,7 @@ export {
   NativePeer,
   NativeTransferRequest,
   NativeTransferEvent,
+  NativeChunkProtocol,
 };
 import { Device } from "@/types/domain";
 
@@ -50,6 +52,11 @@ export const nativeCrossBeam = {
   async getCapabilities(): Promise<string[]> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return [];
     return CrossBeamNative.getPlatformCapabilities();
+  },
+
+  async getChunkProtocol(): Promise<NativeChunkProtocol | null> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return null;
+    return CrossBeamNative.getChunkProtocol();
   },
 
   async startDiscovery(): Promise<void> {

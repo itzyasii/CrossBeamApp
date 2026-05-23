@@ -4,10 +4,10 @@
     "slug": "crossbeam-app",
     "version": "0.1.0",
     "orientation": "default",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/AppIcon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/Logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0F"
     },
@@ -55,7 +55,7 @@
     "android": {
       "package": "com.crossbeam.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/AppIcon.png",
         "backgroundColor": "#0A0A0F"
       },
       "permissions": [
@@ -90,6 +90,7 @@
       "expo-local-authentication",
       "expo-notifications",
       "expo-navigation-bar",
+      "expo-location",
       [
         "expo-media-library",
         {
@@ -97,6 +98,13 @@
           "savePhotosPermission": "Allow CrossBeam to save shared photos to your device.",
           "isAccessMediaLocationEnabled": true,
           "granularPermissions": ["audio", "photo", "video"]
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow CrossBeam to access your location to discover nearby devices for file sharing.",
+          "locationWhenInUsePermission": "Allow CrossBeam to access your location while the app is open to discover nearby devices."
         }
       ],
       [

@@ -25,13 +25,14 @@ import {
   DiscoverScreen,
   DevicesScreen,
 } from "@/screens";
-import { CrossBeamLogo } from "@/components/CrossBeamLogo";
+import { CrossBeamLogo, CrossBeamWordmark } from "@/components/CrossBeamLogo";
 import { useDeviceDiscovery } from "@/hooks/useDeviceDiscovery";
 import { useTheme } from "@/hooks/useTheme";
 import { useTransferManager } from "@/hooks/useTransferManager";
 import { useShareIntent } from "@/hooks/useShareIntent";
 import { useAppStore } from "@/store";
 import { useBiometrics } from "@/hooks/useBiometrics";
+import { usePermissions } from "@/hooks/usePermissions";
 import { haptics } from "@/services/haptics";
 import {
   Home,
@@ -167,7 +168,18 @@ export default function App() {
     void SystemUI.setBackgroundColorAsync(colors.background);
   }, [colors.background]);
 
+  const { requestAllPermissions, getMissingPermissions } = usePermissions();
+
   useEffect(() => {
+    // Request all required permissions on first app launch
+    void (async () => {
+      await requestAllPermissions();
+      const missing = await getMissingPermissions();
+      if (missing.length > 0) {
+        console.warn(`[App] Missing permissions: ${missing.join(", ")}`);
+      }
+    })();
+
     if (biometricLockEnabled) {
       setIsLocked(true);
       void (async () => {
@@ -580,19 +592,10 @@ export default function App() {
               {/* Header */}
               <View style={S.drawerHeader}>
                 <View style={S.drawerHeaderTop}>
-                  <CrossBeamLogo size={48} />
-                  <View>
-                    <Text
-                      style={[S.drawerBrand, { color: colors.textPrimary }]}
-                    >
-                      CROSSBEAM
-                    </Text>
-                    <Text
-                      style={[S.drawerVersion, { color: colors.textMuted }]}
-                    >
-                      v0.1.0-alpha
-                    </Text>
-                  </View>
+                  <CrossBeamWordmark width={220} />
+                  <Text style={[S.drawerVersion, { color: colors.textMuted }]}>
+                    v0.1.0-alpha
+                  </Text>
                 </View>
 
                 <View
@@ -883,8 +886,7 @@ const S = StyleSheet.create({
   },
   drawerInner: { flex: 1, paddingHorizontal: SPACING.xl, gap: 32 },
   drawerHeader: { gap: 16 },
-  drawerHeaderTop: { flexDirection: "row", alignItems: "center", gap: 16 },
-  drawerBrand: { fontSize: 18, fontWeight: "900", letterSpacing: 1 },
+  drawerHeaderTop: { gap: 8 },
   drawerVersion: {
     fontSize: 10,
     fontWeight: "700",

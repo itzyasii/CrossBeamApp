@@ -7,29 +7,22 @@ import {
   Pressable,
   ActivityIndicator,
   Animated,
-  Dimensions,
 } from "react-native";
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
 import QRCode from "react-native-qrcode-svg";
 import { Camera, CameraView } from "expo-camera";
-import {
-  X,
-  ShieldCheck,
-  Zap,
-  Maximize,
-  Smartphone,
-  Tv,
-} from "lucide-react-native";
+import { X, ShieldCheck, Zap } from "lucide-react-native";
 import { BlurView } from "expo-blur";
 import { useTheme } from "@/hooks/useTheme";
-import { SPACING, FONT_SIZE, RADIUS } from "@/theme/colors";
-import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { haptics } from "@/services/haptics";
 import * as ExpoDevice from "expo-device";
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-
 export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
-  const { colors, isDark } = useTheme();
+  const { colors,  } = useTheme();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [qrData, setQrData] = useState<string | null>(null);
@@ -141,108 +134,121 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
     );
   }
 
+  // Swipe down to dismiss gesture (new API)
+  const swipeDownGesture = Gesture.Pan()
+    .onEnd((event) => {
+      if (event.translationY > 100 && event.velocityY > 500) {
+        onBack();
+      }
+    })
+    .activeOffsetY([-10, 50]);
+
   return (
-    <View style={S.container}>
-      <CameraView
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-        style={StyleSheet.absoluteFillObject}
-      />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureDetector gesture={swipeDownGesture}>
+        <View style={S.container}>
+          <CameraView
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            style={StyleSheet.absoluteFillObject}
+          />
 
-      <BlurView intensity={20} tint="dark" style={S.scannerOverlay}>
-        <View style={S.scannerHeader}>
-          <Pressable onPress={onBack} style={S.closeBtn}>
-            <X color="#FFF" size={28} />
-          </Pressable>
-          <Text style={S.scannerTitle}>SCAN_NODE</Text>
-          <View style={{ width: 28 }} />
-        </View>
-
-        <Animated.View
-          style={[
-            S.viewfinderContainer,
-            { transform: [{ scale: viewfinderAnim }] },
-          ]}
-        >
-          <View style={S.viewfinder}>
-            {/* Industry Standard Scanner Frame */}
-            <View
-              style={[
-                S.corner,
-                S.cornerTopLeft,
-                { borderColor: colors.accent },
-              ]}
-            />
-            <View
-              style={[
-                S.corner,
-                S.cornerTopRight,
-                { borderColor: colors.accent },
-              ]}
-            />
-            <View
-              style={[
-                S.corner,
-                S.cornerBottomLeft,
-                { borderColor: colors.accent },
-              ]}
-            />
-            <View
-              style={[
-                S.corner,
-                S.cornerBottomRight,
-                { borderColor: colors.accent },
-              ]}
-            />
+          <BlurView intensity={20} tint="dark" style={S.scannerOverlay}>
+            <View style={S.scannerHeader}>
+              <Pressable onPress={onBack} style={S.closeBtn}>
+                <X color="#FFF" size={28} />
+              </Pressable>
+              <Text style={S.scannerTitle}>SCAN_NODE</Text>
+              <View style={{ width: 28 }} />
+            </View>
 
             <Animated.View
               style={[
-                S.scanLine,
-                {
-                  backgroundColor: colors.accent,
-                  shadowColor: colors.accent,
-                  transform: [
-                    {
-                      translateY: scanAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 280],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-          </View>
-
-          <View style={S.scannerHint}>
-            <Text style={S.hintText}>ALIGN QR CODE WITHIN FRAME</Text>
-            <View
-              style={[
-                S.pairingBadge,
-                { backgroundColor: `${colors.accent}20` },
+                S.viewfinderContainer,
+                { transform: [{ scale: viewfinderAnim }] },
               ]}
             >
-              <Zap size={14} color={colors.accent} strokeWidth={3} />
-              <Text style={[S.pairingText, { color: colors.accent }]}>
-                AUTO_PAIR_ENABLED
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
+              <View style={S.viewfinder}>
+                {/* Industry Standard Scanner Frame */}
+                <View
+                  style={[
+                    S.corner,
+                    S.cornerTopLeft,
+                    { borderColor: colors.accent },
+                  ]}
+                />
+                <View
+                  style={[
+                    S.corner,
+                    S.cornerTopRight,
+                    { borderColor: colors.accent },
+                  ]}
+                />
+                <View
+                  style={[
+                    S.corner,
+                    S.cornerBottomLeft,
+                    { borderColor: colors.accent },
+                  ]}
+                />
+                <View
+                  style={[
+                    S.corner,
+                    S.cornerBottomRight,
+                    { borderColor: colors.accent },
+                  ]}
+                />
 
-        {scanned && (
-          <View style={S.successOverlay}>
-            <BlurView
-              intensity={40}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-            <ShieldCheck size={64} color={colors.success} />
-            <Text style={S.successLabel}>NODE_VERIFIED</Text>
-          </View>
-        )}
-      </BlurView>
-    </View>
+                <Animated.View
+                  style={[
+                    S.scanLine,
+                    {
+                      backgroundColor: colors.accent,
+                      shadowColor: colors.accent,
+                      transform: [
+                        {
+                          translateY: scanAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 280],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </View>
+
+              <View style={S.scannerHint}>
+                <Text style={S.hintText}>ALIGN QR CODE WITHIN FRAME</Text>
+                <View
+                  style={[
+                    S.pairingBadge,
+                    { backgroundColor: `${colors.accent}20` },
+                  ]}
+                >
+                  <Zap size={14} color={colors.accent} strokeWidth={3} />
+                  <Text style={[S.pairingText, { color: colors.accent }]}>
+                    AUTO_PAIR_ENABLED
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+
+            {scanned && (
+              <View style={S.successOverlay}>
+                <BlurView
+                  intensity={40}
+                  tint="dark"
+                  style={StyleSheet.absoluteFill}
+                />
+                <ShieldCheck size={64} color={colors.success} />
+                <Text style={S.successLabel}>NODE_VERIFIED</Text>
+              </View>
+            )}
+          </BlurView>
+        </View>
+      </GestureDetector>
+    </GestureHandlerRootView>
   );
 };
 

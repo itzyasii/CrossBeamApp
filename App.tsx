@@ -38,17 +38,12 @@ import {
   History as HistoryIcon,
   Settings as SettingsIcon,
   Fingerprint,
-  Box,
   Radar,
   Activity,
   ShieldCheck,
   HelpCircle,
-  Info,
   ChevronRight,
   Wifi,
-  Zap,
-  Mail,
-  Lock,
   FileText,
   X,
   Smartphone,
@@ -56,8 +51,9 @@ import {
 } from "lucide-react-native";
 import { SPACING } from "@/theme/colors";
 import {
+  Gesture,
+  GestureDetector,
   GestureHandlerRootView,
-  PanGestureHandler,
 } from "react-native-gesture-handler";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -84,7 +80,7 @@ import {
 import { Device } from "@/types/domain";
 
 export default function App() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { biometricLockEnabled } = useAppStore();
   const { authenticate } = useBiometrics();
   const [isLocked, setIsLocked] = useState(false);
@@ -107,12 +103,8 @@ export default function App() {
     pickFiles,
     clearSelectedFiles,
     startTransfer,
-    togglePause,
-    cancelTransfer,
     addSelectedFiles,
   } = useTransferManager();
-
-  const tab = TABS[tabIndex].id;
 
   const loadApprovals = useCallback(async () => {
     setApprovals(await platformFeatureService.getApprovals());
@@ -150,7 +142,13 @@ export default function App() {
     );
 
     return () => backHandler.remove();
-  }, [drawerOpen, showDevicePicker, showQrPairing, showPrivacyModal, showTermsModal]);
+  }, [
+    drawerOpen,
+    showDevicePicker,
+    showQrPairing,
+    showPrivacyModal,
+    showTermsModal,
+  ]);
 
   // Keep screen on during active transfers (especially for TV)
   useEffect(() => {
@@ -291,32 +289,42 @@ export default function App() {
     [],
   );
 
-  const onGestureEvent = (event: any) => {
-    if (isLocked) return;
-    const { translationX, translationY } = event.nativeEvent;
+  // Main app swipe gesture (new API)
+  const mainSwipeGesture = Gesture.Pan()
+    .onEnd((event) => {
+      if (isLocked) return;
+      const { translationX, translationY, velocityX, velocityY, x, y } = event;
 
-    // Horizontal Swipe for Drawer
-    if (Math.abs(translationX) > Math.abs(translationY)) {
-      if (translationX > 50 && !drawerOpen) {
-        openDrawer();
-      } else if (translationX < -50 && drawerOpen) {
-        closeDrawer();
+      // Only process gestures that are clearly intentional swipes
+      const isHorizontal = Math.abs(translationX) > Math.abs(translationY);
+
+      // Horizontal Swipe for Drawer (only from left edge or when drawer is open)
+      if (isHorizontal && Math.abs(velocityX) > 300) {
+        // Open drawer only if swiping from left edge (x < 50) and drawer is closed
+        if (translationX > 100 && x < 50 && !drawerOpen) {
+          openDrawer();
+        }
+        // Close drawer if swiping left while drawer is open
+        else if (translationX < -100 && drawerOpen) {
+          closeDrawer();
+        }
       }
-    }
-    // Vertical Swipe for QR Scanner
-    else {
-      if (translationY > 80 && !showQrPairing) {
-        setShowQrPairing(true);
-        void haptics.medium();
-      } else if (translationY < -80 && showQrPairing) {
-        setShowQrPairing(false);
+      // Vertical Swipe for QR Scanner (only from top edge when scanner is closed)
+      else if (!isHorizontal && Math.abs(velocityY) > 400) {
+        // Open scanner only if swiping down from top edge (y < 60)
+        if (translationY > 120 && y < 60 && !showQrPairing) {
+          setShowQrPairing(true);
+          void haptics.medium();
+        }
       }
-    }
-  };
+    })
+    .minDistance(30)
+    .activeOffsetX([-50, 50])
+    .activeOffsetY([-60, 60]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PanGestureHandler onGestureEvent={onGestureEvent}>
+      <GestureDetector gesture={mainSwipeGesture}>
         <View style={[S.root, { backgroundColor: colors.background }]}>
           <StatusBar style="light" translucent />
 
@@ -421,7 +429,9 @@ export default function App() {
                     />
                   )}
                   {t.id === "devices" && (
-                    <DevicesScreen onPairDevice={() => setShowQrPairing(true)} />
+                    <DevicesScreen
+                      onPairDevice={() => setShowQrPairing(true)}
+                    />
                   )}
                   {t.id === "history" && (
                     <HistoryScreen transfers={transfers} />
@@ -799,7 +809,7 @@ export default function App() {
             </BlurView>
           </Modal>
         </View>
-      </PanGestureHandler>
+      </GestureDetector>
     </GestureHandlerRootView>
   );
 }

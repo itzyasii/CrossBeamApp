@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { View, StyleSheet, Animated } from "react-native";
 import Svg, {
-  Rect,
+  Path,
   Defs,
   LinearGradient,
   Stop,
@@ -62,52 +62,49 @@ export const CrossBeamLogo = ({ size = 100, animate = true }: Props) => {
       <Animated.View
         style={{ transform: [{ rotate: spin }, { scale: pulse }] }}
       >
-        <Svg width={size} height={size} viewBox="0 0 512 512" fill="none">
+        <Svg width={size} height={size} viewBox="0 0 100 100" fill="none">
           <Defs>
-            <LinearGradient id="bg" x1="0" y1="0" x2="512" y2="512">
-              <Stop offset="0%" stopColor="#BDF8FF" />
-              <Stop offset="100%" stopColor="#B6BCFF" />
-            </LinearGradient>
-            <LinearGradient id="beam1" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#6FF8F2" />
-              <Stop offset="100%" stopColor="#5DCBFF" />
-            </LinearGradient>
-            <LinearGradient id="beam2" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#9E68FF" />
-              <Stop offset="100%" stopColor="#6F4AFF" />
+            <LinearGradient id="logoGrad" x1="0" y1="0" x2="100" y2="100">
+              <Stop offset="0%" stopColor={colors.accent} />
+              <Stop offset="100%" stopColor={colors.accentLight} />
             </LinearGradient>
           </Defs>
 
-          <Rect
-            x="16"
-            y="16"
-            width="480"
-            height="480"
-            rx="64"
-            fill="url(#bg)"
+          {/* Outer Rings */}
+          <Circle
+            cx="50"
+            cy="50"
+            r="48"
+            stroke={colors.border}
+            strokeWidth="0.5"
+            strokeDasharray="4 4"
           />
 
-          <Rect
-            x="148"
-            y="145"
-            width="220"
-            height="54"
-            rx="16"
-            transform="rotate(45 148 145)"
-            fill="url(#beam1)"
-          />
-          <Rect
-            x="365"
-            y="145"
-            width="220"
-            height="54"
-            rx="16"
-            transform="rotate(135 365 145)"
-            fill="url(#beam2)"
+          {/* Main "X" Beams */}
+          <Path
+            d="M30 30 L70 70 M70 30 L30 70"
+            stroke="url(#logoGrad)"
+            strokeWidth="8"
+            strokeLinecap="round"
+            opacity={0.8}
           />
 
-          <Circle cx="256" cy="256" r="24" fill="white" />
-          <Circle cx="256" cy="256" r="10" fill="#4C95FF" />
+          {/* Central Core */}
+          <Circle
+            cx="50"
+            cy="50"
+            r="12"
+            fill={colors.background}
+            stroke={colors.accent}
+            strokeWidth="2"
+          />
+          <Circle cx="50" cy="50" r="6" fill={colors.accent} />
+
+          {/* Accent Nodes */}
+          <Circle cx="30" cy="30" r="3" fill={colors.accent} />
+          <Circle cx="70" cy="70" r="3" fill={colors.accent} />
+          <Circle cx="70" cy="30" r="3" fill={colors.accent} />
+          <Circle cx="30" cy="70" r="3" fill={colors.accent} />
         </Svg>
       </Animated.View>
     </View>

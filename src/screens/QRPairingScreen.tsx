@@ -24,6 +24,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { SPACING, FONT_SIZE, RADIUS } from "@/theme/colors";
 import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { haptics } from "@/services/haptics";
+import * as ExpoDevice from "expo-device";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -34,8 +35,16 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
   const [qrData, setQrData] = useState<string | null>(null);
 
   const scanAnim = useRef(new Animated.Value(0)).current;
+  const viewfinderAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    Animated.spring(viewfinderAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+
     if (!Platform.isTV) {
       (async () => {
         const { status } = await Camera.requestCameraPermissionsAsync();
@@ -46,12 +55,12 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
         Animated.sequence([
           Animated.timing(scanAnim, {
             toValue: 1,
-            duration: 2500,
+            duration: 2000,
             useNativeDriver: true,
           }),
           Animated.timing(scanAnim, {
             toValue: 0,
-            duration: 2500,
+            duration: 2000,
             useNativeDriver: true,
           }),
         ]),
@@ -61,8 +70,11 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
     if (Platform.isTV) {
       void (async () => {
         const info = {
-          id: "node-" + Math.random().toString(36).substr(2, 6),
-          name: "Living Room TV",
+          id:
+            "node-" +
+            (ExpoDevice.osInternalBuildId ||
+              Math.random().toString(36).substr(2, 6)),
+          name: ExpoDevice.deviceName || "Living Room TV",
           platform: "android-tv",
           v: 1,
         };
@@ -146,7 +158,12 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
           <View style={{ width: 28 }} />
         </View>
 
-        <View style={S.viewfinderContainer}>
+        <Animated.View
+          style={[
+            S.viewfinderContainer,
+            { transform: [{ scale: viewfinderAnim }] },
+          ]}
+        >
           <View style={S.viewfinder}>
             {/* Industry Standard Scanner Frame */}
             <View
@@ -211,7 +228,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
               </Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
         {scanned && (
           <View style={S.successOverlay}>

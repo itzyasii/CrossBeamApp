@@ -45,8 +45,17 @@ import {
   ChevronRight,
   Wifi,
   Zap,
+  Mail,
+  Lock,
+  FileText,
+  X,
 } from "lucide-react-native";
 import { SPACING } from "@/theme/colors";
+import {
+  GestureHandlerRootView,
+  PanGestureHandler,
+  State,
+} from "react-native-gesture-handler";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const DRAWER_W = 300;
@@ -60,13 +69,59 @@ const TABS: { id: Tab; icon: any; label: string }[] = [
   { id: "settings", icon: SettingsIcon, label: "SETTINGS" },
 ];
 
+import { Modal, Linking, BackHandler } from "react-native";
+import { FocusablePressable } from "@/components/FocusablePressable";
+import * as KeepScreenOn from "expo-keep-screen-on";
+
 export default function App() {
   const { colors, isDark } = useTheme();
   const { biometricLockEnabled } = useAppStore();
   const { authenticate } = useBiometrics();
   const [isLocked, setIsLocked] = useState(false);
   const [showQrPairing, setShowQrPairing] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const insets = useSafeAreaInsets();
+
+  // Handle Back Button for TV and Android
+  useEffect(() => {
+    const backAction = () => {
+      if (showPrivacyModal) {
+        setShowPrivacyModal(false);
+        return true;
+      }
+      if (showTermsModal) {
+        setShowTermsModal(false);
+        return true;
+      }
+      if (showQrPairing) {
+        setShowQrPairing(false);
+        return true;
+      }
+      if (drawerOpen) {
+        closeDrawer();
+        return true;
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction,
+    );
+
+    return () => backHandler.remove();
+  }, [drawerOpen, showQrPairing, showPrivacyModal, showTermsModal]);
+
+  // Keep screen on during active transfers (especially for TV)
+  useEffect(() => {
+    const hasActiveTransfer = transfers.some((t) => t.status === "in-progress");
+    if (hasActiveTransfer) {
+      void KeepScreenOn.activateKeepScreenOnAsync();
+    } else {
+      void KeepScreenOn.deactivateKeepScreenOnAsync();
+    }
+  }, [transfers]);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -158,294 +213,439 @@ export default function App() {
     setShowQrPairing(true);
   };
 
+  const handleSupportPress = () => {
+    void haptics.light();
+    Linking.openURL(
+      "mailto:yasirpechuho1@gmail.com?subject=CrossBeam Support Request",
+    );
+  };
+
+  const onGestureEvent = (event: any) => {
+    if (isLocked) return;
+    const { translationX, translationY, velocityY, state } = event.nativeEvent;
+
+    // Horizontal Swipe for Drawer
+    if (Math.abs(translationX) > Math.abs(translationY)) {
+      if (translationX > 50 && !drawerOpen) {
+        openDrawer();
+      } else if (translationX < -50 && drawerOpen) {
+        closeDrawer();
+      }
+    }
+    // Vertical Swipe for QR Scanner
+    else {
+      if (translationY > 80 && !showQrPairing) {
+        setShowQrPairing(true);
+        void haptics.medium();
+      } else if (translationY < -80 && showQrPairing) {
+        setShowQrPairing(false);
+      }
+    }
+  };
+
   return (
-    <View style={[S.root, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" translucent />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PanGestureHandler onGestureEvent={onGestureEvent}>
+        <View style={[S.root, { backgroundColor: colors.background }]}>
+          <StatusBar style="light" translucent />
 
-      {drawerOpen && (
-        <Animated.View style={[S.overlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={closeDrawer}
-          />
-        </Animated.View>
-      )}
+          {/* Top Handle for vertical swipe down */}
+          <View style={S.gestureOverlay} pointerEvents="none" />
 
-      {/* ── Header ── */}
-      <View style={[S.header, { paddingTop: insets.top + 10 }]}>
-        <Pressable onPress={openDrawer} style={S.menuIcon}>
-          <View style={[S.menuDot, { backgroundColor: colors.textPrimary }]} />
-          <View style={[S.menuDot, { backgroundColor: colors.textPrimary }]} />
-        </Pressable>
-        <View style={S.headerCenter}>
-          <CrossBeamLogo size={24} />
-          <Text style={[S.headerTitle, { color: colors.textPrimary }]}>
-            CROSSBEAM
-          </Text>
-        </View>
-        <Pressable onPress={handleDiscoveryPress} style={S.headerIcon}>
-          <Radar
-            size={22}
-            color={devices.length > 0 ? colors.accent : colors.textPrimary}
-            strokeWidth={1.5}
-          />
-        </Pressable>
-      </View>
-
-      {showQrPairing && (
-        <QRPairingScreen onBack={() => setShowQrPairing(false)} />
-      )}
-
-      <FlatList
-        ref={pagerRef}
-        data={TABS}
-        keyExtractor={(t) => t.id}
-        horizontal
-        pagingEnabled
-        scrollEnabled={!isLocked}
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) =>
-          setTabIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))
-        }
-        renderItem={({ item: t }) => (
-          <View style={{ width: SCREEN_W }}>
-            <View
-              style={[
-                S.pageContent,
-                {
-                  paddingTop: insets.top + 60,
-                  paddingBottom: TAB_BAR_H + insets.bottom,
-                },
-              ]}
-            >
-              {t.id === "home" && (
-                <HomeScreen
-                  devices={devices}
-                  transfers={transfers}
-                  selectedFiles={selectedFiles}
-                  onStartDiscovery={refreshDevices}
-                  onPickFiles={pickFiles}
-                  onStartTransfer={() => startTransfer(null, "Device")}
-                  onOpenScanner={() => setShowQrPairing(true)}
-                  onGoToTab={(id) =>
-                    goToTab(TABS.findIndex((x) => x.id === id))
-                  }
-                  onClearFiles={clearSelectedFiles}
-                />
-              )}
-              {t.id === "history" && <HistoryScreen transfers={transfers} />}
-              {t.id === "settings" && <SettingsScreen />}
-            </View>
-          </View>
-        )}
-      />
-
-      {/* ── Bottom Nav ── */}
-      <BlurView
-        intensity={20}
-        tint="dark"
-        style={[S.tabBarWrap, { paddingBottom: insets.bottom }]}
-      >
-        <View style={S.tabBar}>
-          {TABS.map((t, i) => (
-            <Pressable key={t.id} onPress={() => goToTab(i)} style={S.tabItem}>
-              <t.icon
-                size={22}
-                color={tabIndex === i ? colors.accent : colors.textMuted}
+          {drawerOpen && (
+            <Animated.View style={[S.overlay, { opacity: overlayOpacity }]}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFill}
+                activeOpacity={1}
+                onPress={closeDrawer}
               />
-              <Text
-                style={[
-                  S.tabLabel,
-                  {
-                    color:
-                      tabIndex === i ? colors.textPrimary : colors.textMuted,
-                  },
-                ]}
-              >
-                {t.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </BlurView>
+            </Animated.View>
+          )}
 
-      {isLocked && (
-        <View style={[S.lockScreen, { backgroundColor: colors.background }]}>
-          <Fingerprint size={64} color={colors.accent} strokeWidth={1} />
-          <Text style={[S.lockTitle, { color: colors.textPrimary }]}>
-            LOCKED
-          </Text>
-          <Pressable
-            style={[S.unlockBtn, { borderColor: colors.borderStrong }]}
-            onPress={async () => {
-              if (await authenticate()) setIsLocked(false);
-            }}
-          >
-            <Text style={[S.unlockText, { color: colors.textSecondary }]}>
-              UNLOCK APP
-            </Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* ── Drawer ── */}
-      <Animated.View
-        style={[S.drawer, { transform: [{ translateX: drawerX }] }]}
-      >
-        <View
-          style={[
-            S.drawerInner,
-            {
-              backgroundColor: colors.backgroundElevated,
-              paddingTop: insets.top + 24,
-            },
-          ]}
-        >
-          {/* Header */}
-          <View style={S.drawerHeader}>
-            <View style={S.drawerHeaderTop}>
-              <CrossBeamLogo size={48} />
-              <View>
-                <Text style={[S.drawerBrand, { color: colors.textPrimary }]}>
-                  CROSSBEAM
-                </Text>
-                <Text style={[S.drawerVersion, { color: colors.textMuted }]}>
-                  v0.1.0-alpha
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                S.statusBadge,
-                {
-                  backgroundColor: `${colors.success}15`,
-                  borderColor: `${colors.success}30`,
-                },
-              ]}
-            >
+          {/* ── Header ── */}
+          <View style={[S.header, { paddingTop: insets.top + 10 }]}>
+            <FocusablePressable onPress={openDrawer} style={S.menuIcon}>
               <View
-                style={[S.statusDot, { backgroundColor: colors.success }]}
+                style={[S.menuDot, { backgroundColor: colors.textPrimary }]}
               />
-              <Text style={[S.statusText, { color: colors.success }]}>
-                SYSTEM_ACTIVE
+              <View
+                style={[S.menuDot, { backgroundColor: colors.textPrimary }]}
+              />
+            </FocusablePressable>
+            <View style={S.headerCenter}>
+              <CrossBeamLogo size={24} />
+              <Text style={[S.headerTitle, { color: colors.textPrimary }]}>
+                CROSSBEAM
               </Text>
             </View>
+            <FocusablePressable
+              onPress={handleDiscoveryPress}
+              style={[S.headerIcon, Platform.isTV && { display: "none" }]}
+            >
+              <Radar
+                size={22}
+                color={devices.length > 0 ? colors.accent : colors.textPrimary}
+                strokeWidth={1.5}
+              />
+            </FocusablePressable>
           </View>
 
-          {/* Navigation */}
-          <View style={S.drawerSection}>
-            <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-              NAVIGATION
-            </Text>
-            <View style={S.drawerList}>
+          {showQrPairing && (
+            <QRPairingScreen onBack={() => setShowQrPairing(false)} />
+          )}
+
+          <FlatList
+            ref={pagerRef}
+            data={TABS}
+            keyExtractor={(t) => t.id}
+            horizontal
+            pagingEnabled
+            scrollEnabled={!isLocked}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) =>
+              setTabIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))
+            }
+            renderItem={({ item: t }) => (
+              <View style={{ width: SCREEN_W }}>
+                <View
+                  style={[
+                    S.pageContent,
+                    {
+                      paddingTop: insets.top + 60,
+                      paddingBottom: TAB_BAR_H + insets.bottom,
+                    },
+                  ]}
+                >
+                  {t.id === "home" && (
+                    <HomeScreen
+                      devices={devices}
+                      transfers={transfers}
+                      selectedFiles={selectedFiles}
+                      onStartDiscovery={refreshDevices}
+                      onPickFiles={pickFiles}
+                      onStartTransfer={() => startTransfer(null, "Device")}
+                      onOpenScanner={() => setShowQrPairing(true)}
+                      onGoToTab={(id) =>
+                        goToTab(TABS.findIndex((x) => x.id === id))
+                      }
+                      onClearFiles={clearSelectedFiles}
+                    />
+                  )}
+                  {t.id === "history" && (
+                    <HistoryScreen transfers={transfers} />
+                  )}
+                  {t.id === "settings" && <SettingsScreen />}
+                </View>
+              </View>
+            )}
+          />
+
+          {/* ── Bottom Nav ── */}
+          <BlurView
+            intensity={20}
+            tint="dark"
+            style={[S.tabBarWrap, { paddingBottom: insets.bottom }]}
+          >
+            <View style={S.tabBar}>
               {TABS.map((t, i) => {
                 const isActive = tabIndex === i;
                 return (
-                  <Pressable
+                  <FocusablePressable
                     key={t.id}
-                    onPress={() => {
-                      goToTab(i);
-                      closeDrawer();
-                    }}
-                    style={[
-                      S.drawerItem,
-                      isActive && {
-                        backgroundColor: `${colors.accent}10`,
-                        borderColor: `${colors.accent}30`,
-                      },
-                    ]}
+                    onPress={() => goToTab(i)}
+                    style={S.tabItem}
                   >
-                    <View
-                      style={[
-                        S.itemIconWrap,
-                        isActive && { backgroundColor: colors.accent },
-                      ]}
-                    >
-                      <t.icon
-                        size={18}
-                        color={isActive ? "#FFF" : colors.textSecondary}
-                      />
-                    </View>
+                    <t.icon
+                      size={20}
+                      color={isActive ? colors.accent : colors.textMuted}
+                      strokeWidth={isActive ? 2.5 : 2}
+                    />
                     <Text
                       style={[
-                        S.drawerLabel,
+                        S.tabLabel,
                         {
                           color: isActive
                             ? colors.textPrimary
-                            : colors.textSecondary,
+                            : colors.textMuted,
                         },
                       ]}
                     >
                       {t.label}
                     </Text>
-                    {isActive && (
-                      <ChevronRight size={16} color={colors.accent} />
-                    )}
-                  </Pressable>
+                  </FocusablePressable>
                 );
               })}
             </View>
-          </View>
+          </BlurView>
 
-          {/* Quick Stats */}
-          <View style={S.drawerSection}>
-            <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-              LIVE_TELEMETRY
-            </Text>
-            <View style={S.statsRow}>
-              <View style={[S.statBox, { backgroundColor: colors.surface }]}>
-                <Wifi size={16} color={colors.accent} />
-                <Text style={[S.statVal, { color: colors.textPrimary }]}>
-                  {devices.length}
+          {isLocked && (
+            <View
+              style={[S.lockScreen, { backgroundColor: colors.background }]}
+            >
+              <Fingerprint size={64} color={colors.accent} strokeWidth={1} />
+              <Text style={[S.lockTitle, { color: colors.textPrimary }]}>
+                LOCKED
+              </Text>
+              <Pressable
+                style={[S.unlockBtn, { borderColor: colors.borderStrong }]}
+                onPress={async () => {
+                  if (await authenticate()) setIsLocked(false);
+                }}
+              >
+                <Text style={[S.unlockText, { color: colors.textSecondary }]}>
+                  UNLOCK APP
                 </Text>
-                <Text style={[S.statLabel, { color: colors.textMuted }]}>
-                  PEERS
-                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* ── Drawer ── */}
+          <Animated.View
+            style={[S.drawer, { transform: [{ translateX: drawerX }] }]}
+          >
+            <View
+              style={[
+                S.drawerInner,
+                {
+                  backgroundColor: colors.backgroundElevated,
+                  paddingTop: insets.top + 24,
+                },
+              ]}
+            >
+              {/* Header */}
+              <View style={S.drawerHeader}>
+                <View style={S.drawerHeaderTop}>
+                  <CrossBeamLogo size={48} />
+                  <View>
+                    <Text
+                      style={[S.drawerBrand, { color: colors.textPrimary }]}
+                    >
+                      CROSSBEAM
+                    </Text>
+                    <Text
+                      style={[S.drawerVersion, { color: colors.textMuted }]}
+                    >
+                      v0.1.0-alpha
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    S.statusBadge,
+                    {
+                      backgroundColor: `${colors.success}15`,
+                      borderColor: `${colors.success}30`,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[S.statusDot, { backgroundColor: colors.success }]}
+                  />
+                  <Text style={[S.statusText, { color: colors.success }]}>
+                    SYSTEM_ACTIVE
+                  </Text>
+                </View>
               </View>
-              <View style={[S.statBox, { backgroundColor: colors.surface }]}>
-                <Activity size={16} color={colors.success} />
-                <Text style={[S.statVal, { color: colors.textPrimary }]}>
-                  {transfers.filter((t) => t.status === "in-progress").length}
+
+              {/* Navigation */}
+              <View style={S.drawerSection}>
+                <View style={S.drawerList}>
+                  {TABS.map((t, i) => {
+                    const isActive = tabIndex === i;
+                    return (
+                      <FocusablePressable
+                        key={t.id}
+                        onPress={() => {
+                          goToTab(i);
+                          closeDrawer();
+                        }}
+                        style={[
+                          S.drawerItem,
+                          isActive && {
+                            backgroundColor: `${colors.accent}10`,
+                            borderColor: `${colors.accent}30`,
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            S.itemIconWrap,
+                            isActive && { backgroundColor: colors.accent },
+                          ]}
+                        >
+                          <t.icon
+                            size={18}
+                            color={isActive ? "#FFF" : colors.textSecondary}
+                          />
+                        </View>
+                        <Text
+                          style={[
+                            S.drawerLabel,
+                            {
+                              color: isActive
+                                ? colors.textPrimary
+                                : colors.textSecondary,
+                            },
+                          ]}
+                        >
+                          {t.label}
+                        </Text>
+                        {isActive && (
+                          <ChevronRight size={16} color={colors.accent} />
+                        )}
+                      </FocusablePressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Quick Stats */}
+              <View style={S.drawerSection}>
+                <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
+                  LIVE_TELEMETRY
                 </Text>
-                <Text style={[S.statLabel, { color: colors.textMuted }]}>
-                  ACTIVE
-                </Text>
+                <View style={S.statsRow}>
+                  <View
+                    style={[S.statBox, { backgroundColor: colors.surface }]}
+                  >
+                    <Wifi size={16} color={colors.accent} />
+                    <Text style={[S.statVal, { color: colors.textPrimary }]}>
+                      {devices.length}
+                    </Text>
+                    <Text style={[S.statLabel, { color: colors.textMuted }]}>
+                      PEERS
+                    </Text>
+                  </View>
+                  <View
+                    style={[S.statBox, { backgroundColor: colors.surface }]}
+                  >
+                    <Activity size={16} color={colors.success} />
+                    <Text style={[S.statVal, { color: colors.textPrimary }]}>
+                      {
+                        transfers.filter((t) => t.status === "in-progress")
+                          .length
+                      }
+                    </Text>
+                    <Text style={[S.statLabel, { color: colors.textMuted }]}>
+                      ACTIVE
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Footer Actions */}
+              <View style={S.drawerFooter}>
+                <FocusablePressable
+                  style={S.footerItem}
+                  onPress={handleSupportPress}
+                >
+                  <HelpCircle size={18} color={colors.textSecondary} />
+                  <Text
+                    style={[S.footerLabel, { color: colors.textSecondary }]}
+                  >
+                    Help & Support
+                  </Text>
+                </FocusablePressable>
+                <FocusablePressable style={S.footerItem}>
+                  <ShieldCheck size={18} color={colors.success} />
+                  <Text
+                    style={[S.footerLabel, { color: colors.textSecondary }]}
+                  >
+                    Security Audit
+                  </Text>
+                </FocusablePressable>
+
+                <View style={S.legalRow}>
+                  <FocusablePressable onPress={() => setShowPrivacyModal(true)}>
+                    <Text style={[S.legalText, { color: colors.textMuted }]}>
+                      Privacy Policy
+                    </Text>
+                  </FocusablePressable>
+                  <View
+                    style={[S.legalDot, { backgroundColor: colors.textMuted }]}
+                  />
+                  <FocusablePressable onPress={() => setShowTermsModal(true)}>
+                    <Text style={[S.legalText, { color: colors.textMuted }]}>
+                      Terms
+                    </Text>
+                  </FocusablePressable>
+                </View>
               </View>
             </View>
-          </View>
+          </Animated.View>
 
-          {/* Footer Actions */}
-          <View style={S.drawerFooter}>
-            <Pressable style={S.footerItem}>
-              <HelpCircle size={18} color={colors.textSecondary} />
-              <Text style={[S.footerLabel, { color: colors.textSecondary }]}>
-                Help & Support
-              </Text>
-            </Pressable>
-            <Pressable style={S.footerItem}>
-              <ShieldCheck size={18} color={colors.success} />
-              <Text style={[S.footerLabel, { color: colors.textSecondary }]}>
-                Security Audit
-              </Text>
-            </Pressable>
-
-            <View style={S.legalRow}>
-              <Text style={[S.legalText, { color: colors.textMuted }]}>
-                Privacy Policy
-              </Text>
+          {/* ── Privacy Policy Modal ── */}
+          <Modal visible={showPrivacyModal} animationType="slide" transparent>
+            <BlurView intensity={80} tint="dark" style={S.modalContainer}>
               <View
-                style={[S.legalDot, { backgroundColor: colors.textMuted }]}
-              />
-              <Text style={[S.legalText, { color: colors.textMuted }]}>
-                Terms
-              </Text>
-            </View>
-          </View>
+                style={[
+                  S.modalContent,
+                  { backgroundColor: colors.backgroundElevated },
+                ]}
+              >
+                <View style={S.modalHeader}>
+                  <ShieldCheck size={24} color={colors.accent} />
+                  <Text style={[S.modalTitle, { color: colors.textPrimary }]}>
+                    Privacy Policy
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowPrivacyModal(false)}
+                    style={S.modalClose}
+                  >
+                    <X size={24} color={colors.textSecondary} />
+                  </Pressable>
+                </View>
+                <ScrollView style={S.modalScroll}>
+                  <Text style={[S.modalText, { color: colors.textSecondary }]}>
+                    Your privacy is paramount. CrossBeam uses end-to-end
+                    peer-to-peer encryption for all transfers.
+                    {"\n\n"}• No files are stored on our servers.{"\n"}• Data
+                    stays on your local network.{"\n"}• We do not collect
+                    personal identifiers.{"\n"}• Analytics are anonymous and
+                    optional.
+                  </Text>
+                </ScrollView>
+              </View>
+            </BlurView>
+          </Modal>
+
+          {/* ── Terms Modal ── */}
+          <Modal visible={showTermsModal} animationType="slide" transparent>
+            <BlurView intensity={80} tint="dark" style={S.modalContainer}>
+              <View
+                style={[
+                  S.modalContent,
+                  { backgroundColor: colors.backgroundElevated },
+                ]}
+              >
+                <View style={S.modalHeader}>
+                  <FileText size={24} color={colors.accent} />
+                  <Text style={[S.modalTitle, { color: colors.textPrimary }]}>
+                    Terms of Service
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowTermsModal(false)}
+                    style={S.modalClose}
+                  >
+                    <X size={24} color={colors.textSecondary} />
+                  </Pressable>
+                </View>
+                <ScrollView style={S.modalScroll}>
+                  <Text style={[S.modalText, { color: colors.textSecondary }]}>
+                    By using CrossBeam, you agree to:{"\n\n"}
+                    1. Use the service for legal file sharing only.{"\n"}
+                    2. Not attempt to reverse engineer the protocol.{"\n"}
+                    3. Acknowledge that transfers depend on local network
+                    quality.
+                  </Text>
+                </ScrollView>
+              </View>
+            </BlurView>
+          </Modal>
         </View>
-      </Animated.View>
-    </View>
+      </PanGestureHandler>
+    </GestureHandlerRootView>
   );
 }
 
@@ -568,6 +768,16 @@ const S = StyleSheet.create({
   },
   drawerLabel: { flex: 1, fontSize: 14, fontWeight: "700", letterSpacing: 0.5 },
 
+  // Gesture Helpers
+  gestureOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    zIndex: 1000,
+  },
+
   statsRow: { flexDirection: "row", gap: 12 },
   statBox: {
     flex: 1,
@@ -596,4 +806,42 @@ const S = StyleSheet.create({
   },
   legalText: { fontSize: 11, fontWeight: "500" },
   legalDot: { width: 3, height: 3, borderRadius: 1.5, opacity: 0.3 },
+
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    width: "100%",
+    maxHeight: "80%",
+    borderRadius: 24,
+    padding: 24,
+    gap: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  modalClose: {
+    padding: 4,
+  },
+  modalScroll: {
+    maxHeight: 400,
+  },
+  modalText: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
 });

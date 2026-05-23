@@ -5,6 +5,7 @@
 import { Device, DeviceStatus, Platform } from '@/types';
 import { generateRandomColor, generateId } from '@/utils/helpers';
 import * as ExpoDevice from 'expo-device';
+import { getRuntimePlatform } from '@/utils/platform';
 
 type DeviceListener = (devices: Device[]) => void;
 
@@ -153,11 +154,7 @@ class DeviceDiscoveryService {
       return {
         id: generateId(),
         name: deviceName || `${brand} ${modelName}`,
-        platform: (ExpoDevice.deviceType === ExpoDevice.DeviceType.TABLET
-          ? 'android-tv'
-          : ExpoDevice.osName === 'iOS'
-            ? 'ios'
-            : 'android') as Platform,
+        platform: getRuntimePlatform() as Platform,
         ipAddress: '0.0.0.0', // Will be set by network service
         port: 5354,
         status: 'idle' as DeviceStatus,
@@ -167,8 +164,8 @@ class DeviceDiscoveryService {
         lastSeen: Date.now(),
         avatarColor: generateRandomColor(deviceName),
         capabilities: {
-          supportsWiFiDirect: ExpoDevice.osName === 'Android',
-          supportsMultipeer: ExpoDevice.osName === 'iOS',
+          supportsWiFiDirect: getRuntimePlatform() !== 'ios',
+          supportsMultipeer: getRuntimePlatform() === 'ios',
           supportsBluetooth: true,
         },
       };

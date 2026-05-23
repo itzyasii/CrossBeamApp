@@ -4,6 +4,7 @@ import { deepLinkService, DeepLinkParams } from "@/services/DeepLinkService";
 
 export const useDeepLink = () => {
   const navigation = useNavigation();
+  const nav = navigation as any;
 
   const handleDeepLink = useCallback(
     (params: DeepLinkParams) => {
@@ -12,8 +13,8 @@ export const useDeepLink = () => {
       switch (params.action) {
         case "send":
           if (params.deviceId) {
-            navigation.navigate(
-              "TransferScreen" as never,
+            nav.navigate(
+              "TransferScreen",
               {
                 deviceId: params.deviceId,
                 fileName: params.fileName,
@@ -23,13 +24,13 @@ export const useDeepLink = () => {
           break;
 
         case "receive":
-          navigation.navigate("DiscoverScreen" as never);
+          nav.navigate("DiscoverScreen");
           break;
 
         case "pair":
           if (params.pairingCode) {
-            navigation.navigate(
-              "QRPairingScreen" as never,
+            nav.navigate(
+              "QRPairingScreen",
               {
                 pairingCode: params.pairingCode,
               } as never,
@@ -40,8 +41,8 @@ export const useDeepLink = () => {
         case "open":
           // Open a specific transfer or device
           if (params.transferId) {
-            navigation.navigate(
-              "HistoryScreen" as never,
+            nav.navigate(
+              "HistoryScreen",
               {
                 transferId: params.transferId,
               } as never,
@@ -53,7 +54,7 @@ export const useDeepLink = () => {
           console.warn(`Unknown deep link action: ${params.action}`);
       }
     },
-    [navigation],
+    [nav],
   );
 
   useEffect(() => {

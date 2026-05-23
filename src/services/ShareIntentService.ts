@@ -1,4 +1,4 @@
-import { ShareIntentModule } from "expo-share-intent";
+import { ShareIntentModule, parseShareIntent, getShareExtensionKey } from "expo-share-intent";
 import { useEffect, useState } from "react";
 
 export interface SharedFile {
@@ -15,35 +15,33 @@ export interface ShareIntentData {
 }
 
 export const shareIntentService = {
+  mapShareIntent(data: any): ShareIntentData {
+    const files: SharedFile[] = (data.files || []).map((file: any) => ({
+      uri: file.path,
+      name: file.fileName || "Shared File",
+      mimeType: file.mimeType || "application/octet-stream",
+      size: file.size ?? undefined,
+    }));
+
+    return {
+      files,
+      text: data.text ?? undefined,
+      webUrl: data.webUrl ?? undefined,
+    };
+  },
+
   /**
    * Get files shared to the app via Share Sheet
    */
   async getSharedFiles(): Promise<ShareIntentData> {
     try {
-      const data = await ShareIntentModule.getShareIntentData?.();
-      if (!data) {
+      if (!ShareIntentModule) {
         return { files: [], text: undefined, webUrl: undefined };
       }
 
-      const files: SharedFile[] = [];
-
-      // Handle file attachments
-      if (Array.isArray(data.files)) {
-        for (const file of data.files) {
-          files.push({
-            uri: file.uri,
-            name: file.name || "Shared File",
-            mimeType: file.type || "application/octet-stream",
-            size: file.size,
-          });
-        }
-      }
-
-      return {
-        files,
-        text: data.text,
-        webUrl: data.webUrl,
-      };
+      const raw = ShareIntentModule.getShareIntent("");
+      if (!raw) return { files: [], text: undefined, webUrl: undefined };
+      return this.mapShareIntent(parseShareIntent(raw, {}));
     } catch (error) {
       console.error("Failed to get shared files:", error);
       return { files: [], text: undefined, webUrl: undefined };
@@ -55,7 +53,7 @@ export const shareIntentService = {
    */
   async clearShareIntent(): Promise<void> {
     try {
-      await ShareIntentModule.clearShareIntent?.();
+      await ShareIntentModule?.clearShareIntent(getShareExtensionKey({}));
     } catch (error) {
       console.error("Failed to clear share intent:", error);
     }
@@ -66,8 +64,7 @@ export const shareIntentService = {
    */
   async hasSharedFiles(): Promise<boolean> {
     try {
-      const data = await ShareIntentModule.getShareIntentData?.();
-      return data && (data.files?.length > 0 || !!data.text || !!data.webUrl);
+      return ShareIntentModule?.hasShareIntent(getShareExtensionKey({})) ?? false;
     } catch (error) {
       console.error("Failed to check share intent:", error);
       return false;
@@ -81,10 +78,10 @@ export const shareIntentService = {
     callback: (data: ShareIntentData) => void,
   ): (() => void) | undefined {
     try {
-      return ShareIntentModule.addShareIntentListener?.(async () => {
-        const data = await this.getSharedFiles();
-        callback(data);
+      const subscription = ShareIntentModule?.addListener("onChange", (event) => {
+        callback(this.mapShareIntent(parseShareIntent(event.value, {})));
       });
+      return () => subscription?.remove();
     } catch (error) {
       console.error("Failed to add share intent listener:", error);
       return undefined;

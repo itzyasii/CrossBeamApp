@@ -37,6 +37,23 @@ export type NativeTransferEvent = {
   errorMessage?: string;
 };
 
+export type NativeBackgroundTransferConfig = {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT';
+  headers?: Record<string, string>;
+  timeout?: number;
+  retryCount?: number;
+};
+
+export type NativeBackgroundTransferStatus = {
+  transferId: string;
+  progress: number;
+  bytesTransferred: number;
+  totalBytes: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'paused';
+  error?: string;
+};
+
 export type CrossBeamNativeEventsMap = {
   onPeerFound: (peer: NativePeer) => void;
   onPeerLost: (event: { id: string }) => void;
@@ -62,8 +79,22 @@ export type CrossBeamNativeModule = {
   pauseTransfer(transferId: string): Promise<void>;
   resumeTransfer(transferId: string): Promise<void>;
   // Phase B: Authentication & Security
-  storeSecureValue(alias: String, value: string): Promise<string>;
-  retrieveSecureValue(alias: String, encryptedValue: string): Promise<string>;
+  storeSecureValue(alias: string, value: string): Promise<string>;
+  retrieveSecureValue(alias: string, encryptedValue: string): Promise<string>;
+  startBackgroundTransfer?(
+    transferId: string,
+    config: NativeBackgroundTransferConfig,
+  ): Promise<void>;
+  getBackgroundTransferStatus?(
+    transferId: string,
+  ): Promise<NativeBackgroundTransferStatus | null>;
+  pauseBackgroundTransfer?(transferId: string): Promise<void>;
+  resumeBackgroundTransfer?(transferId: string): Promise<void>;
+  cancelBackgroundTransfer?(transferId: string): Promise<void>;
+  addBackgroundTransferListener?(
+    callback: (status: NativeBackgroundTransferStatus) => void,
+  ): (() => void) | null;
+  configureBackgroundSession?(identifier: string): void;
 };
 
 const nativeModule = requireOptionalNativeModule<CrossBeamNativeModule>('CrossBeamNative');

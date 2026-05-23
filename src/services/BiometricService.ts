@@ -1,6 +1,8 @@
-import * as SecureStore from "expo-secure-store";
 import * as LocalAuthentication from "expo-local-authentication";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { CrossBeamNative } from "@/native/crossbeamNative";
 
 export interface BiometricSession {
   token: string;
@@ -45,7 +47,7 @@ export const biometricService = {
     try {
       const result = await LocalAuthentication.authenticateAsync({
         disableDeviceFallback: Platform.OS === "ios",
-        reason,
+        promptMessage: reason,
         fallbackLabel: "Use passcode instead",
       });
       return result.success;
@@ -74,10 +76,7 @@ export const biometricService = {
         createdAt: now,
       };
 
-      await SecureStore.setItemAsync(
-        `session_${userId}`,
-        JSON.stringify(session),
-      );
+      await this.storeCredential(`session_${userId}`, JSON.stringify(session));
 
       return true;
     } catch (error) {
@@ -99,7 +98,7 @@ export const biometricService = {
         return null;
       }
 
-      const sessionJson = await SecureStore.getItemAsync(`session_${userId}`);
+      const sessionJson = await this.getCredential(`session_${userId}`);
       if (!sessionJson) {
         return null;
       }
@@ -124,7 +123,7 @@ export const biometricService = {
    */
   async clearSecureSession(userId: string): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync(`session_${userId}`);
+      await this.deleteCredential(`session_${userId}`);
     } catch (error) {
       console.error("Failed to clear secure session:", error);
     }
@@ -135,7 +134,7 @@ export const biometricService = {
    */
   async hasValidSession(userId: string): Promise<boolean> {
     try {
-      const sessionJson = await SecureStore.getItemAsync(`session_${userId}`);
+      const sessionJson = await this.getCredential(`session_${userId}`);
       if (!sessionJson) {
         return false;
       }
@@ -153,7 +152,18 @@ export const biometricService = {
    */
   async storeCredential(key: string, value: string): Promise<boolean> {
     try {
-      await SecureStore.setItemAsync(key, value);
+      if (CrossBeamNative?.storeSecureValue) {
+        const protectedValue = await CrossBeamNative.storeSecureValue(key, value);
+        await AsyncStorage.setItem(
+          `secure_${key}`,
+          JSON.stringify({ nativeProtected: true, value: protectedValue }),
+        );
+      } else {
+        await AsyncStorage.setItem(
+          `secure_${key}`,
+          JSON.stringify({ nativeProtected: false, value }),
+        );
+      }
       return true;
     } catch (error) {
       console.error("Failed to store credential:", error);
@@ -166,7 +176,19 @@ export const biometricService = {
    */
   async getCredential(key: string): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(key);
+      const stored = await AsyncStorage.getItem(`secure_${key}`);
+      if (!stored) return null;
+
+      const payload = JSON.parse(stored) as {
+        nativeProtected?: boolean;
+        value: string;
+      };
+
+      if (payload.nativeProtected && CrossBeamNative?.retrieveSecureValue) {
+        return await CrossBeamNative.retrieveSecureValue(key, payload.value);
+      }
+
+      return payload.value;
     } catch (error) {
       console.error("Failed to get credential:", error);
       return null;
@@ -178,7 +200,7 @@ export const biometricService = {
    */
   async deleteCredential(key: string): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync(key);
+      await AsyncStorage.removeItem(`secure_${key}`);
     } catch (error) {
       console.error("Failed to delete credential:", error);
     }

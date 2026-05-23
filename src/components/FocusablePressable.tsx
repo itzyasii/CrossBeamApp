@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, PressableProps, StyleSheet, ViewStyle, Platform, View } from 'react-native';
+import { Pressable, PressableProps, ViewStyle } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 
 interface FocusablePressableProps extends PressableProps {
@@ -29,7 +29,7 @@ export const FocusablePressable: React.FC<FocusablePressableProps> = ({
       shadowRadius: 10,
       elevation: 5,
     }),
-    state.pressed && { opacity: 0.7, scale: 0.98 }
+    state.pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
   ];
 
   return (

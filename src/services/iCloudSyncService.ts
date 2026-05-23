@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
 export interface SyncedTransfer {
@@ -11,8 +11,9 @@ export interface SyncedTransfer {
   status: "completed" | "pending" | "failed";
 }
 
-const ICLOUD_DOCUMENTS_DIR = `${FileSystem.documentDirectory}CrossBeam/iCloud/`;
-const SYNC_HISTORY_FILE = `${FileSystem.documentDirectory}crossbeam_sync_history.json`;
+const DOCUMENT_DIR = FileSystem.documentDirectory ?? "";
+const ICLOUD_DOCUMENTS_DIR = `${DOCUMENT_DIR}CrossBeam/iCloud/`;
+const SYNC_HISTORY_FILE = `${DOCUMENT_DIR}crossbeam_sync_history.json`;
 
 export const iCloudSyncService = {
   /**

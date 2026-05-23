@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import MultipeerConnectivity
+import Security
 import UIKit
 
 public final class CrossBeamNativeModule: Module {
@@ -24,7 +25,14 @@ public final class CrossBeamNativeModule: Module {
     }
 
     AsyncFunction("getPlatformCapabilities") {
-      return ["multipeer-discovery", "multipeer-resource-transfer"]
+      return [
+        "multipeer-discovery",
+        "multipeer-resource-transfer",
+        "encrypted-session",
+        "keychain-secure-storage",
+        "share-extension-intake",
+        "qr-pairing"
+      ]
     }
 
     AsyncFunction("startDiscovery") {
@@ -101,6 +109,54 @@ public final class CrossBeamNativeModule: Module {
         description: "Resume requires app-managed chunk checkpoints over a custom stream protocol."
       )
     }
+
+    AsyncFunction("storeSecureValue") { (alias: String, value: String) in
+      try self.storeKeychainValue(alias: alias, value: value)
+      return value
+    }
+
+    AsyncFunction("retrieveSecureValue") { (alias: String, encryptedValue: String) in
+      return try self.retrieveKeychainValue(alias: alias)
+    }
+  }
+
+  private func storeKeychainValue(alias: String, value: String) throws {
+    guard let data = value.data(using: .utf8) else {
+      throw Exception(name: "InvalidSecureValue", description: "Unable to encode secure value")
+    }
+
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: "CrossBeamNative",
+      kSecAttrAccount as String: alias
+    ]
+    SecItemDelete(query as CFDictionary)
+
+    var attributes = query
+    attributes[kSecValueData as String] = data
+    attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+
+    let status = SecItemAdd(attributes as CFDictionary, nil)
+    guard status == errSecSuccess else {
+      throw Exception(name: "KeychainStoreFailed", description: "Unable to store secure value")
+    }
+  }
+
+  private func retrieveKeychainValue(alias: String) throws -> String {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: "CrossBeamNative",
+      kSecAttrAccount as String: alias,
+      kSecReturnData as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne
+    ]
+
+    var item: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    guard status == errSecSuccess, let data = item as? Data, let value = String(data: data, encoding: .utf8) else {
+      throw Exception(name: "KeychainValueMissing", description: "Secure value was not found")
+    }
+    return value
   }
 
   private func startMultipeer() {

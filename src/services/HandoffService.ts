@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import * as AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface UserActivity {
   activityType:
@@ -56,7 +56,7 @@ export const handoffService = {
 
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const activityKeys = keys.filter((k) => k.startsWith("activity_"));
+      const activityKeys = keys.filter((k: string) => k.startsWith("activity_"));
 
       if (activityKeys.length === 0) return null;
 
@@ -171,7 +171,7 @@ export const handoffService = {
   async cleanupOldContexts(minutesOld: number = 60): Promise<number> {
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const continuityKeys = keys.filter((k) => k.startsWith("continuity_"));
+      const continuityKeys = keys.filter((k: string) => k.startsWith("continuity_"));
 
       const cutoffTime = Date.now() - minutesOld * 60 * 1000;
       let clearedCount = 0;

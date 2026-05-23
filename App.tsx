@@ -54,7 +54,6 @@ import { SPACING } from "@/theme/colors";
 import {
   GestureHandlerRootView,
   PanGestureHandler,
-  State,
 } from "react-native-gesture-handler";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -71,7 +70,7 @@ const TABS: { id: Tab; icon: any; label: string }[] = [
 
 import { Modal, Linking, BackHandler } from "react-native";
 import { FocusablePressable } from "@/components/FocusablePressable";
-import * as KeepScreenOn from "expo-keep-screen-on";
+import * as KeepAwake from "expo-keep-awake";
 
 export default function App() {
   const { colors, isDark } = useTheme();
@@ -82,6 +81,24 @@ export default function App() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const insets = useSafeAreaInsets();
+  const [tabIndex, setTabIndex] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const { devices, isRefreshing, statusMessage, refreshDevices } =
+    useDeviceDiscovery();
+  const { sharedFiles, setSharedFiles } = useShareIntent();
+  const {
+    transfers,
+    selectedFiles,
+    pickFiles,
+    clearSelectedFiles,
+    startTransfer,
+    togglePause,
+    cancelTransfer,
+    addSelectedFiles,
+  } = useTransferManager();
+
+  const tab = TABS[tabIndex].id;
 
   // Handle Back Button for TV and Android
   useEffect(() => {
@@ -117,9 +134,9 @@ export default function App() {
   useEffect(() => {
     const hasActiveTransfer = transfers.some((t) => t.status === "in-progress");
     if (hasActiveTransfer) {
-      void KeepScreenOn.activateKeepScreenOnAsync();
+      void KeepAwake.activateKeepAwakeAsync("crossbeam-active-transfer");
     } else {
-      void KeepScreenOn.deactivateKeepScreenOnAsync();
+      void KeepAwake.deactivateKeepAwake("crossbeam-active-transfer");
     }
   }, [transfers]);
 
@@ -138,24 +155,6 @@ export default function App() {
       })();
     }
   }, []);
-
-  const [tabIndex, setTabIndex] = useState(0);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const tab = TABS[tabIndex].id;
-
-  const { devices, isRefreshing, statusMessage, refreshDevices } =
-    useDeviceDiscovery();
-  const { sharedFiles, setSharedFiles } = useShareIntent();
-  const {
-    transfers,
-    selectedFiles,
-    pickFiles,
-    clearSelectedFiles,
-    startTransfer,
-    togglePause,
-    cancelTransfer,
-    addSelectedFiles,
-  } = useTransferManager();
 
   const pagerRef = useRef<FlatList>(null);
   const goToTab = useCallback((idx: number) => {
@@ -222,7 +221,7 @@ export default function App() {
 
   const onGestureEvent = (event: any) => {
     if (isLocked) return;
-    const { translationX, translationY, velocityY, state } = event.nativeEvent;
+    const { translationX, translationY } = event.nativeEvent;
 
     // Horizontal Swipe for Drawer
     if (Math.abs(translationX) > Math.abs(translationY)) {
@@ -321,9 +320,17 @@ export default function App() {
                       devices={devices}
                       transfers={transfers}
                       selectedFiles={selectedFiles}
+                      statusMessage={statusMessage}
+                      isRefreshing={isRefreshing}
                       onStartDiscovery={refreshDevices}
                       onPickFiles={pickFiles}
-                      onStartTransfer={() => startTransfer(null, "Device")}
+                      onStartTransfer={() => {
+                        const target = devices[0];
+                        void startTransfer(
+                          target?.id ?? null,
+                          target?.name ?? "Device",
+                        );
+                      }}
                       onOpenScanner={() => setShowQrPairing(true)}
                       onGoToTab={(id) =>
                         goToTab(TABS.findIndex((x) => x.id === id))

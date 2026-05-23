@@ -30,6 +30,7 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.os.ParcelUuid
 import android.content.Intent
+import android.content.res.Configuration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
@@ -85,7 +86,13 @@ class CrossBeamNativeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("CrossBeamNative")
 
-    Events("onPeerFound", "onPeerLost", "onTransferProgress")
+    Events(
+      "onPeerFound",
+      "onPeerLost",
+      "onTransferProgress",
+      "onWiFiDirectPeersChanged",
+      "onWiFiDirectConnectionChanged"
+    )
 
     AsyncFunction("isAvailable") {
       true
@@ -102,6 +109,12 @@ class CrossBeamNativeModule : Module() {
       )
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         capabilities.add("wifi-direct-api-available")
+      }
+      val context = appContext.reactContext
+      if (context != null && isAndroidTv(context)) {
+        capabilities.add("remote-control-focus")
+        capabilities.add("leanback-launcher")
+        capabilities.add("tv-receiver-mode")
       }
       capabilities
     }
@@ -221,6 +234,28 @@ class CrossBeamNativeModule : Module() {
     return (keyStore.getEntry(alias, null) as KeyStore.SecretKeyEntry).secretKey
   }
 
+  private fun isAndroidTv(context: Context): Boolean {
+    val mode = context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
+    return mode == Configuration.UI_MODE_TYPE_TELEVISION
+  }
+
+  private fun localPlatform(context: Context): String =
+    if (isAndroidTv(context)) "android-tv" else "android"
+
+  private fun inferPeerPlatform(name: String?, fallback: String = "android"): String {
+    val normalized = name?.lowercase() ?: return fallback
+    return if (
+      normalized.contains("tv") ||
+      normalized.contains("shield") ||
+      normalized.contains("chromecast") ||
+      normalized.contains("living room")
+    ) {
+      "android-tv"
+    } else {
+      fallback
+    }
+  }
+
   private fun initWifiP2p() {
     val context = appContext.reactContext ?: return
     if (wifiP2pManager != null) return
@@ -282,8 +317,6 @@ class CrossBeamNativeModule : Module() {
     wifiP2pManager = null
     wifiP2pChannel = null
   }
-}
-
   private fun startTransferServer() {
     if (serverSocket != null) return
     val socket = ServerSocket(0)
@@ -327,7 +360,7 @@ class CrossBeamNativeModule : Module() {
       this.serviceType = this@CrossBeamNativeModule.serviceType
       this.port = port
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        setAttribute("platform", "android")
+        setAttribute("platform", localPlatform(context))
       }
     }
 
@@ -387,10 +420,16 @@ class CrossBeamNativeModule : Module() {
           override fun onServiceResolved(resolved: NsdServiceInfo) {
             val host: InetAddress? = resolved.host
             val id = "${resolved.serviceName}-${host?.hostAddress ?: UUID.randomUUID()}"
+            val advertisedPlatform =
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                resolved.attributes["platform"]?.toString(Charsets.UTF_8)
+              } else {
+                null
+              }
             val peer = mapOf(
               "id" to id,
               "name" to resolved.serviceName,
-              "platform" to "android",
+              "platform" to (advertisedPlatform ?: inferPeerPlatform(resolved.serviceName)),
               "connection" to "local-network",
               "host" to host?.hostAddress,
               "port" to resolved.port,
@@ -746,7 +785,7 @@ class CrossBeamNativeModule : Module() {
         val peer = mapOf(
           "id" to id,
           "name" to name,
-          "platform" to "android", // We assume android for now or determine via manufacturer data
+          "platform" to inferPeerPlatform(name),
           "connection" to "ble",
           "isTrusted" to false,
           "lastSeenAt" to System.currentTimeMillis()

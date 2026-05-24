@@ -97,15 +97,16 @@ export default function App() {
   const [discoveryEnabled, setDiscoveryEnabled] = useState(false);
 
   const {
-    requestAllPermissions,
     getMissingPermissions,
     getMissingDiscoveryPermissions,
+    requestDiscoveryPermissions,
   } = usePermissions();
   const { devices, isRefreshing, statusMessage, refreshDevices } =
     useDeviceDiscovery(discoveryEnabled);
   const { sharedFiles, setSharedFiles } = useShareIntent();
   const {
     transfers,
+    transferError,
     selectedFiles,
     pickFiles,
     clearSelectedFiles,
@@ -175,32 +176,41 @@ export default function App() {
   }, [colors.background]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      await requestAllPermissions();
-      const missingDiscovery = await getMissingDiscoveryPermissions();
-      if (!cancelled) {
-        setDiscoveryEnabled(missingDiscovery.length === 0);
-      }
-
-      const missing = await getMissingPermissions();
-      if (missing.length > 0) {
-        console.warn(`[App] Missing permissions: ${missing.join(", ")}`);
-      }
-    })();
-
     if (biometricLockEnabled) {
       setIsLocked(true);
       void (async () => {
         if (await authenticate()) setIsLocked(false);
       })();
     }
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  const handleStartDiscovery = useCallback(async () => {
+    const missingDiscovery = await getMissingDiscoveryPermissions();
+    if (missingDiscovery.length > 0) {
+      const granted = await requestDiscoveryPermissions();
+      if (!granted) {
+        const missing = await getMissingPermissions();
+        if (missing.length > 0) {
+          console.warn(`[App] Missing permissions: ${missing.join(", ")}`);
+        }
+        setDiscoveryEnabled(false);
+        return;
+      }
+    }
+
+    if (discoveryEnabled) {
+      await refreshDevices();
+      return;
+    }
+
+    setDiscoveryEnabled(true);
+  }, [
+    discoveryEnabled,
+    getMissingDiscoveryPermissions,
+    getMissingPermissions,
+    refreshDevices,
+    requestDiscoveryPermissions,
+  ]);
 
   useEffect(() => {
     void loadApprovals();
@@ -259,7 +269,7 @@ export default function App() {
 
   const handleDiscoveryPress = () => {
     void haptics.medium();
-    setShowQrPairing(true);
+    goToTab(1);
   };
 
   const handleSupportPress = () => {
@@ -385,11 +395,22 @@ export default function App() {
             </View>
             <FocusablePressable
               onPress={handleDiscoveryPress}
-              style={[S.headerIcon, Platform.isTV && { display: "none" }]}
+              style={[
+                S.headerIcon,
+                {
+                  backgroundColor: discoveryEnabled
+                    ? colors.successMuted
+                    : colors.surfaceHover,
+                  borderColor: discoveryEnabled
+                    ? `${colors.success}55`
+                    : colors.borderStrong,
+                },
+                Platform.isTV && { display: "none" },
+              ]}
             >
               <Radar
                 size={22}
-                color={devices.length > 0 ? colors.accent : colors.textPrimary}
+                color={discoveryEnabled ? colors.success : colors.textPrimary}
                 strokeWidth={1.5}
               />
             </FocusablePressable>
@@ -425,14 +446,16 @@ export default function App() {
                     <HomeScreen
                       devices={devices}
                       transfers={transfers}
+                      transferError={transferError}
                       selectedFiles={selectedFiles}
                       statusMessage={statusMessage}
                       isRefreshing={isRefreshing}
+                      discoveryEnabled={discoveryEnabled}
                       approvals={approvals}
                       onApprovalAction={handleApprovalAction}
                       onCreateClipboardBeam={handleCreateClipboardBeam}
                       onSaveCollection={handleSaveCollection}
-                      onStartDiscovery={refreshDevices}
+                      onStartDiscovery={handleStartDiscovery}
                       onPickFiles={pickFiles}
                       onStartTransfer={handleStartTransferRequest}
                       onOpenScanner={() => setShowQrPairing(true)}
@@ -446,8 +469,9 @@ export default function App() {
                     <DiscoverScreen
                       devices={devices}
                       isRefreshing={isRefreshing}
+                      discoveryEnabled={discoveryEnabled}
                       statusMessage={statusMessage}
-                      onRefresh={refreshDevices}
+                      onRefresh={handleStartDiscovery}
                       onSelectDevice={(id) => {
                         const device = devices.find((item) => item.id === id);
                         if (device) sendToDevice(device);
@@ -616,16 +640,36 @@ export default function App() {
                   style={[
                     S.statusBadge,
                     {
-                      backgroundColor: `${colors.success}15`,
-                      borderColor: `${colors.success}30`,
+                      backgroundColor: discoveryEnabled
+                        ? colors.successMuted
+                        : colors.surfaceHover,
+                      borderColor: discoveryEnabled
+                        ? `${colors.success}55`
+                        : colors.borderStrong,
                     },
                   ]}
                 >
                   <View
-                    style={[S.statusDot, { backgroundColor: colors.success }]}
+                    style={[
+                      S.statusDot,
+                      {
+                        backgroundColor: discoveryEnabled
+                          ? colors.success
+                          : colors.textMuted,
+                      },
+                    ]}
                   />
-                  <Text style={[S.statusText, { color: colors.success }]}>
-                    SYSTEM_ACTIVE
+                  <Text
+                    style={[
+                      S.statusText,
+                      {
+                        color: discoveryEnabled
+                          ? colors.success
+                          : colors.textMuted,
+                      },
+                    ]}
+                  >
+                    {discoveryEnabled ? "DISCOVERY_ON" : "DISCOVERY_OFF"}
                   </Text>
                 </View>
               </View>
@@ -853,7 +897,14 @@ const S = StyleSheet.create({
   menuIcon: { width: 32, height: 32, justifyContent: "center", gap: 4 },
   menuDot: { width: 4, height: 4, borderRadius: 2 },
   headerTitle: { fontSize: 12, fontWeight: "900", letterSpacing: 3 },
-  headerIcon: { width: 32 },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   pageContent: { flex: 1, paddingHorizontal: SPACING.xl },
 

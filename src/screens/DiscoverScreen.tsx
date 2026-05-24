@@ -12,6 +12,7 @@ type Props = {
   devices: Device[];
   onRefresh: () => void;
   isRefreshing: boolean;
+  discoveryEnabled?: boolean;
   statusMessage: string;
   onSelectDevice?: (deviceId: string) => void;
 };
@@ -75,14 +76,18 @@ const PulseDot = ({ active }: { active: boolean }) => {
   );
 };
 
-const RadarSweep = () => {
+const RadarSweep = ({ active }: { active: boolean }) => {
   const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (!active) {
+      rotate.setValue(0);
+      return undefined;
+    }
     const loop = Animated.loop(Animated.timing(rotate, { toValue: 1, duration: 2200, useNativeDriver: true }));
     loop.start();
     return () => loop.stop();
-  }, [rotate]);
+  }, [active, rotate]);
 
   const spin = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
@@ -91,7 +96,16 @@ const RadarSweep = () => {
       {[76, 126, 176, 226].map((r) => (
         <View key={r} style={[S.radarRing, { width: r, height: r, borderRadius: r / 2 }]} />
       ))}
-      <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', transform: [{ rotate: spin }] }]}>
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            alignItems: 'center',
+            opacity: active ? 1 : 0.28,
+            transform: [{ rotate: spin }],
+          },
+        ]}
+      >
         <LinearGradient colors={['rgba(192,193,255,0.45)', 'transparent']} style={S.radarBeam} />
       </Animated.View>
       <View style={S.radarCore} />
@@ -187,25 +201,88 @@ const DeviceRow = ({
   );
 };
 
-export function DiscoverScreen({ devices, onRefresh, isRefreshing, statusMessage, onSelectDevice }: Props) {
+export function DiscoverScreen({
+  devices,
+  onRefresh,
+  isRefreshing,
+  discoveryEnabled = false,
+  statusMessage,
+  onSelectDevice,
+}: Props) {
   const { colors } = useTheme();
   const connections = Array.from(new Set(devices.map((device) => device.connection.toUpperCase())));
   const trustedCount = devices.filter((device) => device.isTrusted).length;
+  const radarActive = discoveryEnabled || isRefreshing;
+  const statusLabel = isRefreshing ? 'Scanning' : discoveryEnabled ? 'Live' : 'Off';
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={S.scroll}>
       <GlassCard animate style={S.scanCard}>
         <View style={S.scanBody}>
-          <RadarSweep />
+          <View
+            style={[
+              S.statusPill,
+              {
+                backgroundColor: isRefreshing
+                  ? colors.warningMuted
+                  : discoveryEnabled
+                    ? colors.successMuted
+                    : colors.surfaceHover,
+                borderColor: isRefreshing
+                  ? `${colors.warning}55`
+                  : discoveryEnabled
+                    ? `${colors.success}55`
+                    : colors.border,
+              },
+            ]}
+          >
+            <View
+              style={[
+                S.statusDot,
+                {
+                  backgroundColor: isRefreshing
+                    ? colors.warning
+                    : discoveryEnabled
+                      ? colors.success
+                      : colors.textMuted,
+                },
+              ]}
+            />
+            <Text
+              style={[
+                S.statusText,
+                {
+                  color: isRefreshing
+                    ? colors.warning
+                    : discoveryEnabled
+                      ? colors.success
+                      : colors.textMuted,
+                },
+              ]}
+            >
+              {statusLabel}
+            </Text>
+          </View>
+          <RadarSweep active={radarActive} />
           <Text style={[S.scanTitle, { color: colors.textPrimary }]}>
-            {isRefreshing ? 'Scanning for nearby devices...' : 'Device Radar'}
+            {isRefreshing
+              ? 'Scanning for nearby devices...'
+              : discoveryEnabled
+                ? 'Device Radar'
+                : 'Discovery Off'}
           </Text>
           <Text style={[S.scanProtocol, { color: colors.textMuted }]}>WIFI-DIRECT - LAN - BLUETOOTH</Text>
           <Text style={[S.scanSub, { color: colors.textSecondary }]}>{statusMessage}</Text>
           <Pressable onPress={onRefresh} accessibilityRole="button">
             <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={S.scanBtn}>
               <RefreshCcw size={16} color="#FFFFFF" strokeWidth={2.5} />
-              <Text style={S.scanBtnText}>{isRefreshing ? 'Scanning...' : 'Refresh'}</Text>
+              <Text style={S.scanBtnText}>
+                {isRefreshing
+                  ? 'Scanning...'
+                  : discoveryEnabled
+                    ? 'Refresh'
+                    : 'Start Discovery'}
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -215,12 +292,22 @@ export function DiscoverScreen({ devices, onRefresh, isRefreshing, statusMessage
         <GlassCard>
           <View style={S.empty}>
             <Wifi size={42} color={colors.accentLight} strokeWidth={2.1} />
-            <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>No Devices Found</Text>
-            <Text style={[S.emptySub, { color: colors.textSecondary }]}>
-              {devices.length === 0
-                ? 'Show this QR on TV, or scan a TV or nearby phone from another device.'
-                : 'Make sure both devices share the same Wi-Fi, or have Bluetooth enabled.'}
+            <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>
+              {discoveryEnabled ? 'No Devices Found' : 'Discovery Is Off'}
             </Text>
+            <Text style={[S.emptySub, { color: colors.textSecondary }]}>
+              {discoveryEnabled
+                ? 'Make sure both devices share the same Wi-Fi, or have Bluetooth enabled.'
+                : 'Start discovery when you want this device to look for nearby peers.'}
+            </Text>
+            {!discoveryEnabled && (
+              <Pressable onPress={onRefresh} accessibilityRole="button">
+                <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={S.emptyBtn}>
+                  <RefreshCcw size={14} color="#FFFFFF" strokeWidth={2.5} />
+                  <Text style={S.emptyBtnText}>Start Discovery</Text>
+                </LinearGradient>
+              </Pressable>
+            )}
           </View>
         </GlassCard>
       ) : (
@@ -256,6 +343,17 @@ const S = StyleSheet.create({
   scroll: { gap: SPACING.md, paddingBottom: SPACING.md },
   scanCard: {},
   scanBody: { alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm },
+  statusPill: {
+    minHeight: 30,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    paddingHorizontal: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: FONT_SIZE.xs, fontWeight: '900', textTransform: 'uppercase' },
   scanTitle: { fontSize: FONT_SIZE.lg, fontWeight: '800', textAlign: 'center' },
   scanProtocol: { fontSize: FONT_SIZE.xs, fontWeight: '800', letterSpacing: 1.1 },
   scanSub: { fontSize: FONT_SIZE.sm, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
@@ -310,6 +408,17 @@ const S = StyleSheet.create({
   empty: { alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.md },
   emptyTitle: { fontSize: FONT_SIZE.md, fontWeight: '800' },
   emptySub: { fontSize: FONT_SIZE.sm, textAlign: 'center', lineHeight: 20, maxWidth: 260 },
+  emptyBtn: {
+    minHeight: 40,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.xs,
+  },
+  emptyBtnText: { color: '#FFFFFF', fontSize: FONT_SIZE.xs, fontWeight: '900' },
   statsGrid: { flexDirection: 'row', gap: SPACING.md },
   statCard: { flex: 1 },
   statLabel: { fontSize: FONT_SIZE.xs, fontWeight: '900', letterSpacing: 1 },

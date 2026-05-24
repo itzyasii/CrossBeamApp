@@ -6,6 +6,7 @@ import {
   Laptop,
   Plus,
   Radio,
+  RefreshCcw,
   Save,
   Send,
   Settings,
@@ -28,6 +29,7 @@ import { IncomingApprovalRequest } from "@/services/platformFeatureService";
 type Props = {
   devices: Device[];
   transfers: TransferJob[];
+  transferError?: string | null;
   selectedFiles: SelectedFile[];
   onStartDiscovery: () => void;
   onPickFiles: () => void;
@@ -37,6 +39,7 @@ type Props = {
   onClearFiles: () => void;
   statusMessage?: string;
   isRefreshing?: boolean;
+  discoveryEnabled?: boolean;
   approvals?: IncomingApprovalRequest[];
   onApprovalAction?: (
     id: string,
@@ -57,6 +60,7 @@ const DeviceIcon = ({ platform }: { platform: string }) => {
 export function HomeScreen({
   devices,
   transfers,
+  transferError,
   selectedFiles,
   onStartDiscovery,
   onPickFiles,
@@ -66,6 +70,7 @@ export function HomeScreen({
   onClearFiles,
   statusMessage,
   isRefreshing,
+  discoveryEnabled = false,
   approvals = [],
   onApprovalAction,
   onCreateClipboardBeam,
@@ -84,6 +89,11 @@ export function HomeScreen({
   const capabilitySummary = Platform.isTV
     ? ["Receiver mode", "D-pad focus", "QR pairing"]
     : ["Local discovery", "Secure transfer", "QR pairing"];
+  const discoveryActionLabel = isRefreshing
+    ? "Scanning"
+    : discoveryEnabled
+      ? "Refresh"
+      : "Start Discovery";
 
   return (
     <ScrollView
@@ -134,20 +144,30 @@ export function HomeScreen({
               {
                 backgroundColor: isRefreshing
                   ? colors.warningMuted
-                  : colors.successMuted,
+                  : discoveryEnabled
+                    ? colors.successMuted
+                    : colors.surfaceHover,
                 borderColor: isRefreshing
                   ? `${colors.warning}55`
-                  : `${colors.success}55`,
+                  : discoveryEnabled
+                    ? `${colors.success}55`
+                    : colors.border,
               },
             ]}
           >
             <Text
               style={[
                 S.livePillText,
-                { color: isRefreshing ? colors.warning : colors.success },
+                {
+                  color: isRefreshing
+                    ? colors.warning
+                    : discoveryEnabled
+                      ? colors.success
+                      : colors.textMuted,
+                },
               ]}
             >
-              {isRefreshing ? "SYNC" : "LIVE"}
+              {isRefreshing ? "SYNC" : discoveryEnabled ? "LIVE" : "OFF"}
             </Text>
           </View>
         </View>
@@ -169,6 +189,43 @@ export function HomeScreen({
               </Text>
             </View>
           ))}
+        </View>
+        <View style={S.discoveryActions}>
+          <FocusablePressable
+            onPress={onStartDiscovery}
+            style={[
+              S.discoveryPrimary,
+              {
+                backgroundColor: discoveryEnabled
+                  ? colors.surfaceHover
+                  : colors.accent,
+                borderColor: discoveryEnabled ? colors.borderStrong : colors.accent,
+              },
+            ]}
+          >
+            <RefreshCcw
+              size={17}
+              color={discoveryEnabled ? colors.textPrimary : "#FFFFFF"}
+              strokeWidth={2.4}
+            />
+            <Text
+              style={[
+                S.discoveryPrimaryText,
+                { color: discoveryEnabled ? colors.textPrimary : "#FFFFFF" },
+              ]}
+            >
+              {discoveryActionLabel}
+            </Text>
+          </FocusablePressable>
+          <FocusablePressable
+            onPress={() => onGoToTab("discover")}
+            style={[S.discoverySecondary, { borderColor: colors.borderStrong }]}
+          >
+            <Radio size={16} color={colors.accentLight} strokeWidth={2.3} />
+            <Text style={[S.discoverySecondaryText, { color: colors.textSecondary }]}>
+              Radar
+            </Text>
+          </FocusablePressable>
         </View>
       </GlassCard>
 
@@ -238,6 +295,14 @@ export function HomeScreen({
                 Save as collection
               </Text>
             </FocusablePressable>
+          </GlassCard>
+        )}
+
+        {transferError && (
+          <GlassCard style={S.transferErrorCard}>
+            <Text style={[S.transferErrorText, { color: colors.warning }]}>
+              {transferError}
+            </Text>
           </GlassCard>
         )}
       </View>
@@ -349,16 +414,33 @@ export function HomeScreen({
           </Text>
           <FocusablePressable onPress={onStartDiscovery}>
             <Text style={[S.actionLink, { color: colors.accent }]}>
-              {isRefreshing ? "Refreshing" : "Refresh"}
+              {isRefreshing
+                ? "Refreshing"
+                : discoveryEnabled
+                  ? "Refresh"
+                  : "Start Discovery"}
             </Text>
           </FocusablePressable>
         </View>
 
         {devices.length === 0 ? (
           <GlassCard style={S.emptyCard}>
-            <Text style={[S.emptyText, { color: colors.textSecondary }]}>
-              Looking for devices nearby...
-            </Text>
+            <View style={S.emptyContent}>
+              <Text style={[S.emptyText, { color: colors.textSecondary }]}>
+                {discoveryEnabled
+                  ? "Looking for devices nearby..."
+                  : "Discovery is off."}
+              </Text>
+              {!discoveryEnabled && (
+                <FocusablePressable
+                  onPress={onStartDiscovery}
+                  style={[S.emptyButton, { backgroundColor: colors.accent }]}
+                >
+                  <RefreshCcw size={14} color="#FFFFFF" strokeWidth={2.5} />
+                  <Text style={S.emptyButtonText}>Start Discovery</Text>
+                </FocusablePressable>
+              )}
+            </View>
           </GlassCard>
         ) : (
           <ScrollView
@@ -367,7 +449,11 @@ export function HomeScreen({
             style={S.deviceList}
           >
             {devices.map((device) => (
-              <FocusablePressable key={device.id} style={S.deviceCard}>
+              <FocusablePressable
+                key={device.id}
+                onPress={onStartTransfer}
+                style={S.deviceCard}
+              >
                 <View
                   style={[S.deviceAvatar, { backgroundColor: colors.accent }]}
                 >
@@ -514,6 +600,33 @@ const S = StyleSheet.create({
     paddingVertical: 6,
   },
   capabilityText: { fontSize: 11, fontWeight: "800" },
+  discoveryActions: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+  discoveryPrimary: {
+    minHeight: 46,
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+  },
+  discoveryPrimaryText: { fontSize: 13, fontWeight: "900" },
+  discoverySecondary: {
+    minHeight: 46,
+    minWidth: 96,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+  },
+  discoverySecondaryText: { fontSize: 13, fontWeight: "900" },
 
   actionHub: { gap: SPACING.md, marginBottom: SPACING.xl },
   mainButtons: { flexDirection: "row", gap: SPACING.md },
@@ -564,6 +677,16 @@ const S = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   saveCollectionText: { fontSize: 13, fontWeight: "800" },
+  transferErrorCard: {
+    borderStyle: "dashed",
+    paddingVertical: SPACING.md,
+  },
+  transferErrorText: {
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 18,
+  },
 
   clipboardCard: { gap: SPACING.md, marginBottom: SPACING.xl },
   clipboardInputWrap: {
@@ -615,12 +738,23 @@ const S = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: "900" },
   actionLink: { fontSize: 14, fontWeight: "700" },
   emptyCard: {
-    height: 100,
+    minHeight: 116,
     justifyContent: "center",
     alignItems: "center",
     borderStyle: "dashed",
   },
+  emptyContent: { alignItems: "center", gap: SPACING.md },
   emptyText: { fontSize: 14, fontWeight: "600" },
+  emptyButton: {
+    minHeight: 40,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+  },
+  emptyButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
 
   deviceList: { marginHorizontal: -SPACING.xl, paddingHorizontal: SPACING.xl },
   deviceCard: {

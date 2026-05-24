@@ -18,7 +18,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState(
-    'Native peer discovery is not available in this Expo runtime.',
+    'Discovery is off. Start discovery when you want to look for nearby devices.',
   );
 
   const refreshDevices = useCallback(async () => {
@@ -45,7 +45,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   useEffect(() => {
     if (!enabled) {
       setDevices([]);
-      setStatusMessage('Waiting for discovery permissions.');
+      setStatusMessage('Discovery is off. Start discovery when you want to look for nearby devices.');
       return;
     }
 

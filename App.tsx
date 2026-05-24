@@ -112,7 +112,7 @@ export default function App() {
     clearSelectedFiles,
     startTransfer,
     addSelectedFiles,
-  } = useTransferManager();
+  } = useTransferManager(devices);
 
   const loadApprovals = useCallback(async () => {
     setApprovals(await platformFeatureService.getApprovals());
@@ -288,17 +288,25 @@ export default function App() {
     [startTransfer],
   );
 
-  const handleStartTransferRequest = useCallback(() => {
-    if (devices.length > 1) {
-      setShowDevicePicker(true);
-      return;
-    }
-    if (devices.length === 1) {
-      sendToDevice(devices[0]);
-      return;
-    }
-    void startTransfer(null, "Device");
-  }, [devices, sendToDevice, startTransfer]);
+  const handleStartTransferRequest = useCallback(
+    (deviceId?: string) => {
+      if (deviceId) {
+        const device = devices.find((d) => d.id === deviceId);
+        if (device) sendToDevice(device);
+        return;
+      }
+      if (devices.length > 1) {
+        setShowDevicePicker(true);
+        return;
+      }
+      if (devices.length === 1) {
+        sendToDevice(devices[0]);
+        return;
+      }
+      void startTransfer(null, "Device");
+    },
+    [devices, sendToDevice, startTransfer],
+  );
 
   const handleCreateClipboardBeam = useCallback(
     async (text: string) => {
@@ -472,10 +480,6 @@ export default function App() {
                       discoveryEnabled={discoveryEnabled}
                       statusMessage={statusMessage}
                       onRefresh={handleStartDiscovery}
-                      onSelectDevice={(id) => {
-                        const device = devices.find((item) => item.id === id);
-                        if (device) sendToDevice(device);
-                      }}
                     />
                   )}
                   {t.id === "devices" && (
@@ -622,7 +626,7 @@ export default function App() {
               style={[
                 S.drawerInner,
                 {
-                  backgroundColor: colors.backgroundElevated,
+                  backgroundColor: "#161622", // Similar to the dark logo color (deep indigo)
                   paddingTop: insets.top + 24,
                 },
               ]}
@@ -632,7 +636,7 @@ export default function App() {
                 <View style={S.drawerHeaderTop}>
                   <CrossBeamWordmark width={220} />
                   <Text style={[S.drawerVersion, { color: colors.textMuted }]}>
-                    v0.1.0-alpha
+                    Version 0.1
                   </Text>
                 </View>
 
@@ -669,7 +673,7 @@ export default function App() {
                       },
                     ]}
                   >
-                    {discoveryEnabled ? "DISCOVERY_ON" : "DISCOVERY_OFF"}
+                    {discoveryEnabled ? "SCANNING" : "SCANNING OFF"}
                   </Text>
                 </View>
               </View>
@@ -729,7 +733,7 @@ export default function App() {
               {/* Quick Stats */}
               <View style={S.drawerSection}>
                 <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-                  LIVE_TELEMETRY
+                  ACTIVITY
                 </Text>
                 <View style={S.statsRow}>
                   <View
@@ -740,7 +744,7 @@ export default function App() {
                       {devices.length}
                     </Text>
                     <Text style={[S.statLabel, { color: colors.textMuted }]}>
-                      PEERS
+                      DEVICES
                     </Text>
                   </View>
                   <View
@@ -754,7 +758,7 @@ export default function App() {
                       }
                     </Text>
                     <Text style={[S.statLabel, { color: colors.textMuted }]}>
-                      ACTIVE
+                      TRANSFERS
                     </Text>
                   </View>
                 </View>
@@ -778,7 +782,7 @@ export default function App() {
                   <Text
                     style={[S.footerLabel, { color: colors.textSecondary }]}
                   >
-                    Security Audit
+                    Safety Center
                   </Text>
                 </FocusablePressable>
 

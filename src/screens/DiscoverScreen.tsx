@@ -135,10 +135,10 @@ const DeviceRow = ({
 
   const capabilityChips =
     device.platform === 'ios'
-      ? ['Multipeer', 'QR Pairing']
+      ? ['Apple Device', 'Easy Connect']
       : device.platform === 'android-tv'
-        ? ['Wi-Fi Direct', 'BLE', 'TV Receiver']
-        : ['Wi-Fi Direct', 'BLE', 'LAN'];
+        ? ['Smart TV', 'Big Screen']
+        : ['Android', 'Easy Connect'];
 
   return (
     <Animated.View style={{ opacity: fade, transform: [{ translateX: tx }] }}>
@@ -158,12 +158,12 @@ const DeviceRow = ({
               )}
             </View>
             <Text style={[S.deviceMeta, { color: colors.textSecondary }]} numberOfLines={1}>
-              {platformLabel[device.platform]} - {device.connection.toUpperCase()}
+              {platformLabel[device.platform]}
             </Text>
             <View style={S.capabilityRow}>
-              {capabilityChips.map((capability) => (
+              {capabilityChips.map((chip) => (
                 <Text
-                  key={capability}
+                  key={chip}
                   style={[
                     S.capabilityChip,
                     {
@@ -173,7 +173,7 @@ const DeviceRow = ({
                     },
                   ]}
                 >
-                  {capability}
+                  {chip}
                 </Text>
               ))}
             </View>
@@ -213,7 +213,7 @@ export function DiscoverScreen({
   const connections = Array.from(new Set(devices.map((device) => device.connection.toUpperCase())));
   const trustedCount = devices.filter((device) => device.isTrusted).length;
   const radarActive = discoveryEnabled || isRefreshing;
-  const statusLabel = isRefreshing ? 'Scanning' : discoveryEnabled ? 'Live' : 'Off';
+  const statusLabel = isRefreshing ? 'Scanning' : discoveryEnabled ? 'On' : 'Off';
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={S.scroll}>
@@ -268,10 +268,9 @@ export function DiscoverScreen({
             {isRefreshing
               ? 'Scanning for nearby devices...'
               : discoveryEnabled
-                ? 'Device Radar'
-                : 'Discovery Off'}
+                ? 'Find Nearby Devices'
+                : 'Scanning Paused'}
           </Text>
-          <Text style={[S.scanProtocol, { color: colors.textMuted }]}>WIFI-DIRECT - LAN - BLUETOOTH</Text>
           <Text style={[S.scanSub, { color: colors.textSecondary }]}>{statusMessage}</Text>
           <Pressable onPress={onRefresh} accessibilityRole="button">
             <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={S.scanBtn}>
@@ -281,7 +280,7 @@ export function DiscoverScreen({
                   ? 'Scanning...'
                   : discoveryEnabled
                     ? 'Refresh'
-                    : 'Start Discovery'}
+                    : 'Start Scanning'}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -293,18 +292,18 @@ export function DiscoverScreen({
           <View style={S.empty}>
             <Wifi size={42} color={colors.accentLight} strokeWidth={2.1} />
             <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>
-              {discoveryEnabled ? 'No Devices Found' : 'Discovery Is Off'}
+              {discoveryEnabled ? 'No devices nearby' : 'Scanning Paused'}
             </Text>
             <Text style={[S.emptySub, { color: colors.textSecondary }]}>
               {discoveryEnabled
-                ? 'Make sure both devices share the same Wi-Fi, or have Bluetooth enabled.'
-                : 'Start discovery when you want this device to look for nearby peers.'}
+                ? 'Check that your devices are nearby and have scanning turned on.'
+                : 'Tap below to find phones, tablets and TVs around you.'}
             </Text>
             {!discoveryEnabled && (
               <Pressable onPress={onRefresh} accessibilityRole="button">
                 <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={S.emptyBtn}>
                   <RefreshCcw size={14} color="#FFFFFF" strokeWidth={2.5} />
-                  <Text style={S.emptyBtnText}>Start Discovery</Text>
+                  <Text style={S.emptyBtnText}>Start Scanning</Text>
                 </LinearGradient>
               </Pressable>
             )}
@@ -313,7 +312,7 @@ export function DiscoverScreen({
       ) : (
         <View style={S.list}>
           <Text style={[S.listHeader, { color: colors.textMuted }]}>
-            AVAILABLE TARGETS - {devices.length} DEVICE{devices.length !== 1 ? 'S' : ''}
+            NEARBY — {devices.length} DEVICE{devices.length !== 1 ? 'S' : ''}
           </Text>
           {devices.map((device, index) => (
             <DeviceRow key={device.id} device={device} index={index} onSelectDevice={onSelectDevice} />
@@ -323,16 +322,16 @@ export function DiscoverScreen({
 
       <View style={S.statsGrid}>
         <GlassCard padding={SPACING.md} style={S.statCard}>
-          <Text style={[S.statLabel, { color: colors.textMuted }]}>ACTIVE LINKS</Text>
+          <Text style={[S.statLabel, { color: colors.textMuted }]}>CONNECTED</Text>
           <Text style={[S.statValue, { color: colors.accentLight }]}>{connections.length || 0}</Text>
           <Text style={[S.statSub, { color: colors.textMuted }]} numberOfLines={1}>
-            {connections.length > 0 ? connections.join(', ') : 'No peers visible'}
+            {connections.length > 0 ? `${connections.length} type${connections.length !== 1 ? 's' : ''}` : 'None nearby'}
           </Text>
         </GlassCard>
         <GlassCard padding={SPACING.md} style={S.statCard}>
           <Text style={[S.statLabel, { color: colors.textMuted }]}>TRUSTED</Text>
           <Text style={[S.statValue, { color: colors.success }]}>{trustedCount}</Text>
-          <Text style={[S.statSub, { color: colors.textMuted }]}>{devices.length} discovered</Text>
+          <Text style={[S.statSub, { color: colors.textMuted }]}>{devices.length} nearby</Text>
         </GlassCard>
       </View>
     </ScrollView>
@@ -355,7 +354,6 @@ const S = StyleSheet.create({
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   statusText: { fontSize: FONT_SIZE.xs, fontWeight: '900', textTransform: 'uppercase' },
   scanTitle: { fontSize: FONT_SIZE.lg, fontWeight: '800', textAlign: 'center' },
-  scanProtocol: { fontSize: FONT_SIZE.xs, fontWeight: '800', letterSpacing: 1.1 },
   scanSub: { fontSize: FONT_SIZE.sm, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
   scanBtn: {
     borderRadius: RADIUS.full,

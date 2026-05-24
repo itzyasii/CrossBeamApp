@@ -1,5 +1,12 @@
 import React from "react";
-import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import {
   Camera,
   History,
@@ -33,7 +40,7 @@ type Props = {
   selectedFiles: SelectedFile[];
   onStartDiscovery: () => void;
   onPickFiles: () => void;
-  onStartTransfer: () => void;
+  onStartTransfer: (deviceId?: string) => void;
   onOpenScanner: () => void;
   onGoToTab: (tab: string) => void;
   onClearFiles: () => void;
@@ -87,13 +94,13 @@ export function HomeScreen({
     0,
   );
   const capabilitySummary = Platform.isTV
-    ? ["Receiver mode", "D-pad focus", "QR pairing"]
-    : ["Local discovery", "Secure transfer", "QR pairing"];
+    ? ["Ready to receive", "TV remote support", "Easy connect"]
+    : ["Find nearby friends", "Private sharing", "Easy connect"];
   const discoveryActionLabel = isRefreshing
     ? "Scanning"
     : discoveryEnabled
       ? "Refresh"
-      : "Start Discovery";
+      : "Start Scanning";
 
   return (
     <ScrollView
@@ -123,73 +130,26 @@ export function HomeScreen({
       <GlassCard style={S.platformCard}>
         <View style={S.platformHeader}>
           <View
-            style={[S.platformIcon, { backgroundColor: colors.accentHighlight }]}
+            style={[
+              S.platformIcon,
+              { backgroundColor: colors.accentHighlight },
+            ]}
           >
             <Radio size={20} color={colors.accent} strokeWidth={2.4} />
           </View>
           <View style={S.platformCopy}>
             <Text style={[S.platformTitle, { color: colors.textPrimary }]}>
-              {getRuntimePlatformLabel()} node
+              Your {getRuntimePlatformLabel()}
             </Text>
             <Text
               style={[S.platformSub, { color: colors.textSecondary }]}
               numberOfLines={2}
             >
-              {statusMessage || "Ready for private local transfers."}
-            </Text>
-          </View>
-          <View
-            style={[
-              S.livePill,
-              {
-                backgroundColor: isRefreshing
-                  ? colors.warningMuted
-                  : discoveryEnabled
-                    ? colors.successMuted
-                    : colors.surfaceHover,
-                borderColor: isRefreshing
-                  ? `${colors.warning}55`
-                  : discoveryEnabled
-                    ? `${colors.success}55`
-                    : colors.border,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                S.livePillText,
-                {
-                  color: isRefreshing
-                    ? colors.warning
-                    : discoveryEnabled
-                      ? colors.success
-                      : colors.textMuted,
-                },
-              ]}
-            >
-              {isRefreshing ? "SYNC" : discoveryEnabled ? "LIVE" : "OFF"}
+              {statusMessage || "Ready to send and receive files."}
             </Text>
           </View>
         </View>
-        <View style={S.capabilityRow}>
-          {capabilitySummary.map((capability) => (
-            <View
-              key={capability}
-              style={[
-                S.capabilityChip,
-                {
-                  backgroundColor: colors.surfaceHover,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Sparkles size={12} color={colors.accentLight} strokeWidth={2.5} />
-              <Text style={[S.capabilityText, { color: colors.textSecondary }]}>
-                {capability}
-              </Text>
-            </View>
-          ))}
-        </View>
+
         <View style={S.discoveryActions}>
           <FocusablePressable
             onPress={onStartDiscovery}
@@ -199,7 +159,9 @@ export function HomeScreen({
                 backgroundColor: discoveryEnabled
                   ? colors.surfaceHover
                   : colors.accent,
-                borderColor: discoveryEnabled ? colors.borderStrong : colors.accent,
+                borderColor: discoveryEnabled
+                  ? colors.borderStrong
+                  : colors.accent,
               },
             ]}
           >
@@ -222,8 +184,13 @@ export function HomeScreen({
             style={[S.discoverySecondary, { borderColor: colors.borderStrong }]}
           >
             <Radio size={16} color={colors.accentLight} strokeWidth={2.3} />
-            <Text style={[S.discoverySecondaryText, { color: colors.textSecondary }]}>
-              Radar
+            <Text
+              style={[
+                S.discoverySecondaryText,
+                { color: colors.textSecondary },
+              ]}
+            >
+              Search
             </Text>
           </FocusablePressable>
         </View>
@@ -270,7 +237,8 @@ export function HomeScreen({
           <GlassCard animate style={S.selectionCard} accentBorder>
             <View style={S.selectionHeader}>
               <Text style={[S.selectionTitle, { color: colors.textPrimary }]}>
-                {selectedFiles.length} item{selectedFiles.length > 1 ? "s" : ""} ready
+                {selectedFiles.length} item{selectedFiles.length > 1 ? "s" : ""}{" "}
+                ready
               </Text>
               <FocusablePressable onPress={onClearFiles}>
                 <X size={18} color={colors.error} />
@@ -280,20 +248,11 @@ export function HomeScreen({
               Total size: {formatSize(totalSelectedBytes)}
             </Text>
             <FocusablePressable
-              onPress={onStartTransfer}
+              onPress={() => onStartTransfer()}
               style={[S.sendNowBtn, { backgroundColor: colors.success }]}
             >
               <Send size={18} color="#FFF" />
               <Text style={S.sendNowText}>Send Now</Text>
-            </FocusablePressable>
-            <FocusablePressable
-              onPress={onSaveCollection}
-              style={[S.saveCollectionBtn, { borderColor: colors.border }]}
-            >
-              <Save size={16} color={colors.textSecondary} />
-              <Text style={[S.saveCollectionText, { color: colors.textSecondary }]}>
-                Save as collection
-              </Text>
             </FocusablePressable>
           </GlassCard>
         )}
@@ -307,67 +266,46 @@ export function HomeScreen({
         )}
       </View>
 
-      <GlassCard style={S.clipboardCard}>
-        <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
-          Clipboard Beam
-        </Text>
-        <View
-          style={[
-            S.clipboardInputWrap,
-            { borderColor: colors.border, backgroundColor: colors.surface },
-          ]}
-        >
-          <TextInput
-            value={clipboardText}
-            onChangeText={setClipboardText}
-            placeholder="Paste text or a link to beam..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-            style={[S.clipboardInput, { color: colors.textPrimary }]}
-          />
-        </View>
-        <FocusablePressable
-          onPress={() => {
-            onCreateClipboardBeam?.(clipboardText);
-            setClipboardText("");
-          }}
-          style={[S.clipboardBtn, { backgroundColor: colors.accent }]}
-        >
-          <Send size={15} color="#FFF" />
-          <Text style={S.clipboardBtnText}>Add to transfer</Text>
-        </FocusablePressable>
-      </GlassCard>
-
       {approvals.length > 0 && (
         <View style={S.section}>
           <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
-            Transfer Approval Queue
+            Waiting for your approval
           </Text>
           {approvals.map((approval) => {
             const pending = approval.status === "pending";
             return (
-              <GlassCard key={approval.id} style={S.approvalCard} accentBorder={pending}>
+              <GlassCard
+                key={approval.id}
+                style={S.approvalCard}
+                accentBorder={pending}
+              >
                 <View style={S.approvalTop}>
                   <View style={S.approvalCopy}>
-                    <Text style={[S.approvalTitle, { color: colors.textPrimary }]}>
+                    <Text
+                      style={[S.approvalTitle, { color: colors.textPrimary }]}
+                    >
                       {approval.fromDevice.name}
                     </Text>
-                    <Text style={[S.approvalMeta, { color: colors.textSecondary }]}>
-                      {approval.fileNames.join(", ")} - {formatSize(approval.sizeBytes)}
+                    <Text
+                      style={[S.approvalMeta, { color: colors.textSecondary }]}
+                    >
+                      {approval.fileNames.join(", ")} -{" "}
+                      {formatSize(approval.sizeBytes)}
                     </Text>
                     <Text
                       style={[
                         S.approvalStorage,
                         {
-                          color: approval.storageOk === false
-                            ? colors.error
-                            : colors.success,
+                          color:
+                            approval.storageOk === false
+                              ? colors.error
+                              : colors.success,
                         },
                       ]}
                     >
                       {approval.storageOk === false
-                        ? "Receiver storage guard: not enough free space"
-                        : "Receiver storage guard: space looks OK"}
+                        ? "Storage check: Not enough free space"
+                        : "Storage check: Space looks OK"}
                     </Text>
                   </View>
                   <Text
@@ -382,19 +320,29 @@ export function HomeScreen({
                 {pending && (
                   <View style={S.approvalActions}>
                     <FocusablePressable
-                      onPress={() => onApprovalAction?.(approval.id, "accepted")}
-                      style={[S.approvalBtn, { backgroundColor: colors.success }]}
+                      onPress={() =>
+                        onApprovalAction?.(approval.id, "accepted")
+                      }
+                      style={[
+                        S.approvalBtn,
+                        { backgroundColor: colors.success },
+                      ]}
                     >
                       <Text style={S.approvalBtnText}>Accept</Text>
                     </FocusablePressable>
                     <FocusablePressable
                       onPress={() => onApprovalAction?.(approval.id, "trusted")}
-                      style={[S.approvalBtn, { backgroundColor: colors.accent }]}
+                      style={[
+                        S.approvalBtn,
+                        { backgroundColor: colors.accent },
+                      ]}
                     >
                       <Text style={S.approvalBtnText}>Always trust</Text>
                     </FocusablePressable>
                     <FocusablePressable
-                      onPress={() => onApprovalAction?.(approval.id, "rejected")}
+                      onPress={() =>
+                        onApprovalAction?.(approval.id, "rejected")
+                      }
                       style={[S.approvalBtn, { backgroundColor: colors.error }]}
                     >
                       <Text style={S.approvalBtnText}>Reject</Text>
@@ -418,7 +366,7 @@ export function HomeScreen({
                 ? "Refreshing"
                 : discoveryEnabled
                   ? "Refresh"
-                  : "Start Discovery"}
+                  : "Start Scanning"}
             </Text>
           </FocusablePressable>
         </View>
@@ -429,7 +377,7 @@ export function HomeScreen({
               <Text style={[S.emptyText, { color: colors.textSecondary }]}>
                 {discoveryEnabled
                   ? "Looking for devices nearby..."
-                  : "Discovery is off."}
+                  : "Scanning is paused."}
               </Text>
               {!discoveryEnabled && (
                 <FocusablePressable
@@ -437,7 +385,7 @@ export function HomeScreen({
                   style={[S.emptyButton, { backgroundColor: colors.accent }]}
                 >
                   <RefreshCcw size={14} color="#FFFFFF" strokeWidth={2.5} />
-                  <Text style={S.emptyButtonText}>Start Discovery</Text>
+                  <Text style={S.emptyButtonText}>Start Scanning</Text>
                 </FocusablePressable>
               )}
             </View>
@@ -451,7 +399,7 @@ export function HomeScreen({
             {devices.map((device) => (
               <FocusablePressable
                 key={device.id}
-                onPress={onStartTransfer}
+                onPress={() => onStartTransfer(device.id)}
                 style={S.deviceCard}
               >
                 <View
@@ -466,7 +414,7 @@ export function HomeScreen({
                   {device.name}
                 </Text>
                 <Text style={[S.deviceStatus, { color: colors.textMuted }]}>
-                  {device.isTrusted ? "Trusted" : device.connection}
+                  {device.isTrusted ? "Trusted" : "Nearby"}
                 </Text>
               </FocusablePressable>
             ))}
@@ -571,7 +519,11 @@ const S = StyleSheet.create({
   },
 
   platformCard: { gap: SPACING.md, marginBottom: SPACING.xl },
-  platformHeader: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
+  platformHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
   platformIcon: {
     width: 42,
     height: 42,
@@ -718,7 +670,11 @@ const S = StyleSheet.create({
   approvalTitle: { fontSize: 15, fontWeight: "900" },
   approvalMeta: { fontSize: 12, lineHeight: 18, marginTop: 3 },
   approvalStorage: { fontSize: 11, fontWeight: "800", marginTop: 5 },
-  approvalStatus: { fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
+  approvalStatus: {
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
   approvalActions: { flexDirection: "row", gap: SPACING.xs, flexWrap: "wrap" },
   approvalBtn: {
     minHeight: 38,
@@ -772,7 +728,11 @@ const S = StyleSheet.create({
     marginBottom: 4,
   },
   deviceName: { fontSize: 13, fontWeight: "700", textAlign: "center" },
-  deviceStatus: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
+  deviceStatus: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
 
   jobCard: { gap: 8, marginBottom: SPACING.sm },
   jobInfo: { flexDirection: "row", justifyContent: "space-between" },

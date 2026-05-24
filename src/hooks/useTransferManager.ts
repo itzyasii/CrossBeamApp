@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import * as DocumentPicker from "expo-document-picker";
 
 import { nativeCrossBeam } from "@/native/crossbeamNative";
-import { SelectedFile, TransferJob } from "@/types/domain";
+import { SelectedFile, TransferJob, Device } from "@/types/domain";
 import { saveTransferHistory } from "@/store/database";
 import { usePermissions } from "./usePermissions";
 import { platformFeatureService } from "@/services/platformFeatureService";
 import { chunkedTransferService } from "@/services/chunkedTransferService";
 
-export const useTransferManager = () => {
+export const useTransferManager = (knownDevices: Device[] = []) => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [transferError, setTransferError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export const useTransferManager = () => {
             totalBytes: event.totalBytes,
             progress,
             status: event.status as any,
-            fromDeviceName: event.peerId,
+            fromDeviceName: knownDevices.find((d) => d.id === event.peerId)?.name || event.peerId,
             toDeviceName: "This Device",
             encrypted: true,
             startedAt: Date.now(),
@@ -65,7 +65,7 @@ export const useTransferManager = () => {
             await platformFeatureService.queueApproval({
               fromDevice: {
                 id: event.peerId,
-                name: event.peerId,
+                name: knownDevices.find((d) => d.id === event.peerId)?.name || event.peerId,
                 platform: "android",
                 connection: "local-network",
                 lastSeenAt: Date.now(),

@@ -18,7 +18,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState(
-    'Discovery is off. Start discovery when you want to look for nearby devices.',
+    'Scanning is paused. Tap to find nearby devices.',
   );
 
   const refreshDevices = useCallback(async () => {
@@ -30,10 +30,10 @@ export const useDeviceDiscovery = (enabled = true) => {
       setLastRefreshAt(Date.now());
       setStatusMessage(
         result.length > 0
-          ? `Nearby peers discovered via ${capabilities.join(', ')}.`
+          ? `Found nearby devices ready for sharing.`
           : capabilities.length > 0
-            ? `Native discovery is active (${capabilities.join(', ')}); no peers are currently visible.`
-            : 'Native discovery is unavailable in this runtime. Build a native Android/iOS app to use CrossBeam discovery.',
+            ? `Scanning for nearby devices...`
+            : 'Device scanning is not available on this device.',
       );
     } catch (error) {
       setStatusMessage(String(error));
@@ -45,7 +45,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   useEffect(() => {
     if (!enabled) {
       setDevices([]);
-      setStatusMessage('Discovery is off. Start discovery when you want to look for nearby devices.');
+      setStatusMessage('Scanning is paused. Tap to find nearby devices.');
       return;
     }
 
@@ -53,7 +53,7 @@ export const useDeviceDiscovery = (enabled = true) => {
     void startNearbyDiscovery()
       .then(() => {
         if (mounted) {
-          setStatusMessage('Native discovery started.');
+          setStatusMessage('Scanning for nearby devices...');
         }
       })
       .catch((error) => {
@@ -67,11 +67,20 @@ export const useDeviceDiscovery = (enabled = true) => {
 
     const removeFound = addNearbyDeviceFoundListener((device) => {
       setDevices((current) => {
-        const alreadyFound = current.some((item) => item.id === device.id);
+        const existingById = current.find((item) => item.id === device.id);
+        const existingByName = current.find((item) => item.name === device.name);
+        
+        const isIpLike = /^(\d{1,3}\.){3}\d{1,3}$/.test(device.name);
+        if (isIpLike && existingById && !/^(\d{1,3}\.){3}\d{1,3}$/.test(existingById.name)) {
+          device.name = existingById.name;
+        }
+
+        const alreadyFound = existingById || existingByName;
         if (!alreadyFound) {
           void haptics.light();
         }
-        const existing = current.filter((item) => item.id !== device.id);
+        
+        const existing = current.filter((item) => item.id !== device.id && item.name !== device.name);
         return [device, ...existing];
       });
       setLastRefreshAt(Date.now());

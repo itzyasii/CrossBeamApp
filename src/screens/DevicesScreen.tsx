@@ -71,7 +71,7 @@ export function DevicesScreen({ onPairDevice }: Props) {
         <View style={S.headerCopy}>
           <Text style={[S.title, { color: colors.textPrimary }]}>Trusted Devices</Text>
           <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-            Hardware authorized to receive files with fewer prompts.
+            Devices you've connected with before — they can send and receive without extra steps.
           </Text>
         </View>
         <Pressable onPress={onPairDevice} style={[S.pairButton, { backgroundColor: colors.accent }]} accessibilityRole="button">
@@ -109,7 +109,7 @@ export function DevicesScreen({ onPairDevice }: Props) {
                 <Text style={[S.platformPill, { color: colors.textSecondary, backgroundColor: colors.surfaceHover }]}>
                   {platformLabel[device.platform]}
                 </Text>
-                <Text style={[S.deviceId, { color: colors.textMuted }]} numberOfLines={1}>ID: {device.id.slice(0, 10)}</Text>
+                <Text style={[S.deviceId, { color: colors.textMuted }]} numberOfLines={1}>Added {formatDate(device.lastSeenAt)}</Text>
               </View>
 
               <View style={[S.cardFooter, { borderTopColor: colors.border }]}>

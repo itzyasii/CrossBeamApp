@@ -19,6 +19,8 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react-native";
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { GlassCard } from "@/components/GlassCard";
 import { useTheme } from "@/hooks/useTheme";
@@ -137,6 +139,44 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
         },
       ],
     );
+  };
+
+  const handleJobPress = async (job: TransferJob) => {
+    if (job.status !== "completed") return;
+    try {
+      const fileName = job.fileNames?.[0] || job.fileName;
+      if (!fileName) return;
+
+      const possibleUris = [
+        `file:///storage/emulated/0/Download/CrossBeam/${fileName}`,
+        `file:///storage/emulated/0/Downloads/CrossBeam/${fileName}`,
+        `${FileSystem.documentDirectory}CrossBeam/${fileName}`,
+        `${FileSystem.cacheDirectory}${fileName}`,
+        `${FileSystem.documentDirectory}${fileName}`,
+      ];
+
+      let foundUri = null;
+      for (const uri of possibleUris) {
+        try {
+          const info = await FileSystem.getInfoAsync(uri);
+          if (info.exists) {
+            foundUri = uri;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (foundUri && (await Sharing.isAvailableAsync())) {
+        await Sharing.shareAsync(foundUri);
+      } else {
+        Alert.alert("File Unavailable", "The file could not be located on disk or sharing is not available.");
+      }
+    } catch (err) {
+      console.warn(err);
+      Alert.alert("Error", "Could not open the file.");
+    }
   };
 
   return (
@@ -277,7 +317,7 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
             const Icon = statusIcon(job.status);
             return (
               <GlassCard key={job.id} padding={SPACING.md}>
-                <View style={S.item}>
+                <FocusablePressable onPress={() => handleJobPress(job)} style={S.item}>
                   <View
                     style={[S.statusIcon, { backgroundColor: `${color}1F` }]}
                   >
@@ -324,7 +364,7 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
                   >
                     <Text style={[S.statusText, { color }]}>{job.status}</Text>
                   </View>
-                </View>
+                </FocusablePressable>
               </GlassCard>
             );
           })}

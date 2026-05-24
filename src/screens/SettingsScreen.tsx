@@ -179,7 +179,7 @@ export const SettingsScreen: React.FC = () => {
       <View style={S.header}>
         <Text style={[S.title, { color: colors.textPrimary }]}>Settings</Text>
         <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-          Configure your local node and appearance.
+          Configure your app preferences and appearance.
         </Text>
       </View>
 
@@ -192,10 +192,10 @@ export const SettingsScreen: React.FC = () => {
           </View>
           <View style={S.nodeCopy}>
             <Text style={[S.nodeTitle, { color: colors.textPrimary }]}>
-              Local Node
+              This Device
             </Text>
             <Text style={[S.nodeMeta, { color: colors.textSecondary }]}>
-              Encrypted by default - no cloud relay
+              Transfers are direct and private
             </Text>
           </View>
           <View
@@ -325,126 +325,27 @@ export const SettingsScreen: React.FC = () => {
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={LockKeyhole}
-            title="Require encrypted tunnel"
-            description="Block transfers that cannot negotiate E2EE."
+            title="Strict Privacy Mode"
+            description="Only allow fully secure connections."
             value={settings.requireEncryption}
             onValueChange={(value) => updateSetting("requireEncryption", value)}
           />
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={ShieldCheck}
-            title="Verify file checksum"
-            description="Confirm integrity after each completed transfer."
+            title="Verify file transfers"
+            description="Ensure files are transferred without corruption."
             value={settings.verifyChecksum}
             onValueChange={(value) => updateSetting("verifyChecksum", value)}
           />
         </GlassCard>
       </View>
 
-      <View style={S.section}>
-        <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-          LAN DIAGNOSTICS
-        </Text>
-        <GlassCard padding={0}>
-          <View style={S.diagnosticsGrid}>
-            {[
-              {
-                label: "Wi-Fi",
-                value: diagnostics?.isWifiConnected ? "Connected" : "Check",
-                color: diagnostics?.isWifiConnected ? colors.success : colors.warning,
-                icon: Wifi,
-              },
-              {
-                label: "Native bridge",
-                value: diagnostics?.nativeAvailable ? "Ready" : "Unavailable",
-                color: diagnostics?.nativeAvailable ? colors.success : colors.error,
-                icon: Activity,
-              },
-              {
-                label: "Local IP",
-                value: diagnostics?.ipAddress || "Unknown",
-                color: colors.accent,
-                icon: Smartphone,
-              },
-              {
-                label: "Free disk",
-                value: formatBytes(diagnostics?.freeDiskBytes ?? 0),
-                color: colors.accent,
-                icon: Database,
-              },
-            ].map((item) => (
-              <View key={item.label} style={S.diagnosticItem}>
-                <View style={[S.iconBox, { backgroundColor: colors.accentHighlight }]}>
-                  <item.icon size={17} color={item.color} strokeWidth={2.4} />
-                </View>
-                <View style={S.settingCopy}>
-                  <Text style={[S.settingDescription, { color: colors.textMuted }]}>
-                    {item.label}
-                  </Text>
-                  <Text style={[S.settingTitle, { color: item.color }]}>
-                    {item.value}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-          <View style={[S.divider, { backgroundColor: colors.border, marginLeft: 0 }]} />
-          <View style={S.capabilityWrap}>
-            {(diagnostics?.capabilities ?? []).slice(0, 8).map((capability) => (
-              <Text
-                key={capability}
-                style={[
-                  S.capabilityPill,
-                  {
-                    color: colors.textSecondary,
-                    backgroundColor: colors.surfaceHover,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                {capability}
-              </Text>
-            ))}
-          </View>
-          {(diagnostics?.blockedPermissions.length ?? 0) > 0 && (
-            <View style={S.blockedList}>
-              {diagnostics?.blockedPermissions.map((item) => (
-                <Text key={item} style={[S.blockedText, { color: colors.warning }]}>
-                  {item}
-                </Text>
-              ))}
-            </View>
-          )}
-        </GlassCard>
-      </View>
+
 
       <View style={S.section}>
         <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-          CHUNKED TRANSFER PROTOCOL
-        </Text>
-        <GlassCard>
-          <View style={S.protocolGrid}>
-            {[
-              ["Protocol", chunkPlan.protocol],
-              ["Transport", chunkPlan.transport],
-              ["Chunk size", formatBytes(chunkPlan.chunkSizeBytes)],
-              ["Chunk ACK", chunkPlan.supportsChunkAck ? "Verified" : "Unavailable"],
-              ["Pause", chunkPlan.supportsPause ? "Supported" : "Platform limited"],
-              ["Resume", chunkPlan.supportsResume ? "Supported" : "Retry only"],
-              ["Retry", `${chunkPlan.retryCount} attempts`],
-            ].map(([label, value]) => (
-              <View key={label} style={S.protocolItem}>
-                <Text style={[S.footerLabel, { color: colors.textMuted }]}>{label}</Text>
-                <Text style={[S.footerValue, { color: colors.textPrimary }]}>{value}</Text>
-              </View>
-            ))}
-          </View>
-        </GlassCard>
-      </View>
-
-      <View style={S.section}>
-        <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-          PRIVACY AUDIT
+          PRIVACY
         </Text>
         <GlassCard padding={0}>
           {[
@@ -493,7 +394,7 @@ export const SettingsScreen: React.FC = () => {
       </GlassCard>
 
       <Text style={[S.footer, { color: colors.textMuted }]}>
-        CrossBeam 1.0.0 · Private · Local · Fast
+        CrossBeam · Private · Local · Fast
       </Text>
     </ScrollView>
   );

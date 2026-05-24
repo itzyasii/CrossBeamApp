@@ -1,11 +1,15 @@
 package com.crossbeam.nativebridge
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Environment
+import androidx.core.content.ContextCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.BufferedInputStream
@@ -50,6 +54,7 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.content.IntentFilter
 import android.content.BroadcastReceiver
+import android.util.Log
 
 class CrossBeamNativeModule : Module() {
   private var wifiP2pManager: WifiP2pManager? = null
@@ -66,6 +71,7 @@ class CrossBeamNativeModule : Module() {
   private val peers = ConcurrentHashMap<String, Map<String, Any?>>()
   private var discoveryListener: NsdManager.DiscoveryListener? = null
   private var registrationListener: NsdManager.RegistrationListener? = null
+  private var multicastLock: WifiManager.MulticastLock? = null
   private var serverSocket: ServerSocket? = null
   private var serverThread: Thread? = null
   private var localServiceName: String? = null
@@ -136,12 +142,16 @@ class CrossBeamNativeModule : Module() {
     }
 
     AsyncFunction("startDiscovery") {
-      initWifiP2p()
       startTransferServer()
       registerLocalService()
       startNsdDiscovery()
-      startBleDiscovery()
-      startWifiP2pDiscovery()
+      runCatching {
+        initWifiP2p()
+        startWifiP2pDiscovery()
+      }.onFailure { Log.w("CrossBeamNative", "Wi-Fi Direct discovery unavailable", it) }
+      runCatching {
+        startBleDiscovery()
+      }.onFailure { Log.w("CrossBeamNative", "BLE discovery unavailable", it) }
     }
 
     AsyncFunction("stopDiscovery") {
@@ -272,9 +282,48 @@ class CrossBeamNativeModule : Module() {
     }
   }
 
+  private fun hasPermission(context: Context, permission: String): Boolean =
+    ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+  private fun hasBluetoothScanPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+      hasPermission(context, Manifest.permission.BLUETOOTH_SCAN)
+
+  private fun hasBluetoothConnectPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+      hasPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
+
+  private fun hasBluetoothAdvertisePermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+      hasPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE)
+
+  private fun hasNearbyWifiPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+      hasPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES)
+
+  private fun acquireMulticastLock(context: Context) {
+    if (multicastLock?.isHeld == true) return
+    val wifiManager =
+      context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return
+    multicastLock = wifiManager.createMulticastLock("CrossBeamNsd").apply {
+      setReferenceCounted(false)
+      acquire()
+    }
+  }
+
+  private fun releaseMulticastLock() {
+    try {
+      if (multicastLock?.isHeld == true) multicastLock?.release()
+    } catch (_: Exception) {
+    } finally {
+      multicastLock = null
+    }
+  }
+
   private fun initWifiP2p() {
     val context = appContext.reactContext ?: return
     if (wifiP2pManager != null) return
+    if (!hasNearbyWifiPermission(context)) return
 
     wifiP2pManager = context.getSystemService(Context.WIFI_P2P_SERVICE) as? WifiP2pManager
     wifiP2pChannel = wifiP2pManager?.initialize(context, context.mainLooper, null)
@@ -283,6 +332,7 @@ class CrossBeamNativeModule : Module() {
       override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
           WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
+            if (!hasNearbyWifiPermission(context)) return
             wifiP2pManager?.requestPeers(wifiP2pChannel) { peersList ->
               val peerMapList = peersList.deviceList.map { device ->
                 mapOf(
@@ -298,7 +348,7 @@ class CrossBeamNativeModule : Module() {
                   }
                 )
               }
-              sendEvent("onWiFiDirectPeersChanged", peerMapList)
+              sendEvent("onWiFiDirectPeersChanged", mapOf("peers" to peerMapList))
             }
           }
           WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
@@ -307,10 +357,17 @@ class CrossBeamNativeModule : Module() {
         }
       }
     }
-    context.registerReceiver(wifiP2pReceiver, wifiP2pIntentFilter)
+    ContextCompat.registerReceiver(
+      context,
+      wifiP2pReceiver,
+      wifiP2pIntentFilter,
+      ContextCompat.RECEIVER_NOT_EXPORTED
+    )
   }
 
   private fun startWifiP2pDiscovery() {
+    val context = appContext.reactContext ?: return
+    if (!hasNearbyWifiPermission(context)) return
     wifiP2pManager?.discoverPeers(wifiP2pChannel, object : WifiP2pManager.ActionListener {
       override fun onSuccess() = Unit
       override fun onFailure(reason: Int) = Unit
@@ -318,10 +375,12 @@ class CrossBeamNativeModule : Module() {
   }
 
   private fun stopWifiP2pDiscovery() {
-    wifiP2pManager?.stopPeerDiscovery(wifiP2pChannel, object : WifiP2pManager.ActionListener {
-      override fun onSuccess() = Unit
-      override fun onFailure(reason: Int) = Unit
-    })
+    runCatching {
+      wifiP2pManager?.stopPeerDiscovery(wifiP2pChannel, object : WifiP2pManager.ActionListener {
+        override fun onSuccess() = Unit
+        override fun onFailure(reason: Int) = Unit
+      })
+    }
     
     val context = appContext.reactContext ?: return
     wifiP2pReceiver?.let {
@@ -367,6 +426,7 @@ class CrossBeamNativeModule : Module() {
     if (registrationListener != null) return
     val context = appContext.reactContext ?: return
     val port = serverSocket?.localPort ?: return
+    acquireMulticastLock(context)
     val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     val serviceName = "CrossBeam-${Build.MODEL ?: Build.DEVICE ?: UUID.randomUUID()}"
     localServiceName = serviceName
@@ -413,6 +473,7 @@ class CrossBeamNativeModule : Module() {
     if (discoveryListener != null) return
 
     val context = appContext.reactContext ?: return
+    acquireMulticastLock(context)
     val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
 
     val listener = object : NsdManager.DiscoveryListener {
@@ -482,6 +543,7 @@ class CrossBeamNativeModule : Module() {
     } finally {
       discoveryListener = null
       peers.clear()
+      releaseMulticastLock()
     }
   }
 
@@ -797,12 +859,17 @@ class CrossBeamNativeModule : Module() {
 
   private fun startBleDiscovery() {
     val context = appContext.reactContext ?: return
+    if (!hasBluetoothScanPermission(context) || !hasBluetoothConnectPermission(context)) return
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     bluetoothAdapter = bluetoothManager?.adapter
 
     if (bluetoothAdapter == null || bluetoothAdapter?.isEnabled == false) return
 
-    bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+    bleAdvertiser = if (hasBluetoothAdvertisePermission(context)) {
+      bluetoothAdapter?.bluetoothLeAdvertiser
+    } else {
+      null
+    }
     bleScanner = bluetoothAdapter?.bluetoothLeScanner
 
     // --- Start Advertising ---
@@ -814,7 +881,7 @@ class CrossBeamNativeModule : Module() {
       .build()
 
     val data = AdvertiseData.Builder()
-      .setIncludeDeviceName(true)
+      .setIncludeDeviceName(false)
       .addServiceUuid(ParcelUuid(bleServiceUuid))
       .build()
 
@@ -825,7 +892,9 @@ class CrossBeamNativeModule : Module() {
       }
     }
 
-    bleAdvertiser?.startAdvertising(settings, data, bleAdvertiseCallback)
+    if (hasBluetoothAdvertisePermission(context)) {
+      bleAdvertiser?.startAdvertising(settings, data, bleAdvertiseCallback)
+    }
 
     // --- Start Scanning ---
     val filter = ScanFilter.Builder()
@@ -835,8 +904,8 @@ class CrossBeamNativeModule : Module() {
     bleScanCallback = object : ScanCallback() {
       override fun onScanResult(callbackType: Int, result: ScanResult) {
         val device = result.device
-        val name = result.scanRecord?.deviceName ?: device.name ?: "Unknown BLE Peer"
-        val id = "ble-${device.address}"
+        val name = result.scanRecord?.deviceName ?: "Unknown BLE Peer"
+        val id = "ble-${result.device.address}"
         
         if (peers.containsKey(id)) return
 
@@ -861,9 +930,14 @@ class CrossBeamNativeModule : Module() {
   }
 
   private fun stopBleDiscovery() {
+    val context = appContext.reactContext
     try {
-      bleAdvertiser?.stopAdvertising(bleAdvertiseCallback)
-      bleScanner?.stopScan(bleScanCallback)
+      if (context == null || hasBluetoothAdvertisePermission(context)) {
+        bleAdvertiser?.stopAdvertising(bleAdvertiseCallback)
+      }
+      if (context == null || hasBluetoothScanPermission(context)) {
+        bleScanner?.stopScan(bleScanCallback)
+      }
     } catch (_: Exception) {}
     bleAdvertiseCallback = null
     bleScanCallback = null

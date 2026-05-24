@@ -5,6 +5,8 @@ import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import { Camera } from "expo-camera";
 
+const nearbyWifiPermission = "android.permission.NEARBY_WIFI_DEVICES";
+
 export const usePermissions = () => {
   const requestAllPermissions = async (): Promise<boolean> => {
     try {
@@ -30,12 +32,36 @@ export const usePermissions = () => {
       const bluetoothGranted = await requestBluetoothPermissions();
       allGranted = allGranted && bluetoothGranted;
 
+      // Nearby Wi-Fi permission (required for Wi-Fi Direct on Android 13+)
+      const nearbyWifiGranted = await requestNearbyWifiPermissions();
+      allGranted = allGranted && nearbyWifiGranted;
+
       console.log(
         `[Permissions] All permissions requested. Overall status: ${allGranted}`,
       );
       return allGranted;
     } catch (error) {
       console.error("[Permissions] Error requesting permissions:", error);
+      return false;
+    }
+  };
+
+  const requestDiscoveryPermissions = async (): Promise<boolean> => {
+    try {
+      const locationGranted = await requestLocationPermissions();
+      const bluetoothGranted = await requestBluetoothPermissions();
+      const nearbyWifiGranted = await requestNearbyWifiPermissions();
+
+      const granted = locationGranted && bluetoothGranted && nearbyWifiGranted;
+      console.log(
+        `[Permissions] Discovery access: ${granted ? "granted" : "denied"}`,
+      );
+      return granted;
+    } catch (error) {
+      console.error(
+        "[Permissions] Error requesting discovery permissions:",
+        error,
+      );
       return false;
     }
   };
@@ -136,6 +162,30 @@ export const usePermissions = () => {
     }
   };
 
+  const requestNearbyWifiPermissions = async (): Promise<boolean> => {
+    try {
+      if (
+        Platform.OS === "android" &&
+        Device.platformApiLevel &&
+        Device.platformApiLevel >= 33
+      ) {
+        const status = await PermissionsAndroid.request(nearbyWifiPermission);
+        const granted = status === PermissionsAndroid.RESULTS.GRANTED;
+        console.log(
+          `[Permissions] Nearby Wi-Fi access: ${granted ? "granted" : "denied"}`,
+        );
+        return granted;
+      }
+      return true;
+    } catch (error) {
+      console.error(
+        "[Permissions] Error requesting nearby Wi-Fi permissions:",
+        error,
+      );
+      return false;
+    }
+  };
+
   const getMissingPermissions = async (): Promise<string[]> => {
     const missing: string[] = [];
 
@@ -146,12 +196,6 @@ export const usePermissions = () => {
       (mediaPerm as any).status !== "limited"
     ) {
       missing.push("Storage/Media");
-    }
-
-    // Check location
-    const locPerm = await Location.getForegroundPermissionsAsync();
-    if (locPerm.status !== "granted") {
-      missing.push("Location");
     }
 
     // Check notifications
@@ -166,16 +210,60 @@ export const usePermissions = () => {
       missing.push("Camera");
     }
 
-    return missing;
+    missing.push(...(await getMissingDiscoveryPermissions()));
+
+    return Array.from(new Set(missing));
+  };
+
+  const getMissingDiscoveryPermissions = async (): Promise<string[]> => {
+    const missing: string[] = [];
+
+    const locPerm = await Location.getForegroundPermissionsAsync();
+    if (locPerm.status !== "granted") {
+      missing.push("Location");
+    }
+
+    if (
+      Platform.OS === "android" &&
+      Device.platformApiLevel &&
+      Device.platformApiLevel >= 31
+    ) {
+      const statuses = await Promise.all([
+        PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN),
+        PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        ),
+        PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE,
+        ),
+      ]);
+      if (!statuses.every(Boolean)) {
+        missing.push("Bluetooth");
+      }
+    }
+
+    if (
+      Platform.OS === "android" &&
+      Device.platformApiLevel &&
+      Device.platformApiLevel >= 33 &&
+      !(await PermissionsAndroid.check(nearbyWifiPermission))
+    ) {
+      missing.push("Nearby Wi-Fi");
+    }
+
+    return Array.from(new Set(missing));
   };
 
   return {
     requestAllPermissions,
+    requestDiscoveryPermissions,
     requestStoragePermissions,
     requestLocationPermissions,
     requestNotificationPermissions,
     requestCameraPermissions,
     requestBluetoothPermissions,
+    requestNearbyWifiPermissions,
     getMissingPermissions,
+    getMissingDiscoveryPermissions,
   };
 };

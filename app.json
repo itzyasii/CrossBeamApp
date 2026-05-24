@@ -46,9 +46,7 @@
             "NSUbiquitousContainerIsDocumentScopePublic": false,
             "NSUbiquitousContainerSupportsFolderLevelEncryption": true
           }
-        }
-      },
-      "infoPlistExtras": {
+        },
         "LSApplicationQueriesSchemes": ["files", "sharemenow"]
       }
     },

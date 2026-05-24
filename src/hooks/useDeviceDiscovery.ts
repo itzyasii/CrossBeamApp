@@ -13,7 +13,7 @@ import { haptics } from '@/services/haptics';
 
 const AUTO_REFRESH_MS = 12_000;
 
-export const useDeviceDiscovery = () => {
+export const useDeviceDiscovery = (enabled = true) => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
@@ -43,6 +43,12 @@ export const useDeviceDiscovery = () => {
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      setDevices([]);
+      setStatusMessage('Waiting for discovery permissions.');
+      return;
+    }
+
     let mounted = true;
     void startNearbyDiscovery()
       .then(() => {
@@ -82,15 +88,17 @@ export const useDeviceDiscovery = () => {
       removeLost();
       void stopNearbyDiscovery();
     };
-  }, [refreshDevices]);
+  }, [enabled, refreshDevices]);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const interval = setInterval(() => {
       void refreshDevices();
     }, AUTO_REFRESH_MS);
 
     return () => clearInterval(interval);
-  }, [refreshDevices]);
+  }, [enabled, refreshDevices]);
 
   return {
     devices,

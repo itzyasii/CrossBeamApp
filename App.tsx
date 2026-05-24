@@ -94,9 +94,15 @@ export default function App() {
   const insets = useSafeAreaInsets();
   const [tabIndex, setTabIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [discoveryEnabled, setDiscoveryEnabled] = useState(false);
 
+  const {
+    requestAllPermissions,
+    getMissingPermissions,
+    getMissingDiscoveryPermissions,
+  } = usePermissions();
   const { devices, isRefreshing, statusMessage, refreshDevices } =
-    useDeviceDiscovery();
+    useDeviceDiscovery(discoveryEnabled);
   const { sharedFiles, setSharedFiles } = useShareIntent();
   const {
     transfers,
@@ -168,12 +174,16 @@ export default function App() {
     void SystemUI.setBackgroundColorAsync(colors.background);
   }, [colors.background]);
 
-  const { requestAllPermissions, getMissingPermissions } = usePermissions();
-
   useEffect(() => {
-    // Request all required permissions on first app launch
+    let cancelled = false;
+
     void (async () => {
       await requestAllPermissions();
+      const missingDiscovery = await getMissingDiscoveryPermissions();
+      if (!cancelled) {
+        setDiscoveryEnabled(missingDiscovery.length === 0);
+      }
+
       const missing = await getMissingPermissions();
       if (missing.length > 0) {
         console.warn(`[App] Missing permissions: ${missing.join(", ")}`);
@@ -186,6 +196,10 @@ export default function App() {
         if (await authenticate()) setIsLocked(false);
       })();
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

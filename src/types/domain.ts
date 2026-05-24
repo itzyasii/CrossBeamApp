@@ -48,6 +48,7 @@ export type TransferJob = {
   startedAt: number;
   updatedAt: number;
   errorMessage?: string;
+  mimeType?: string;
 };
 
 export type IncomingTransferRequest = {

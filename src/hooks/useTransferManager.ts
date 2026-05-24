@@ -18,23 +18,32 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     return nativeCrossBeam.addTransferProgressListener((event) => {
       setTransfers((current) => {
         const progress =
-          event.totalBytes > 0
-            ? Math.min(100, Math.round((event.bytesTransferred / event.totalBytes) * 100))
-            : 0;
+          event.totalBytes > 0 ? event.bytesTransferred / event.totalBytes : 0;
         const existing = current.find((job) => job.id === event.transferId);
-        
+
+        // Fix: If progress is 100%, we treat it as completed for history,
+        // as some builds might not fire the 'completed' status event correctly.
+        const effectiveStatus =
+          progress >= 1 && event.status === "in-progress"
+            ? "completed"
+            : event.status;
+
         let newJob: TransferJob;
         if (!existing) {
           newJob = {
             id: event.transferId,
-            fileNames: event.fileName ? [event.fileName] : ["Incoming transfer"],
+            fileNames: event.fileName
+              ? [event.fileName]
+              : ["Incoming transfer"],
             fileName: event.fileName,
             sizeBytes: event.totalBytes,
             bytesTransferred: event.bytesTransferred,
             totalBytes: event.totalBytes,
             progress,
-            status: event.status as any,
-            fromDeviceName: knownDevices.find((d) => d.id === event.peerId)?.name || event.peerId,
+            status: effectiveStatus as any,
+            fromDeviceName:
+              knownDevices.find((d) => d.id === event.peerId)?.name ||
+              event.peerId,
             toDeviceName: "This Device",
             encrypted: true,
             startedAt: Date.now(),
@@ -51,27 +60,33 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
             bytesTransferred: event.bytesTransferred,
             totalBytes: event.totalBytes,
             progress,
-            status: event.status as any,
+            status: effectiveStatus as any,
+            mimeType: event.mimeType, // Store mimeType for path resolution
             updatedAt: Date.now(),
             errorMessage: event.errorMessage,
           };
         }
-        
+
         void saveTransferHistory(newJob as any);
 
         if (!existing) {
           void (async () => {
-            const freeDiskBytes = await platformFeatureService.getFreeDiskBytes();
+            const freeDiskBytes =
+              await platformFeatureService.getFreeDiskBytes();
             await platformFeatureService.queueApproval({
               fromDevice: {
                 id: event.peerId,
-                name: knownDevices.find((d) => d.id === event.peerId)?.name || event.peerId,
+                name:
+                  knownDevices.find((d) => d.id === event.peerId)?.name ||
+                  event.peerId,
                 platform: "android",
                 connection: "local-network",
                 lastSeenAt: Date.now(),
                 isTrusted: false,
               },
-              fileNames: event.fileName ? [event.fileName] : ["Incoming transfer"],
+              fileNames: event.fileName
+                ? [event.fileName]
+                : ["Incoming transfer"],
               sizeBytes: event.totalBytes,
               storageOk: freeDiskBytes <= 0 || freeDiskBytes > event.totalBytes,
             });
@@ -79,14 +94,16 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
 
           return [newJob, ...current];
         }
-        return current.map((job) => (job.id === event.transferId ? newJob : job));
+        return current.map((job) =>
+          job.id === event.transferId ? newJob : job,
+        );
       });
     });
   }, []);
 
   const pickFiles = async () => {
     setTransferError(null);
-    
+
     const hasPermission = await requestStoragePermissions();
     if (!hasPermission) {
       setTransferError("Storage permission is required to select files.");
@@ -112,7 +129,10 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   };
 
   const addSelectedFiles = (files: SelectedFile[]) => {
-    setSelectedFiles(current => [...current, ...files.filter(f => !current.some(c => c.id === f.id))]);
+    setSelectedFiles((current) => [
+      ...current,
+      ...files.filter((f) => !current.some((c) => c.id === f.id)),
+    ]);
     setTransferError(null);
   };
 
@@ -121,7 +141,10 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     setTransferError(null);
   };
 
-  const startTransfer = async (targetDeviceId: string | null, targetDeviceName: string) => {
+  const startTransfer = async (
+    targetDeviceId: string | null,
+    targetDeviceName: string,
+  ) => {
     if (selectedFiles.length === 0) {
       setTransferError("Select one or more files before starting a transfer.");
       return;
@@ -165,7 +188,12 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
       setTransfers((current) =>
         current.map((job) =>
           job.id === baseJob.id
-            ? { ...job, id: result.transferId, status: "in-progress", updatedAt: Date.now() }
+            ? {
+                ...job,
+                id: result.transferId,
+                status: "in-progress",
+                updatedAt: Date.now(),
+              }
             : job,
         ),
       );
@@ -190,7 +218,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   };
 
   const togglePause = async (id: string) => {
-    const job = transfers.find(j => j.id === id);
+    const job = transfers.find((j) => j.id === id);
     if (!job) return;
 
     try {

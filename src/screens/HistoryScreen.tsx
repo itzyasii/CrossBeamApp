@@ -88,12 +88,17 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
 
   useEffect(() => {
     const syncReports = async () => {
-      const completed = mergedTransfers.filter((job) => job.status === "completed");
+      const completed = mergedTransfers.filter(
+        (job) => job.status === "completed",
+      );
       const entries = await Promise.all(
-        completed.map(async (job) => [
-          job.id,
-          await platformFeatureService.ensureIntegrityReport(job),
-        ] as const),
+        completed.map(
+          async (job) =>
+            [
+              job.id,
+              await platformFeatureService.ensureIntegrityReport(job),
+            ] as const,
+        ),
       );
       setReports(Object.fromEntries(entries));
     };
@@ -147,9 +152,30 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
       const fileName = job.fileNames?.[0] || job.fileName;
       if (!fileName) return;
 
+      const report = reports[job.id];
+      const mimeType = job.mimeType || "";
+      
+      const subfolder = 
+        mimeType.startsWith("image/") ? "Images" :
+        mimeType.startsWith("video/") ? "Videos" :
+        mimeType.startsWith("audio/") ? "Audio" :
+        (mimeType === "application/pdf" || mimeType.startsWith("text/") || /word|excel|powerpoint/.test(mimeType)) ? "Documents" :
+        "Others";
+
       const possibleUris = [
+        // Structured CrossBeam path
+        `file:///storage/emulated/0/Download/CrossBeam/${subfolder}/${fileName}`,
+        `file:///storage/emulated/0/Downloads/CrossBeam/${subfolder}/${fileName}`,
+        `file:///sdcard/Download/CrossBeam/${subfolder}/${fileName}`,
+        
+        // Fallback to legacy flat path
         `file:///storage/emulated/0/Download/CrossBeam/${fileName}`,
         `file:///storage/emulated/0/Downloads/CrossBeam/${fileName}`,
+        `file:///sdcard/Download/CrossBeam/${fileName}`,
+        
+        // Use the saved path from report if available
+        ...(report?.savedPath ? [`file:///storage/emulated/0/${report.savedPath}/${fileName}`] : []),
+        
         `${FileSystem.documentDirectory}CrossBeam/${fileName}`,
         `${FileSystem.cacheDirectory}${fileName}`,
         `${FileSystem.documentDirectory}${fileName}`,
@@ -171,7 +197,10 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
       if (foundUri && (await Sharing.isAvailableAsync())) {
         await Sharing.shareAsync(foundUri);
       } else {
-        Alert.alert("File Unavailable", "The file could not be located on disk or sharing is not available.");
+        Alert.alert(
+          "File Unavailable",
+          `The file "${fileName}" could not be located on disk. It may have been moved or deleted.`,
+        );
       }
     } catch (err) {
       console.warn(err);
@@ -267,7 +296,11 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {collections.map((collection) => (
-              <GlassCard key={collection.id} padding={SPACING.md} style={S.collectionCard}>
+              <GlassCard
+                key={collection.id}
+                padding={SPACING.md}
+                style={S.collectionCard}
+              >
                 <View style={S.collectionHead}>
                   <Folder size={18} color={colors.accent} strokeWidth={2.4} />
                   <Text
@@ -277,8 +310,11 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
                     {collection.name}
                   </Text>
                 </View>
-                <Text style={[S.collectionMeta, { color: colors.textSecondary }]}>
-                  {collection.fileNames.length} files - {formatBytes(collection.totalBytes)}
+                <Text
+                  style={[S.collectionMeta, { color: colors.textSecondary }]}
+                >
+                  {collection.fileNames.length} files -{" "}
+                  {formatBytes(collection.totalBytes)}
                 </Text>
                 <Text style={[S.date, { color: colors.textMuted }]}>
                   {collection.lastSentAt
@@ -317,7 +353,10 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
             const Icon = statusIcon(job.status);
             return (
               <GlassCard key={job.id} padding={SPACING.md}>
-                <FocusablePressable onPress={() => handleJobPress(job)} style={S.item}>
+                <FocusablePressable
+                  onPress={() => handleJobPress(job)}
+                  style={S.item}
+                >
                   <View
                     style={[S.statusIcon, { backgroundColor: `${color}1F` }]}
                   >
@@ -342,12 +381,16 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
                     </Text>
                     {reports[job.id] && (
                       <View style={S.integrityRow}>
-                        <Gauge size={12} color={colors.success} strokeWidth={2.5} />
+                        <Gauge
+                          size={12}
+                          color={colors.success}
+                          strokeWidth={2.5}
+                        />
                         <Text
                           style={[S.integrityText, { color: colors.success }]}
                           numberOfLines={1}
                         >
-                          SHA {reports[job.id].checksum.slice(0, 12)} -{" "}
+                          Verified Integrity •{" "}
                           {formatBytes(reports[job.id].averageBytesPerSecond)}/s
                         </Text>
                       </View>
@@ -399,9 +442,17 @@ const S = StyleSheet.create({
   collectionStrip: { gap: SPACING.sm },
   listHeader: { fontSize: FONT_SIZE.xs, fontWeight: "900", letterSpacing: 1.2 },
   collectionCard: { width: 220, marginRight: SPACING.sm },
-  collectionHead: { flexDirection: "row", alignItems: "center", gap: SPACING.xs },
+  collectionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+  },
   collectionName: { flex: 1, fontSize: FONT_SIZE.base, fontWeight: "900" },
-  collectionMeta: { fontSize: FONT_SIZE.sm, fontWeight: "700", marginTop: SPACING.sm },
+  collectionMeta: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "700",
+    marginTop: SPACING.sm,
+  },
   searchBox: {
     minHeight: 48,
     borderWidth: 1,

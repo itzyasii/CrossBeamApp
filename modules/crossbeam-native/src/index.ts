@@ -31,6 +31,7 @@ export type NativeTransferEvent = {
   transferId: string;
   peerId: string;
   fileName?: string;
+  mimeType?: string;
   bytesTransferred: number;
   totalBytes: number;
   status: 'queued' | 'in-progress' | 'paused' | 'completed' | 'failed' | 'cancelled';

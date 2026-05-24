@@ -726,10 +726,8 @@ class CrossBeamNativeModule : Module() {
               val transferId = input.readUTF()
             val fileCount = input.readInt()
             val downloadsRoot =
-              context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-            val outputDir = File(downloadsRoot, "CrossBeam")
-            outputDir.mkdirs()
-
+              Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            
             var batchTotal = 0L
             var batchTransferred = 0L
             val pendingFiles = mutableListOf<IncomingFileHeader>()
@@ -744,7 +742,8 @@ class CrossBeamNativeModule : Module() {
             }
 
             // --- Phase 1: Android TV Storage Optimization ---
-            val statFs = android.os.StatFs(outputDir.absolutePath)
+            // We use the root downloads folder to check space since subfolders are on the same partition
+            val statFs = android.os.StatFs(downloadsRoot.absolutePath)
             val availableBytes = statFs.availableBlocksLong * statFs.blockSizeLong
             val requiredBytes = batchTotal + (500L * 1024L * 1024L) // Safety buffer 500MB
             
@@ -754,6 +753,20 @@ class CrossBeamNativeModule : Module() {
             }
 
             pendingFiles.forEach { header ->
+              // Map MIME types to subfolders
+              val subfolder = when {
+                  header.mimeType.startsWith("image/") -> "Images"
+                  header.mimeType.startsWith("video/") -> "Videos"
+                  header.mimeType.startsWith("audio/") -> "Audio"
+                  header.mimeType == "application/pdf" -> "Documents"
+                  header.mimeType.startsWith("text/") -> "Documents"
+                  header.mimeType.contains("word") || header.mimeType.contains("excel") || header.mimeType.contains("powerpoint") -> "Documents"
+                  else -> "Others"
+              }
+              
+              val outputDir = File(downloadsRoot, "CrossBeam/$subfolder")
+              outputDir.mkdirs()
+
               val destination = uniqueDestination(outputDir, header.name)
               val partial = File(outputDir, "${destination.name}.crossbeam-part")
               val existingSize = if (partial.exists() && partial.isFile) partial.length() else 0L

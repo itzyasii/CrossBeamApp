@@ -626,15 +626,22 @@ export default function App() {
               style={[
                 S.drawerInner,
                 {
-                  backgroundColor: "#161622", // Similar to the dark logo color (deep indigo)
+                  backgroundColor: isDark
+                    ? "#161622"
+                    : colors.backgroundElevated,
                   paddingTop: insets.top + 24,
+                  borderRightWidth: isDark ? 0 : 1,
+                  borderRightColor: colors.border,
                 },
               ]}
             >
               {/* Header */}
               <View style={S.drawerHeader}>
                 <View style={S.drawerHeaderTop}>
-                  <CrossBeamWordmark width={220} />
+                  <CrossBeamWordmark
+                    width={220}
+                    color={isDark ? undefined : colors.textPrimary}
+                  />
                   <Text style={[S.drawerVersion, { color: colors.textMuted }]}>
                     Version 0.1
                   </Text>
@@ -683,6 +690,7 @@ export default function App() {
                 <View style={S.drawerList}>
                   {TABS.map((t, i) => {
                     const isActive = tabIndex === i;
+                    const Icon = t.icon;
                     return (
                       <FocusablePressable
                         key={t.id}
@@ -693,8 +701,12 @@ export default function App() {
                         style={[
                           S.drawerItem,
                           isActive && {
-                            backgroundColor: `${colors.accent}10`,
-                            borderColor: `${colors.accent}30`,
+                            backgroundColor: isDark
+                              ? `${colors.accent}10`
+                              : colors.accentHighlight,
+                            borderColor: isDark
+                              ? `${colors.accent}30`
+                              : `${colors.accent}20`,
                           },
                         ]}
                       >
@@ -702,28 +714,45 @@ export default function App() {
                           style={[
                             S.itemIconWrap,
                             isActive && { backgroundColor: colors.accent },
-                          ]}
-                        >
-                          <t.icon
-                            size={18}
-                            color={isActive ? "#FFF" : colors.textSecondary}
-                          />
-                        </View>
-                        <Text
-                          style={[
-                            S.drawerLabel,
-                            {
-                              color: isActive
-                                ? colors.textPrimary
-                                : colors.textSecondary,
+                            !isActive && {
+                              backgroundColor: isDark
+                                ? "rgba(255,255,255,0.03)"
+                                : colors.surfaceHover,
                             },
                           ]}
                         >
-                          {t.label}
-                        </Text>
-                        {isActive && (
-                          <ChevronRight size={16} color={colors.accent} />
-                        )}
+                          <Icon
+                            size={18}
+                            color={
+                              isActive
+                                ? "#FFFFFF"
+                                : isDark
+                                  ? colors.textSecondary
+                                  : colors.textPrimary
+                            }
+                            strokeWidth={isActive ? 2.5 : 2}
+                          />
+                        </View>
+                        <View style={S.itemTextWrap}>
+                          <Text
+                            style={[
+                              S.itemName,
+                              {
+                                color: isActive
+                                  ? colors.accent
+                                  : colors.textPrimary,
+                              },
+                              isActive && { fontWeight: "900" },
+                            ]}
+                          >
+                            {t.label}
+                          </Text>
+                          <Text
+                            style={[S.itemDesc, { color: colors.textMuted }]}
+                          >
+                            {t.desc}
+                          </Text>
+                        </View>
                       </FocusablePressable>
                     );
                   })}
@@ -764,43 +793,43 @@ export default function App() {
                 </View>
               </View>
 
-              {/* Footer Actions */}
-              <View style={S.drawerFooter}>
+              {/* Footer */}
+              <View
+                style={[
+                  S.drawerFooter,
+                  {
+                    borderTopColor: isDark
+                      ? colors.border
+                      : colors.borderStrong,
+                  },
+                ]}
+              >
                 <FocusablePressable
-                  style={S.footerItem}
-                  onPress={handleSupportPress}
+                  onPress={() => {
+                    void haptics.light();
+                    setThemePreference(isDark ? "light" : "dark");
+                  }}
+                  style={[
+                    S.themeSwitch,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(255,255,255,0.05)"
+                        : colors.surfaceHover,
+                      borderColor: colors.borderStrong,
+                    },
+                  ]}
                 >
-                  <HelpCircle size={18} color={colors.textSecondary} />
+                  {isDark ? (
+                    <Sun size={18} color={colors.warning} strokeWidth={2.2} />
+                  ) : (
+                    <Moon size={18} color={colors.accent} strokeWidth={2.2} />
+                  )}
                   <Text
-                    style={[S.footerLabel, { color: colors.textSecondary }]}
+                    style={[S.themeSwitchText, { color: colors.textPrimary }]}
                   >
-                    Help & Support
+                    {isDark ? "Light Mode" : "Dark Mode"}
                   </Text>
                 </FocusablePressable>
-                <FocusablePressable style={S.footerItem}>
-                  <ShieldCheck size={18} color={colors.success} />
-                  <Text
-                    style={[S.footerLabel, { color: colors.textSecondary }]}
-                  >
-                    Safety Center
-                  </Text>
-                </FocusablePressable>
-
-                <View style={S.legalRow}>
-                  <FocusablePressable onPress={() => setShowPrivacyModal(true)}>
-                    <Text style={[S.legalText, { color: colors.textMuted }]}>
-                      Privacy Policy
-                    </Text>
-                  </FocusablePressable>
-                  <View
-                    style={[S.legalDot, { backgroundColor: colors.textMuted }]}
-                  />
-                  <FocusablePressable onPress={() => setShowTermsModal(true)}>
-                    <Text style={[S.legalText, { color: colors.textMuted }]}>
-                      Terms
-                    </Text>
-                  </FocusablePressable>
-                </View>
               </View>
             </View>
           </Animated.View>
@@ -1025,23 +1054,29 @@ const S = StyleSheet.create({
   statVal: { fontSize: 18, fontWeight: "900" },
   statLabel: { fontSize: 9, fontWeight: "800", letterSpacing: 1 },
 
-  drawerFooter: { marginTop: "auto", paddingBottom: 40, gap: 16 },
-  footerItem: {
+  drawerFooter: {
+    paddingTop: 24,
+    marginTop: "auto",
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    gap: 16,
+  },
+  themeSwitch: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 8,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  footerLabel: { fontSize: 13, fontWeight: "600" },
-
-  legalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
+  themeSwitchText: {
+    fontSize: 14,
+    fontWeight: "800",
   },
-  legalText: { fontSize: 11, fontWeight: "500" },
-  legalDot: { width: 3, height: 3, borderRadius: 1.5, opacity: 0.3 },
+  drawerLabel: { fontSize: 14, fontWeight: "800" },
+  itemTextWrap: { flex: 1, gap: 2 },
+  itemName: { fontSize: 15, fontWeight: "800" },
+  itemDesc: { fontSize: 11, fontWeight: "600", opacity: 0.7 },
 
   modalContainer: {
     flex: 1,

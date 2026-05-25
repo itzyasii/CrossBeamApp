@@ -1,4 +1,7 @@
-import { PermissionsAndroid, Platform } from "react-native";
+import { PermissionsAndroid, Platform, Linking } from "react-native";
+
+// Define missing permission constant for TypeScript
+const MANAGE_EXTERNAL_STORAGE = "android.permission.MANAGE_EXTERNAL_STORAGE";
 import * as Device from "expo-device";
 import * as MediaLibrary from "expo-media-library";
 import * as Location from "expo-location";
@@ -68,6 +71,33 @@ export const usePermissions = () => {
 
   const requestStoragePermissions = async (): Promise<boolean> => {
     try {
+      if (Platform.OS === "android") {
+        // For Android 11+, we need MANAGE_EXTERNAL_STORAGE to write to public downloads
+        if (Device.platformApiLevel && Device.platformApiLevel >= 30) {
+          const canWrite = await PermissionsAndroid.check(
+            MANAGE_EXTERNAL_STORAGE as any,
+          );
+          if (!canWrite) {
+            // Open app settings to let user grant all files access
+            console.log(
+              "[Permissions] Needs MANAGE_EXTERNAL_STORAGE, opening settings",
+            );
+            await Linking.openSettings();
+            return false;
+          }
+        } else {
+          // For Android < 11, request traditional write permission
+          const writeStatus = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          );
+          if (writeStatus !== PermissionsAndroid.RESULTS.GRANTED) {
+            console.log("[Permissions] Write storage denied");
+            return false;
+          }
+        }
+      }
+
+      // Request media library permissions for reading media
       const { status } = await MediaLibrary.requestPermissionsAsync();
       const granted = status === "granted" || (status as any) === "limited";
       console.log(`[Permissions] Storage access: ${status}`);
@@ -196,6 +226,20 @@ export const usePermissions = () => {
       (mediaPerm as any).status !== "limited"
     ) {
       missing.push("Storage/Media");
+    }
+
+    // Check MANAGE_EXTERNAL_STORAGE for Android 11+
+    if (
+      Platform.OS === "android" &&
+      Device.platformApiLevel &&
+      Device.platformApiLevel >= 30
+    ) {
+      const canWrite = await PermissionsAndroid.check(
+        MANAGE_EXTERNAL_STORAGE as any,
+      );
+      if (!canWrite) {
+        missing.push("All Files Access");
+      }
     }
 
     // Check notifications

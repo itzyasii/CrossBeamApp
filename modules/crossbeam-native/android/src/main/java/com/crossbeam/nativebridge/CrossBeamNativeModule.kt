@@ -2,6 +2,7 @@ package com.crossbeam.nativebridge
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.nsd.NsdManager
@@ -9,6 +10,7 @@ import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Environment
+import android.util.Log
 import androidx.core.content.ContextCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -765,7 +767,13 @@ class CrossBeamNativeModule : Module() {
               }
               
               val outputDir = File(downloadsRoot, "CrossBeam/$subfolder")
-              outputDir.mkdirs()
+              if (!outputDir.exists()) {
+                  val dirCreated = outputDir.mkdirs()
+                  if (!dirCreated) {
+                      Log.e("CrossBeamNative", "Failed to create directory: ${outputDir.absolutePath}")
+                      throw IllegalStateException("Could not create storage directory")
+                  }
+              }
 
               val destination = uniqueDestination(outputDir, header.name)
               val partial = File(outputDir, "${destination.name}.crossbeam-part")
@@ -856,7 +864,52 @@ class CrossBeamNativeModule : Module() {
                 throw IllegalStateException("Checksum mismatch for ${header.name}")
               }
               if (destination.exists()) destination.delete()
-              partial.renameTo(destination)
+              val renameSuccess = partial.renameTo(destination)
+              if (!renameSuccess) {
+                  Log.e("CrossBeamNative", "Failed to rename partial file to final destination: ${destination.absolutePath}")
+                  throw IllegalStateException("Could not save received file")
+              }
+              
+              // Notify media scanner about the new file so it appears in gallery/file managers
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                  // For Android 10+, use MediaStore to properly index the file
+                  val contentValues = android.content.ContentValues().apply {
+                      put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, destination.name)
+                      put(android.provider.MediaStore.MediaColumns.MIME_TYPE, header.mimeType)
+                      put(android.provider.MediaStore.MediaColumns.SIZE, destination.length())
+                      
+                      // Add to appropriate media collection
+                      when {
+                          header.mimeType.startsWith("image/") -> 
+                              put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Download/CrossBeam/Images")
+                          header.mimeType.startsWith("video/") ->
+                              put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Download/CrossBeam/Videos")
+                          header.mimeType.startsWith("audio/") ->
+                              put(android.provider.MediaStore.Audio.Media.RELATIVE_PATH, "Download/CrossBeam/Audio")
+                          else ->
+                              put(android.provider.MediaStore.Downloads.Media.RELATIVE_PATH, "Download/CrossBeam/$subfolder")
+                      }
+                  }
+                  
+                  val contentUri = when {
+                      header.mimeType.startsWith("image/") -> android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                      header.mimeType.startsWith("video/") -> android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                      header.mimeType.startsWith("audio/") -> android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                      else -> android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                  }
+                  
+                  context.contentResolver.insert(contentUri, contentValues)?.let {
+                      context.contentResolver.openOutputStream(it)?.use { output ->
+                          destination.inputStream().copyTo(output)
+                      }
+                  }
+              } else {
+                  // Legacy method for older Android versions
+                  val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                  val uri = Uri.fromFile(destination)
+                  mediaScanIntent.data = uri
+                  context.sendBroadcast(mediaScanIntent)
+              }
             }
 
             emitTransfer(transferId, peerId, null, batchTotal, batchTotal, "completed", null)

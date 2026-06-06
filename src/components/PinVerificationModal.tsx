@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Modal, StyleSheet, View, Text, Pressable, Animated, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { Modal, StyleSheet, View, Text, Pressable, Animated } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Lock, ShieldCheck, X } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
-import { SPACING, FONT_SIZE, RADIUS } from '@/theme/colors';
+import { SPACING } from '@/theme/colors';
 import { haptics } from '@/services/haptics';
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
 }
 
 export const PinVerificationModal = ({ visible, onConfirm, onCancel, expectedPin = '1234' }: Props) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;

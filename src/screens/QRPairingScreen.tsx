@@ -22,7 +22,7 @@ import { haptics } from "@/services/haptics";
 import * as ExpoDevice from "expo-device";
 
 export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
-  const { colors,  } = useTheme();
+  const { colors } = useTheme();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [qrData, setQrData] = useState<string | null>(null);
@@ -40,8 +40,13 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
 
     if (!Platform.isTV) {
       (async () => {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasPermission(status === "granted");
+        try {
+          const { status } = await Camera.requestCameraPermissionsAsync();
+          setHasPermission(status === "granted");
+        } catch (error) {
+          console.warn("[QRPairing] Camera permission request failed:", error);
+          setHasPermission(false);
+        }
       })();
 
       Animated.loop(
@@ -76,7 +81,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
     }
   }, []);
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = ({ data: _data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
     void haptics.success();
@@ -130,6 +135,35 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
             SECURE_P2P_ENCRYPTED
           </Text>
         </View>
+      </View>
+    );
+  }
+
+  if (hasPermission === null) {
+    return (
+      <View style={[S.container, S.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (!hasPermission) {
+    return (
+      <View style={[S.container, S.centered, { backgroundColor: colors.background }]}>
+        <Text style={[S.permissionTitle, { color: colors.textPrimary }]}>
+          Camera unavailable
+        </Text>
+        <Text style={[S.permissionText, { color: colors.textSecondary }]}>
+          Camera access is required to scan a pairing code.
+        </Text>
+        <Pressable
+          onPress={onBack}
+          style={[S.permissionButton, { borderColor: colors.borderStrong }]}
+        >
+          <Text style={[S.permissionButtonText, { color: colors.textPrimary }]}>
+            CLOSE
+          </Text>
+        </Pressable>
       </View>
     );
   }
@@ -254,6 +288,27 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
 
 const S = StyleSheet.create({
   container: { flex: 1 },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+    gap: 16,
+  },
+  permissionTitle: { fontSize: 20, fontWeight: "900" },
+  permissionText: {
+    maxWidth: 300,
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  permissionButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  permissionButtonText: { fontSize: 12, fontWeight: "900", letterSpacing: 1 },
 
   // TV Styles
   tvLayout: {
@@ -288,7 +343,6 @@ const S = StyleSheet.create({
     height: 320,
     backgroundColor: "rgba(99, 102, 241, 0.2)",
     borderRadius: 160,
-    filter: "blur(60px)",
   } as any,
   tvFooter: {
     position: "absolute",

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -213,6 +212,78 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
       </GlassCard>
+
+      {diagnostics && (
+        <View style={S.section}>
+          <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
+            DEVICE HEALTH
+          </Text>
+          <GlassCard padding={SPACING.md}>
+            <View style={S.diagnosticsGrid}>
+              {[
+                {
+                  label: "Platform",
+                  value: diagnostics.platform,
+                },
+                {
+                  label: "Native bridge",
+                  value: diagnostics.nativeAvailable ? "Available" : "Unavailable",
+                },
+                {
+                  label: "Wi-Fi",
+                  value: diagnostics.isWifiConnected ? "Connected" : "Inactive",
+                },
+                {
+                  label: "Free space",
+                  value: formatBytes(diagnostics.freeDiskBytes),
+                },
+                {
+                  label: "Chunk size",
+                  value: formatBytes(chunkPlan.chunkSizeBytes),
+                },
+                {
+                  label: "Transport",
+                  value: chunkPlan.transport,
+                },
+              ].map((item) => (
+                <View key={item.label} style={S.diagnosticItem}>
+                  <View
+                    style={[S.iconBox, { backgroundColor: colors.surfaceHover }]}
+                  >
+                    <Activity
+                      size={17}
+                      color={colors.accent}
+                      strokeWidth={2.4}
+                    />
+                  </View>
+                  <View style={S.settingCopy}>
+                    <Text style={[S.footerLabel, { color: colors.textMuted }]}>
+                      {item.label}
+                    </Text>
+                    <Text
+                      style={[S.settingTitle, { color: colors.textPrimary }]}
+                    >
+                      {item.value}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+            {diagnostics.blockedPermissions.length > 0 && (
+              <View style={S.blockedList}>
+                {diagnostics.blockedPermissions.map((item) => (
+                  <Text
+                    key={item}
+                    style={[S.blockedText, { color: colors.warning }]}
+                  >
+                    {item}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </GlassCard>
+        </View>
+      )}
 
       <View style={S.section}>
         <Text style={[S.sectionLabel, { color: colors.textMuted }]}>

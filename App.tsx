@@ -49,6 +49,8 @@ import {
   X,
   Smartphone,
   Users,
+  Sun,
+  Moon,
 } from "lucide-react-native";
 import { SPACING } from "@/theme/colors";
 import {
@@ -62,13 +64,24 @@ const DRAWER_W = 300;
 const TAB_BAR_H = 76;
 
 type Tab = "home" | "discover" | "devices" | "history" | "settings";
+type TabConfig = { id: Tab; icon: any; label: string; desc: string };
 
-const TABS: { id: Tab; icon: any; label: string }[] = [
-  { id: "home", icon: Home, label: "HOME" },
-  { id: "discover", icon: Radar, label: "RADAR" },
-  { id: "devices", icon: Users, label: "TRUST" },
-  { id: "history", icon: HistoryIcon, label: "HISTORY" },
-  { id: "settings", icon: SettingsIcon, label: "SETTINGS" },
+const TABS: TabConfig[] = [
+  { id: "home", icon: Home, label: "HOME", desc: "Send and receive" },
+  { id: "discover", icon: Radar, label: "RADAR", desc: "Find nearby peers" },
+  { id: "devices", icon: Users, label: "TRUST", desc: "Trusted devices" },
+  {
+    id: "history",
+    icon: HistoryIcon,
+    label: "HISTORY",
+    desc: "Past transfers",
+  },
+  {
+    id: "settings",
+    icon: SettingsIcon,
+    label: "SETTINGS",
+    desc: "Preferences",
+  },
 ];
 
 import { Modal, Linking, BackHandler } from "react-native";
@@ -81,8 +94,24 @@ import {
 import { Device } from "@/types/domain";
 
 export default function App() {
-  const { colors } = useTheme();
-  const { biometricLockEnabled } = useAppStore();
+  const { colors, isDark } = useTheme();
+  const DRAWER_BACKGROUND = "#050507";
+  const DRAWER_TEXT_PRIMARY = isDark ? colors.textPrimary : "#FFFFFF";
+  const DRAWER_TEXT_SECONDARY = isDark
+    ? colors.textSecondary
+    : "rgba(255,255,255,0.75)";
+  const DRAWER_TEXT_MUTED = isDark
+    ? colors.textMuted
+    : "rgba(255,255,255,0.65)";
+  const DRAWER_SURFACE = isDark ? colors.surface : "rgba(255,255,255,0.08)";
+  const DRAWER_SURFACE_HOVER = isDark
+    ? colors.surfaceHover
+    : "rgba(255,255,255,0.08)";
+  const DRAWER_BORDER = isDark ? colors.border : "rgba(255,255,255,0.12)";
+  const DRAWER_BORDER_STRONG = isDark
+    ? colors.borderStrong
+    : "rgba(255,255,255,0.16)";
+  const { biometricLockEnabled, setThemePreference } = useAppStore();
   const { authenticate } = useBiometrics();
   const [isLocked, setIsLocked] = useState(false);
   const [showQrPairing, setShowQrPairing] = useState(false);
@@ -170,9 +199,13 @@ export default function App() {
 
   useEffect(() => {
     if (Platform.OS === "android") {
-      void NavigationBar.setVisibilityAsync("hidden");
+      void NavigationBar.setVisibilityAsync("hidden").catch((error) => {
+        console.warn("[App] Navigation bar update failed:", error);
+      });
     }
-    void SystemUI.setBackgroundColorAsync(colors.background);
+    void SystemUI.setBackgroundColorAsync(colors.background).catch((error) => {
+      console.warn("[App] System UI update failed:", error);
+    });
   }, [colors.background]);
 
   useEffect(() => {
@@ -274,9 +307,11 @@ export default function App() {
 
   const handleSupportPress = () => {
     void haptics.light();
-    Linking.openURL(
+    void Linking.openURL(
       "mailto:yasirpechuho1@gmail.com?subject=CrossBeam Support Request",
-    );
+    ).catch((error) => {
+      console.warn("[App] Unable to open support email:", error);
+    });
   };
 
   const sendToDevice = useCallback(
@@ -626,23 +661,18 @@ export default function App() {
               style={[
                 S.drawerInner,
                 {
-                  backgroundColor: isDark
-                    ? "#161622"
-                    : colors.backgroundElevated,
+                  backgroundColor: DRAWER_BACKGROUND,
                   paddingTop: insets.top + 24,
                   borderRightWidth: isDark ? 0 : 1,
-                  borderRightColor: colors.border,
+                  borderRightColor: DRAWER_BORDER,
                 },
               ]}
             >
               {/* Header */}
               <View style={S.drawerHeader}>
                 <View style={S.drawerHeaderTop}>
-                  <CrossBeamWordmark
-                    width={220}
-                    color={isDark ? undefined : colors.textPrimary}
-                  />
-                  <Text style={[S.drawerVersion, { color: colors.textMuted }]}>
+                  <CrossBeamWordmark width={220} />
+                  <Text style={[S.drawerVersion, { color: DRAWER_TEXT_MUTED }]}>
                     Version 0.1
                   </Text>
                 </View>
@@ -653,10 +683,10 @@ export default function App() {
                     {
                       backgroundColor: discoveryEnabled
                         ? colors.successMuted
-                        : colors.surfaceHover,
+                        : DRAWER_SURFACE_HOVER,
                       borderColor: discoveryEnabled
                         ? `${colors.success}55`
-                        : colors.borderStrong,
+                        : DRAWER_BORDER_STRONG,
                     },
                   ]}
                 >
@@ -666,7 +696,7 @@ export default function App() {
                       {
                         backgroundColor: discoveryEnabled
                           ? colors.success
-                          : colors.textMuted,
+                          : DRAWER_TEXT_MUTED,
                       },
                     ]}
                   />
@@ -676,7 +706,7 @@ export default function App() {
                       {
                         color: discoveryEnabled
                           ? colors.success
-                          : colors.textMuted,
+                          : DRAWER_TEXT_MUTED,
                       },
                     ]}
                   >
@@ -717,7 +747,7 @@ export default function App() {
                             !isActive && {
                               backgroundColor: isDark
                                 ? "rgba(255,255,255,0.03)"
-                                : colors.surfaceHover,
+                                : DRAWER_SURFACE_HOVER,
                             },
                           ]}
                         >
@@ -728,7 +758,7 @@ export default function App() {
                                 ? "#FFFFFF"
                                 : isDark
                                   ? colors.textSecondary
-                                  : colors.textPrimary
+                                  : DRAWER_TEXT_SECONDARY
                             }
                             strokeWidth={isActive ? 2.5 : 2}
                           />
@@ -740,7 +770,7 @@ export default function App() {
                               {
                                 color: isActive
                                   ? colors.accent
-                                  : colors.textPrimary,
+                                  : DRAWER_TEXT_PRIMARY,
                               },
                               isActive && { fontWeight: "900" },
                             ]}
@@ -748,7 +778,7 @@ export default function App() {
                             {t.label}
                           </Text>
                           <Text
-                            style={[S.itemDesc, { color: colors.textMuted }]}
+                            style={[S.itemDesc, { color: DRAWER_TEXT_MUTED }]}
                           >
                             {t.desc}
                           </Text>
@@ -761,32 +791,32 @@ export default function App() {
 
               {/* Quick Stats */}
               <View style={S.drawerSection}>
-                <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
+                <Text style={[S.sectionLabel, { color: DRAWER_TEXT_MUTED }]}>
                   ACTIVITY
                 </Text>
                 <View style={S.statsRow}>
                   <View
-                    style={[S.statBox, { backgroundColor: colors.surface }]}
+                    style={[S.statBox, { backgroundColor: DRAWER_SURFACE }]}
                   >
                     <Wifi size={16} color={colors.accent} />
-                    <Text style={[S.statVal, { color: colors.textPrimary }]}>
+                    <Text style={[S.statVal, { color: DRAWER_TEXT_PRIMARY }]}>
                       {devices.length}
                     </Text>
-                    <Text style={[S.statLabel, { color: colors.textMuted }]}>
+                    <Text style={[S.statLabel, { color: DRAWER_TEXT_MUTED }]}>
                       DEVICES
                     </Text>
                   </View>
                   <View
-                    style={[S.statBox, { backgroundColor: colors.surface }]}
+                    style={[S.statBox, { backgroundColor: DRAWER_SURFACE }]}
                   >
                     <Activity size={16} color={colors.success} />
-                    <Text style={[S.statVal, { color: colors.textPrimary }]}>
+                    <Text style={[S.statVal, { color: DRAWER_TEXT_PRIMARY }]}>
                       {
                         transfers.filter((t) => t.status === "in-progress")
                           .length
                       }
                     </Text>
-                    <Text style={[S.statLabel, { color: colors.textMuted }]}>
+                    <Text style={[S.statLabel, { color: DRAWER_TEXT_MUTED }]}>
                       TRANSFERS
                     </Text>
                   </View>
@@ -798,9 +828,7 @@ export default function App() {
                 style={[
                   S.drawerFooter,
                   {
-                    borderTopColor: isDark
-                      ? colors.border
-                      : colors.borderStrong,
+                    borderTopColor: DRAWER_BORDER_STRONG,
                   },
                 ]}
               >
@@ -814,8 +842,8 @@ export default function App() {
                     {
                       backgroundColor: isDark
                         ? "rgba(255,255,255,0.05)"
-                        : colors.surfaceHover,
-                      borderColor: colors.borderStrong,
+                        : DRAWER_SURFACE_HOVER,
+                      borderColor: DRAWER_BORDER_STRONG,
                     },
                   ]}
                 >
@@ -825,7 +853,7 @@ export default function App() {
                     <Moon size={18} color={colors.accent} strokeWidth={2.2} />
                   )}
                   <Text
-                    style={[S.themeSwitchText, { color: colors.textPrimary }]}
+                    style={[S.themeSwitchText, { color: DRAWER_TEXT_PRIMARY }]}
                   >
                     {isDark ? "Light Mode" : "Dark Mode"}
                   </Text>
@@ -1073,7 +1101,6 @@ const S = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
   },
-  drawerLabel: { fontSize: 14, fontWeight: "800" },
   itemTextWrap: { flex: 1, gap: 2 },
   itemName: { fontSize: 15, fontWeight: "800" },
   itemDesc: { fontSize: 11, fontWeight: "600", opacity: 0.7 },

@@ -59,12 +59,21 @@ export type DiagnosticsReport = {
 };
 
 const readJson = async <T>(key: string, fallback: T): Promise<T> => {
-  const raw = await AsyncStorage.getItem(key);
-  return raw ? (JSON.parse(raw) as T) : fallback;
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch (error) {
+    console.warn(`[PlatformFeatures] Ignoring invalid stored data for ${key}`, error);
+    return fallback;
+  }
 };
 
 const writeJson = async <T>(key: string, value: T): Promise<void> => {
-  await AsyncStorage.setItem(key, JSON.stringify(value));
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`[PlatformFeatures] Failed to store ${key}`, error);
+  }
 };
 
 const syntheticChecksum = (job: TransferJob): string => {
@@ -191,15 +200,23 @@ export const platformFeatureService = {
   async createClipboardBeamFile(text: string): Promise<SelectedFile | null> {
     const content = text.trim();
     if (!content) return null;
+    if (!FileSystem.cacheDirectory) return null;
+
     const fileName = `clipboard-beam-${Date.now()}.txt`;
-    const uri = `${FileSystem.cacheDirectory ?? ""}${fileName}`;
-    await FileSystem.writeAsStringAsync(uri, content);
+    const uri = `${FileSystem.cacheDirectory}${fileName}`;
+    try {
+      await FileSystem.writeAsStringAsync(uri, content);
+    } catch (error) {
+      console.warn("[PlatformFeatures] Failed to create clipboard beam file", error);
+      return null;
+    }
+
     return {
       id: `clipboard-${Date.now()}`,
       name: fileName,
       uri,
       mimeType: "text/plain",
-      sizeBytes: new Blob([content]).size,
+      sizeBytes: content.length,
     };
   },
 

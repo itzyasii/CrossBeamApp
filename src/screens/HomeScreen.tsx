@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import {
@@ -14,12 +13,10 @@ import {
   Plus,
   Radio,
   RefreshCcw,
-  Save,
   Send,
   Settings,
   Shield,
   Smartphone,
-  Sparkles,
   Tv,
   X,
 } from "lucide-react-native";
@@ -80,11 +77,8 @@ export function HomeScreen({
   discoveryEnabled = false,
   approvals = [],
   onApprovalAction,
-  onCreateClipboardBeam,
-  onSaveCollection,
 }: Props) {
   const { colors } = useTheme();
-  const [clipboardText, setClipboardText] = React.useState("");
   const hasFiles = selectedFiles.length > 0;
   const activeTransfers = transfers.filter(
     (t) => t.status === "in-progress" || t.status === "queued",
@@ -93,9 +87,6 @@ export function HomeScreen({
     (total, file) => total + file.sizeBytes,
     0,
   );
-  const capabilitySummary = Platform.isTV
-    ? ["Ready to receive", "TV remote support", "Easy connect"]
-    : ["Find nearby friends", "Private sharing", "Easy connect"];
   const discoveryActionLabel = isRefreshing
     ? "Scanning"
     : discoveryEnabled

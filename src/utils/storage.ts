@@ -6,6 +6,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TransferHistory, AppSettings } from '@/types';
 import { APP_CONFIG, DEFAULT_SETTINGS } from '@/constants/config';
 
+const parseStoredJson = <T>(value: string | null, fallback: T): T => {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch (error) {
+    console.warn("Ignoring invalid stored JSON:", error);
+    return fallback;
+  }
+};
+
 class StorageServiceImpl {
   /**
    * Save transfer history
@@ -33,7 +43,7 @@ class StorageServiceImpl {
   async getTransferHistory(): Promise<TransferHistory[]> {
     try {
       const data = await AsyncStorage.getItem(APP_CONFIG.storage.historyStorageKey);
-      return data ? JSON.parse(data) : [];
+      return parseStoredJson<TransferHistory[]>(data, []);
     } catch (error) {
       console.error('Error getting transfer history:', error);
       return [];
@@ -91,7 +101,7 @@ class StorageServiceImpl {
   async getPairedDevices(): Promise<Array<{ id: string; name: string; pairedAt: number }>> {
     try {
       const data = await AsyncStorage.getItem(APP_CONFIG.storage.devicesStorageKey);
-      return data ? JSON.parse(data) : [];
+      return parseStoredJson<Array<{ id: string; name: string; pairedAt: number }>>(data, []);
     } catch (error) {
       console.error('Error getting paired devices:', error);
       return [];
@@ -120,7 +130,7 @@ class StorageServiceImpl {
   async getSettings(): Promise<AppSettings> {
     try {
       const data = await AsyncStorage.getItem(APP_CONFIG.storage.settingsStorageKey);
-      return data ? JSON.parse(data) : DEFAULT_SETTINGS;
+      return parseStoredJson<AppSettings>(data, DEFAULT_SETTINGS);
     } catch (error) {
       console.error('Error getting settings:', error);
       return DEFAULT_SETTINGS;

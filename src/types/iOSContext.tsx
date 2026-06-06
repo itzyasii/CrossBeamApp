@@ -31,7 +31,6 @@ export interface iOSFeaturesProviderProps {
 
 export const iOSFeaturesProvider = ({
   children,
-  userId,
 }: iOSFeaturesProviderProps) => {
   const {
     sharedData,

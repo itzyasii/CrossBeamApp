@@ -152,18 +152,16 @@ export const biometricService = {
    */
   async storeCredential(key: string, value: string): Promise<boolean> {
     try {
-      if (CrossBeamNative?.storeSecureValue) {
-        const protectedValue = await CrossBeamNative.storeSecureValue(key, value);
-        await AsyncStorage.setItem(
-          `secure_${key}`,
-          JSON.stringify({ nativeProtected: true, value: protectedValue }),
-        );
-      } else {
-        await AsyncStorage.setItem(
-          `secure_${key}`,
-          JSON.stringify({ nativeProtected: false, value }),
-        );
+      if (!CrossBeamNative?.storeSecureValue) {
+        console.warn("Secure native credential storage is unavailable.");
+        return false;
       }
+
+      const protectedValue = await CrossBeamNative.storeSecureValue(key, value);
+      await AsyncStorage.setItem(
+        `secure_${key}`,
+        JSON.stringify({ nativeProtected: true, value: protectedValue }),
+      );
       return true;
     } catch (error) {
       console.error("Failed to store credential:", error);
@@ -184,11 +182,16 @@ export const biometricService = {
         value: string;
       };
 
-      if (payload.nativeProtected && CrossBeamNative?.retrieveSecureValue) {
-        return await CrossBeamNative.retrieveSecureValue(key, payload.value);
+      if (!payload.nativeProtected) {
+        await this.deleteCredential(key);
+        return null;
       }
 
-      return payload.value;
+      if (!CrossBeamNative?.retrieveSecureValue) {
+        return null;
+      }
+
+      return await CrossBeamNative.retrieveSecureValue(key, payload.value);
     } catch (error) {
       console.error("Failed to get credential:", error);
       return null;

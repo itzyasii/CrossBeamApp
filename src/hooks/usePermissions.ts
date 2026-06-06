@@ -1,14 +1,28 @@
-import { PermissionsAndroid, Platform, Linking } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
+import { isRunningInExpoGo } from "expo";
 
-// Define missing permission constant for TypeScript
-const MANAGE_EXTERNAL_STORAGE = "android.permission.MANAGE_EXTERNAL_STORAGE";
 import * as Device from "expo-device";
 import * as MediaLibrary from "expo-media-library";
 import * as Location from "expo-location";
-import * as Notifications from "expo-notifications";
 import { Camera } from "expo-camera";
 
 const nearbyWifiPermission = "android.permission.NEARBY_WIFI_DEVICES";
+type NotificationsModule = typeof import("expo-notifications");
+
+const shouldSkipNotifications = () =>
+  Platform.OS === "android" && isRunningInExpoGo();
+
+let notificationsModulePromise: Promise<NotificationsModule | null> | null =
+  null;
+
+const getNotifications = async () => {
+  if (Platform.OS === "web" || shouldSkipNotifications()) {
+    return null;
+  }
+
+  notificationsModulePromise ??= import("expo-notifications");
+  return notificationsModulePromise;
+};
 
 export const usePermissions = () => {
   const requestAllPermissions = async (): Promise<boolean> => {
@@ -71,22 +85,19 @@ export const usePermissions = () => {
 
   const requestStoragePermissions = async (): Promise<boolean> => {
     try {
+      if (Platform.isTV) {
+        return true;
+      }
+
+      if (Platform.OS === "android" && isRunningInExpoGo()) {
+        console.log("[Permissions] Media library access limited in Expo Go");
+        return true;
+      }
+
       if (Platform.OS === "android") {
-        // For Android 11+, we need MANAGE_EXTERNAL_STORAGE to write to public downloads
-        if (Device.platformApiLevel && Device.platformApiLevel >= 30) {
-          const canWrite = await PermissionsAndroid.check(
-            MANAGE_EXTERNAL_STORAGE as any,
-          );
-          if (!canWrite) {
-            // Open app settings to let user grant all files access
-            console.log(
-              "[Permissions] Needs MANAGE_EXTERNAL_STORAGE, opening settings",
-            );
-            await Linking.openSettings();
-            return false;
-          }
-        } else {
-          // For Android < 11, request traditional write permission
+        // Android 13+ uses scoped media permissions and the document picker
+        // does not require broad storage access.
+        if (!Device.platformApiLevel || Device.platformApiLevel < 30) {
           const writeStatus = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
           );
@@ -97,7 +108,6 @@ export const usePermissions = () => {
         }
       }
 
-      // Request media library permissions for reading media
       const { status } = await MediaLibrary.requestPermissionsAsync();
       const granted = status === "granted" || (status as any) === "limited";
       console.log(`[Permissions] Storage access: ${status}`);
@@ -134,6 +144,12 @@ export const usePermissions = () => {
 
   const requestNotificationPermissions = async (): Promise<boolean> => {
     try {
+      const Notifications = await getNotifications();
+      if (!Notifications) {
+        console.log("[Permissions] Notifications unavailable in Expo Go");
+        return true;
+      }
+
       const { status } = await Notifications.requestPermissionsAsync();
       const granted = status === "granted";
       console.log(`[Permissions] Notifications access: ${status}`);
@@ -219,33 +235,22 @@ export const usePermissions = () => {
   const getMissingPermissions = async (): Promise<string[]> => {
     const missing: string[] = [];
 
-    // Check storage
-    const mediaPerm = await MediaLibrary.getPermissionsAsync();
-    if (
-      mediaPerm.status !== "granted" &&
-      (mediaPerm as any).status !== "limited"
-    ) {
-      missing.push("Storage/Media");
-    }
-
-    // Check MANAGE_EXTERNAL_STORAGE for Android 11+
-    if (
-      Platform.OS === "android" &&
-      Device.platformApiLevel &&
-      Device.platformApiLevel >= 30
-    ) {
-      const canWrite = await PermissionsAndroid.check(
-        MANAGE_EXTERNAL_STORAGE as any,
-      );
-      if (!canWrite) {
-        missing.push("All Files Access");
+    if (!Platform.isTV && !(Platform.OS === "android" && isRunningInExpoGo())) {
+      const mediaPerm = await MediaLibrary.getPermissionsAsync();
+      if (
+        mediaPerm.status !== "granted" &&
+        (mediaPerm as any).status !== "limited"
+      ) {
+        missing.push("Storage/Media");
       }
     }
 
-    // Check notifications
-    const notifPerm = await Notifications.getPermissionsAsync();
-    if (!notifPerm.granted) {
-      missing.push("Notifications");
+    const Notifications = await getNotifications();
+    if (Notifications) {
+      const notifPerm = await Notifications.getPermissionsAsync();
+      if (!notifPerm.granted) {
+        missing.push("Notifications");
+      }
     }
 
     // Check camera

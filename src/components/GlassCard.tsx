@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, ViewProps, StyleSheet, Animated, Platform } from 'react-native';
+import { View, ViewProps, StyleSheet, Animated } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '@/hooks/useTheme';
 import { RADIUS, SPACING } from '@/theme/colors';

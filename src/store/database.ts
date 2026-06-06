@@ -4,6 +4,18 @@ import { TransferHistory, Device } from "@/types/domain";
 let db: SQLite.SQLiteDatabase | null = null;
 let initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+const parseFileNames = (value: unknown): string[] => {
+  if (typeof value !== "string" || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+};
+
 export const initDatabase = async () => {
   if (db) return db;
   if (initPromise) return initPromise;
@@ -57,7 +69,7 @@ export const getTransferHistory = async (): Promise<TransferHistory[]> => {
     return result.map((row: any) => ({
       id: row.id,
       fileName: row.fileName,
-      fileNames: row.fileNames ? JSON.parse(row.fileNames) : [],
+      fileNames: parseFileNames(row.fileNames),
       sizeBytes: row.sizeBytes,
       bytesTransferred: row.bytesTransferred,
       totalBytes: row.sizeBytes,
@@ -173,7 +185,7 @@ export const getAnalyticsData = async () => {
     const transfers = rows.map((row: any) => ({
       id: row.id,
       fileName: row.fileName,
-      fileNames: row.fileNames ? JSON.parse(row.fileNames) : [],
+      fileNames: parseFileNames(row.fileNames),
       sizeBytes: row.sizeBytes,
       bytesTransferred: row.bytesTransferred,
       totalBytes: row.sizeBytes,

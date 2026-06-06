@@ -1,22 +1,45 @@
-import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
+
+const shouldSkipNotifications = () =>
+  Platform.OS === 'android' && isRunningInExpoGo();
+
+let notificationsModulePromise: Promise<NotificationsModule | null> | null =
+  null;
+
+const getNotifications = async () => {
+  if (Platform.OS === 'web' || shouldSkipNotifications()) {
+    return null;
+  }
+
+  notificationsModulePromise ??= import('expo-notifications').then(
+    (Notifications) => {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+
+      return Notifications;
+    },
+  );
+
+  return notificationsModulePromise;
+};
 
 export const notificationService = {
   /**
    * Shows or updates a progress notification for a file transfer.
    */
   updateProgress: async (id: string, fileName: string, progress: number) => {
-    if (Platform.OS === 'web') return;
+    const Notifications = await getNotifications();
+    if (!Notifications) return;
 
     await Notifications.setNotificationChannelAsync('transfer-progress', {
       name: 'Transfer Progress',
@@ -39,6 +62,9 @@ export const notificationService = {
    * Shows a completion notification.
    */
   showComplete: async (fileName: string) => {
+    const Notifications = await getNotifications();
+    if (!Notifications) return;
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Transfer Complete',
@@ -52,6 +78,9 @@ export const notificationService = {
    * Request permissions.
    */
   requestPermissions: async () => {
+    const Notifications = await getNotifications();
+    if (!Notifications) return false;
+
     const { status } = await Notifications.requestPermissionsAsync();
     return status === 'granted';
   },

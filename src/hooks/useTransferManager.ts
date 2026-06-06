@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { Platform } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 
 import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { SelectedFile, TransferJob, Device } from "@/types/domain";
 import { saveTransferHistory } from "@/store/database";
-import { usePermissions } from "./usePermissions";
 import { platformFeatureService } from "@/services/platformFeatureService";
 import { chunkedTransferService } from "@/services/chunkedTransferService";
 
@@ -12,7 +12,6 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [transferError, setTransferError] = useState<string | null>(null);
-  const { requestStoragePermissions } = usePermissions();
 
   useEffect(() => {
     return nativeCrossBeam.addTransferProgressListener((event) => {
@@ -104,16 +103,21 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   const pickFiles = async () => {
     setTransferError(null);
 
-    const hasPermission = await requestStoragePermissions();
-    if (!hasPermission) {
-      setTransferError("Storage permission is required to select files.");
+    if (Platform.isTV) {
+      setTransferError("File picking is not available on TV. Send files from a phone or computer.");
       return;
     }
 
-    const result = await DocumentPicker.getDocumentAsync({
-      multiple: true,
-      copyToCacheDirectory: false,
-    });
+    let result: DocumentPicker.DocumentPickerResult;
+    try {
+      result = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+    } catch (error) {
+      setTransferError(String(error));
+      return;
+    }
 
     if (result.canceled) return;
 

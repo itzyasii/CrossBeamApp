@@ -46,17 +46,32 @@ export const nativeCrossBeam = {
 
   async isAvailable(): Promise<boolean> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return false;
-    return CrossBeamNative.isAvailable();
+    try {
+      return await CrossBeamNative.isAvailable();
+    } catch (error) {
+      console.warn("[Native] Availability check failed:", error);
+      return false;
+    }
   },
 
   async getCapabilities(): Promise<string[]> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return [];
-    return CrossBeamNative.getPlatformCapabilities();
+    try {
+      return await CrossBeamNative.getPlatformCapabilities();
+    } catch (error) {
+      console.warn("[Native] Capability check failed:", error);
+      return [];
+    }
   },
 
   async getChunkProtocol(): Promise<NativeChunkProtocol | null> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return null;
-    return CrossBeamNative.getChunkProtocol();
+    try {
+      return await CrossBeamNative.getChunkProtocol();
+    } catch (error) {
+      console.warn("[Native] Chunk protocol check failed:", error);
+      return null;
+    }
   },
 
   async startDiscovery(): Promise<void> {
@@ -70,13 +85,20 @@ export const nativeCrossBeam = {
 
   async stopDiscovery(): Promise<void> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return;
-    await CrossBeamNative.stopDiscovery();
+    await CrossBeamNative.stopDiscovery().catch((error) => {
+      console.warn("[Native] Stop discovery failed:", error);
+    });
   },
 
   async getDiscoveredDevices(): Promise<Device[]> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return [];
-    const peers = await CrossBeamNative.getDiscoveredPeers();
-    return peers.map(toDevice);
+    try {
+      const peers = await CrossBeamNative.getDiscoveredPeers();
+      return peers.map(toDevice);
+    } catch (error) {
+      console.warn("[Native] Reading discovered devices failed:", error);
+      return [];
+    }
   },
 
   async sendFiles(

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.media.MediaScannerConnection
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
@@ -38,8 +39,10 @@ import android.os.ParcelUuid
 import android.content.res.Configuration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.math.max
+import kotlin.text.Charsets
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -76,12 +79,14 @@ class CrossBeamNativeModule : Module() {
   private var serverThread: Thread? = null
   private var localServiceName: String? = null
   private val activeSockets = ConcurrentHashMap<String, Socket>()
+  private val activeTransferCount = AtomicInteger(0)
   private val cancelledTransfers = ConcurrentHashMap.newKeySet<String>()
   private val pausedTransfers = ConcurrentHashMap.newKeySet<String>()
   private val serviceType = "_crossbeam._tcp."
   private val protocolMagic = "CROSSBEAM1"
   private val chunkedProtocolVersion = 2
   private val transferChunkSize = 1024 * 1024
+  private val DEFAULT_BUFFER_SIZE = 8192
 
   // BLE State
   private var bluetoothAdapter: BluetoothAdapter? = null
@@ -93,6 +98,27 @@ class CrossBeamNativeModule : Module() {
 
   override fun definition() = ModuleDefinition {
     Name("CrossBeamNative")
+
+    OnCreate {
+      val context = appContext.reactContext ?: return@OnCreate
+      val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+      bluetoothAdapter = bluetoothManager?.adapter
+      if (bluetoothAdapter != null) {
+        bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+        bleScanner = bluetoothAdapter?.bluetoothLeScanner
+      }
+    }
+
+    OnDestroy {
+      try {
+        stopWifiP2pDiscovery()
+        stopNsdDiscovery()
+        unregisterLocalService()
+        stopTransferServer()
+        stopBleDiscovery()
+        releaseMulticastLock()
+      } catch (_: Exception) {}
+    }
 
     Events(
       "onPeerFound",
@@ -142,9 +168,9 @@ class CrossBeamNativeModule : Module() {
     }
 
     AsyncFunction("startDiscovery") {
-      startTransferServer()
-      registerLocalService()
-      startNsdDiscovery()
+      runCatching { startTransferServer() }.onFailure { Log.e("CrossBeamNative", "Failed to start transfer server", it) }
+      runCatching { registerLocalService() }.onFailure { Log.e("CrossBeamNative", "Failed to register local service", it) }
+      runCatching { startNsdDiscovery() }.onFailure { Log.e("CrossBeamNative", "Failed to start NSD discovery", it) }
       runCatching {
         initWifiP2p()
         startWifiP2pDiscovery()
@@ -160,6 +186,7 @@ class CrossBeamNativeModule : Module() {
       unregisterLocalService()
       stopTransferServer()
       stopBleDiscovery()
+      releaseMulticastLock()
     }
 
     AsyncFunction("getDiscoveredPeers") {
@@ -367,19 +394,23 @@ class CrossBeamNativeModule : Module() {
 
   private fun startWifiP2pDiscovery() {
     val context = appContext.reactContext ?: return
+    val channel = wifiP2pChannel ?: return
     if (!hasNearbyWifiPermission(context)) return
-    wifiP2pManager?.discoverPeers(wifiP2pChannel, object : WifiP2pManager.ActionListener {
+    wifiP2pManager?.discoverPeers(channel, object : WifiP2pManager.ActionListener {
       override fun onSuccess() = Unit
       override fun onFailure(reason: Int) = Unit
     })
   }
 
   private fun stopWifiP2pDiscovery() {
-    runCatching {
-      wifiP2pManager?.stopPeerDiscovery(wifiP2pChannel, object : WifiP2pManager.ActionListener {
-        override fun onSuccess() = Unit
-        override fun onFailure(reason: Int) = Unit
-      })
+    val channel = wifiP2pChannel
+    if (channel != null) {
+      runCatching {
+        wifiP2pManager?.stopPeerDiscovery(channel, object : WifiP2pManager.ActionListener {
+          override fun onSuccess() = Unit
+          override fun onFailure(reason: Int) = Unit
+        })
+      }
     }
     
     val context = appContext.reactContext ?: return
@@ -427,7 +458,7 @@ class CrossBeamNativeModule : Module() {
     val context = appContext.reactContext ?: return
     val port = serverSocket?.localPort ?: return
     acquireMulticastLock(context)
-    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return
     val serviceName = "CrossBeam-${Build.MODEL ?: Build.DEVICE ?: UUID.randomUUID()}"
     localServiceName = serviceName
 
@@ -449,8 +480,13 @@ class CrossBeamNativeModule : Module() {
         registrationListener = null
       }
 
-      override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
-      override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) = Unit
+      override fun onServiceUnregistered(info: NsdServiceInfo) {
+        registrationListener = null
+      }
+
+      override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {
+        registrationListener = null
+      }
     }
 
     registrationListener = listener
@@ -460,7 +496,7 @@ class CrossBeamNativeModule : Module() {
   private fun unregisterLocalService() {
     val context = appContext.reactContext ?: return
     val listener = registrationListener ?: return
-    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return
     try {
       nsdManager.unregisterService(listener)
     } catch (_: IllegalArgumentException) {
@@ -474,7 +510,7 @@ class CrossBeamNativeModule : Module() {
 
     val context = appContext.reactContext ?: return
     acquireMulticastLock(context)
-    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return
 
     val listener = object : NsdManager.DiscoveryListener {
       override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) {
@@ -535,7 +571,7 @@ class CrossBeamNativeModule : Module() {
   private fun stopNsdDiscovery() {
     val context = appContext.reactContext ?: return
     val listener = discoveryListener ?: return
-    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    val nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return
     try {
       nsdManager.stopServiceDiscovery(listener)
     } catch (_: IllegalArgumentException) {
@@ -558,11 +594,14 @@ class CrossBeamNativeModule : Module() {
     
     // Start Foreground Service
     val serviceIntent = Intent(context, CrossBeamTransferService::class.java)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.startForegroundService(serviceIntent)
-    } else {
-        context.startService(serviceIntent)
-    }
+    runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
+        }
+    }.onFailure { Log.e("CrossBeamNative", "Failed to start foreground service", it) }
+    activeTransferCount.incrementAndGet()
 
     thread(name = "CrossBeamOutgoingTransfer", isDaemon = true) {
       val totalBytes = files.sumOf { (it["sizeBytes"] as? Number)?.toLong() ?: 0L }
@@ -668,7 +707,8 @@ class CrossBeamNativeModule : Module() {
                         transferred,
                         totalBytes,
                         "in-progress",
-                        null
+                        null,
+                        file.mimeType
                       )
                       read = input.read(buffer)
                     }
@@ -694,8 +734,32 @@ class CrossBeamNativeModule : Module() {
         activeSockets.remove(transferId)
         emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "failed", error.message)
       } finally {
-          context.stopService(serviceIntent)
+          if (activeTransferCount.decrementAndGet() <= 0) {
+              context.stopService(serviceIntent)
+          }
       }
+    }
+  }
+
+  private fun getStructuredOutputDir(downloadsRoot: File, mimeType: String): File {
+    val subfolder = when {
+      mimeType.startsWith("image/") -> "Images"
+      mimeType.startsWith("video/") -> "Videos"
+      mimeType.startsWith("audio/") -> "Audio"
+      mimeType == "application/pdf" || mimeType.startsWith("text/") || 
+        mimeType.contains("word") || mimeType.contains("excel") || mimeType.contains("powerpoint") -> "Documents"
+      else -> "Others"
+    }
+    return File(downloadsRoot, "CrossBeam/$subfolder")
+  }
+
+  private fun checkStorageSpace(outputDir: File, totalSize: Long) {
+    val statFs = android.os.StatFs(outputDir.absolutePath)
+    val availableBytes = statFs.availableBlocksLong * statFs.blockSizeLong
+    val requiredBytes = totalSize + (500L * 1024L * 1024L) // Safety buffer 500MB
+    
+    if (availableBytes < requiredBytes) {
+      throw IllegalStateException("Insufficient storage on device. Need ${requiredBytes / (1024*1024)} MB.")
     }
   }
 
@@ -703,92 +767,49 @@ class CrossBeamNativeModule : Module() {
     val context = appContext.reactContext ?: return
     val peerId = socket.inetAddress.hostAddress ?: "unknown-peer"
     
-    // Start Foreground Service
     val serviceIntent = Intent(context, CrossBeamTransferService::class.java)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    runCatching {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         context.startForegroundService(serviceIntent)
-    } else {
+      } else {
         context.startService(serviceIntent)
-    }
+      }
+    }.onFailure { Log.e("CrossBeamNative", "Failed to start foreground service", it) }
+    activeTransferCount.incrementAndGet()
 
     socket.use { client ->
       try {
         DataInputStream(BufferedInputStream(client.getInputStream())).use { input ->
           DataOutputStream(BufferedOutputStream(client.getOutputStream())).use { output ->
-            val magic = input.readUTF()
-              if (magic != protocolMagic) throw IllegalArgumentException("Unsupported CrossBeam protocol")
+            if (input.readUTF() != protocolMagic) throw IllegalArgumentException("Unsupported CrossBeam protocol")
+            if (input.readInt() < chunkedProtocolVersion) throw IllegalArgumentException("Unsupported protocol version")
 
-              val protocolVersion = input.readInt()
-              if (protocolVersion < chunkedProtocolVersion) {
-                throw IllegalArgumentException("Unsupported CrossBeam chunk protocol version")
-              }
-
-              val transferId = input.readUTF()
+            val transferId = input.readUTF()
             val fileCount = input.readInt()
-            val downloadsRoot =
-              Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val downloadsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             
-            var batchTotal = 0L
-            var batchTransferred = 0L
             val pendingFiles = mutableListOf<IncomingFileHeader>()
-
+            var batchTotal = 0L
             repeat(fileCount) {
-              val name = sanitizeFileName(input.readUTF())
-              val mimeType = input.readUTF()
-              val size = input.readLong()
-              val checksum = input.readUTF()
-              batchTotal += size
-              pendingFiles.add(IncomingFileHeader(name, mimeType, size, checksum))
+              val header = IncomingFileHeader(sanitizeFileName(input.readUTF()), input.readUTF(), input.readLong(), input.readUTF())
+              batchTotal += header.size
+              pendingFiles.add(header)
             }
 
-            // --- Phase 1: Android TV Storage Optimization ---
-            // We use the root downloads folder to check space since subfolders are on the same partition
-            val statFs = android.os.StatFs(downloadsRoot.absolutePath)
-            val availableBytes = statFs.availableBlocksLong * statFs.blockSizeLong
-            val requiredBytes = batchTotal + (500L * 1024L * 1024L) // Safety buffer 500MB
-            
-            if (availableBytes < requiredBytes) {
-                emitTransfer(transferId, peerId, null, 0, batchTotal, "failed", "Insufficient storage on device. Need ${requiredBytes / (1024*1024)} MB.")
-                return
-            }
+            checkStorageSpace(downloadsRoot, batchTotal)
 
+            var batchTransferred = 0L
             pendingFiles.forEach { header ->
-              // Map MIME types to subfolders
-              val subfolder = when {
-                  header.mimeType.startsWith("image/") -> "Images"
-                  header.mimeType.startsWith("video/") -> "Videos"
-                  header.mimeType.startsWith("audio/") -> "Audio"
-                  header.mimeType == "application/pdf" -> "Documents"
-                  header.mimeType.startsWith("text/") -> "Documents"
-                  header.mimeType.contains("word") || header.mimeType.contains("excel") || header.mimeType.contains("powerpoint") -> "Documents"
-                  else -> "Others"
-              }
-              
-              val outputDir = File(downloadsRoot, "CrossBeam/$subfolder")
-              if (!outputDir.exists()) {
-                  val dirCreated = outputDir.mkdirs()
-                  if (!dirCreated) {
-                      Log.e("CrossBeamNative", "Failed to create directory: ${outputDir.absolutePath}")
-                      throw IllegalStateException("Could not create storage directory")
-                  }
-              }
+              val outputDir = getStructuredOutputDir(downloadsRoot, header.mimeType)
+              if (!outputDir.exists() && !outputDir.mkdirs()) throw IllegalStateException("Could not create storage directory")
 
               val destination = uniqueDestination(outputDir, header.name)
               val partial = File(outputDir, "${destination.name}.crossbeam-part")
-              val existingSize = if (partial.exists() && partial.isFile) partial.length() else 0L
-               
-              // Ensure we don't start at an offset greater than the file itself or corrupt it
-              val offset = if (existingSize <= header.size) existingSize else 0L
-               
-              // If we are starting from scratch because it was larger or invalid, delete it
-              if (offset == 0L && partial.exists()) {
-                  partial.delete()
-              }
+              val offset = if (partial.exists() && partial.isFile && partial.length() <= header.size) partial.length() else 0L
+              if (offset == 0L && partial.exists()) partial.delete()
 
-              // Tell sender where to start
               output.writeLong(offset)
               output.flush()
-
               batchTransferred += offset
 
               if (offset < header.size) {
@@ -796,92 +817,48 @@ class CrossBeamNativeModule : Module() {
                   fileOutput.seek(offset)
                   var remaining = header.size - offset
                   while (remaining > 0) {
-                  val chunkOffset = input.readLong()
-                  val chunkLength = input.readInt()
-                  val chunkChecksum = input.readUTF()
-                  if (chunkOffset != fileOutput.filePointer) {
-                    output.writeBoolean(false)
+                    val chunkOffset = input.readLong()
+                    val chunkLength = input.readInt()
+                    val chunkChecksum = input.readUTF()
+                    
+                    if (chunkOffset != fileOutput.filePointer) throw IllegalStateException("Unexpected chunk offset")
+                    
+                    val chunk = ByteArray(chunkLength)
+                    input.readFully(chunk)
+                    if (sha256(chunk, chunkLength) != chunkChecksum) throw IllegalStateException("Chunk checksum mismatch")
+
+                    fileOutput.write(chunk)
+                    remaining -= chunkLength
+                    batchTransferred += chunkLength
+                    output.writeBoolean(true)
                     output.writeLong(fileOutput.filePointer)
                     output.flush()
-                    throw IllegalStateException("Unexpected chunk offset for ${header.name}")
-                  }
-                  if (chunkLength <= 0 || chunkLength > transferChunkSize) {
-                    output.writeBoolean(false)
-                    output.writeLong(fileOutput.filePointer)
-                    output.flush()
-                    throw IllegalStateException("Invalid chunk length for ${header.name}")
-                  }
-
-                  val chunk = ByteArray(chunkLength)
-                  input.readFully(chunk)
-                  val actualChunkChecksum = sha256(chunk, chunkLength)
-                  if (actualChunkChecksum != chunkChecksum) {
-                    output.writeBoolean(false)
-                    output.writeLong(fileOutput.filePointer)
-                    output.flush()
-                    throw IllegalStateException("Chunk checksum mismatch for ${header.name}")
-                  }
-
-                  fileOutput.write(chunk)
-                  remaining -= chunkLength
-                  batchTransferred += chunkLength
-                  output.writeBoolean(true)
-                  output.writeLong(fileOutput.filePointer)
-                  output.flush()
-                  
-                  // Throttle notification updates
-                  if (batchTransferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || batchTransferred == batchTotal) {
-                      CrossBeamTransferService.updateNotification(
-                          context,
-                          "Receiving from $peerId",
-                          "Progress: ${(batchTransferred * 100 / max(batchTotal, 1L))}%",
-                          batchTransferred.toInt(),
-                          batchTotal.toInt()
-                      )
-                  }
-
-                  emitTransfer(
-                    transferId,
-                    peerId,
-                    header.name,
-                    batchTransferred,
-                    batchTotal,
-                    "in-progress",
-                    null
-                  )
+                    
+                    if (batchTransferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || batchTransferred == batchTotal) {
+                      CrossBeamTransferService.updateNotification(context, "Receiving from $peerId", "Progress: ${(batchTransferred * 100 / max(batchTotal, 1L))}%", batchTransferred.toInt(), batchTotal.toInt())
+                    }
+                    emitTransfer(transferId, peerId, header.name, batchTransferred, batchTotal, "in-progress", null, header.mimeType)
                   }
                 }
               }
 
-              if (!partial.exists()) {
-                partial.createNewFile()
-              }
-              val actualChecksum = calculateSha256(partial)
-              if (header.checksum.isNotBlank() && header.checksum != actualChecksum) {
+              if (!partial.exists()) partial.createNewFile()
+              if (header.checksum.isNotBlank() && header.checksum != calculateSha256(partial)) {
                 partial.delete()
-                throw IllegalStateException("Checksum mismatch for ${header.name}")
+                throw IllegalStateException("Checksum mismatch")
               }
               if (destination.exists()) destination.delete()
-              val renameSuccess = partial.renameTo(destination)
-              if (!renameSuccess) {
-                  Log.e("CrossBeamNative", "Failed to rename partial file to final destination: ${destination.absolutePath}")
-                  throw IllegalStateException("Could not save received file")
-              }
+              if (!partial.renameTo(destination)) throw IllegalStateException("Could not save received file")
               
-              // Notify media scanner about the new file so it appears in gallery/file managers
-              val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
-              val uri = Uri.fromFile(destination)
-              mediaScanIntent.data = uri
-              context.sendBroadcast(mediaScanIntent)
+              MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf(header.mimeType), null)
             }
-
             emitTransfer(transferId, peerId, null, batchTotal, batchTotal, "completed", null)
           }
         }
       } catch (error: Exception) {
         emitTransfer(UUID.randomUUID().toString(), peerId, null, 0, 1, "failed", error.message)
       } finally {
-          context.stopService(serviceIntent)
+        if (activeTransferCount.decrementAndGet() <= 0) context.stopService(serviceIntent)
       }
     }
   }
@@ -1013,7 +990,8 @@ class CrossBeamNativeModule : Module() {
     bytesTransferred: Long,
     totalBytes: Long,
     status: String,
-    errorMessage: String?
+    errorMessage: String?,
+    mimeType: String? = null
   ) {
     sendEvent(
       "onTransferProgress",
@@ -1021,6 +999,7 @@ class CrossBeamNativeModule : Module() {
         "transferId" to transferId,
         "peerId" to peerId,
         "fileName" to fileName,
+        "mimeType" to mimeType,
         "bytesTransferred" to bytesTransferred,
         "totalBytes" to totalBytes,
         "status" to status,

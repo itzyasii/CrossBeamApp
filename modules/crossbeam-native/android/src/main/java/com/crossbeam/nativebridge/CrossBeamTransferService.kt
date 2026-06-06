@@ -38,8 +38,8 @@ class CrossBeamTransferService : Service() {
                 "File Transfers",
                 NotificationManager.IMPORTANCE_LOW
             )
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.createNotificationChannel(channel)
         }
     }
 
@@ -65,8 +65,8 @@ class CrossBeamTransferService : Service() {
                 .setOnlyAlertOnce(true)
                 .build()
 
-            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.notify(1, notification)
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.notify(1, notification)
         }
     }
 }

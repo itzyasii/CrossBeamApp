@@ -28,6 +28,15 @@ export type NativeTransferRequest = {
   files: NativeSelectedFile[];
 };
 
+export type NativeIncomingTransferRequest = {
+  transferId: string;
+  peerId: string;
+  peerName: string;
+  fileNames: string[];
+  sizeBytes: number;
+  requestedAt: number;
+};
+
 export type NativeTransferEvent = {
   transferId: string;
   peerId: string;
@@ -71,6 +80,7 @@ export type CrossBeamNativeEventsMap = {
   onPeerFound: (peer: NativePeer) => void;
   onPeerLost: (event: { id: string }) => void;
   onTransferProgress: (event: NativeTransferEvent) => void;
+  onIncomingTransferRequest: (request: NativeIncomingTransferRequest) => void;
 };
 
 export type NativeEventSubscription = {
@@ -88,6 +98,7 @@ export type CrossBeamNativeModule = {
   startDiscovery(): Promise<void>;
   stopDiscovery(): Promise<void>;
   getDiscoveredPeers(): Promise<NativePeer[]>;
+  respondToIncomingTransfer(transferId: string, accepted: boolean): Promise<void>;
   sendFiles(request: NativeTransferRequest): Promise<{ transferId: string }>;
   cancelTransfer(transferId: string): Promise<void>;
   pauseTransfer(transferId: string): Promise<void>;

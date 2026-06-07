@@ -7,6 +7,7 @@ import {
   NativePeer,
   NativeTransferRequest,
   NativeTransferEvent,
+  NativeIncomingTransferRequest,
 } from "crossbeam-native";
 
 export {
@@ -16,6 +17,7 @@ export {
   NativeTransferRequest,
   NativeTransferEvent,
   NativeChunkProtocol,
+  NativeIncomingTransferRequest,
 };
 import { Device } from "@/types/domain";
 
@@ -130,6 +132,24 @@ export const nativeCrossBeam = {
   async resumeTransfer(transferId: string): Promise<void> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return;
     await CrossBeamNative.resumeTransfer(transferId);
+  },
+
+  async respondToIncomingTransfer(
+    transferId: string,
+    accepted: boolean,
+  ): Promise<void> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return;
+    await CrossBeamNative.respondToIncomingTransfer(transferId, accepted);
+  },
+
+  addIncomingTransferRequestListener(
+    listener: (request: NativeIncomingTransferRequest) => void,
+  ): () => void {
+    const subscription = CrossBeamNativeEvents?.addListener(
+      "onIncomingTransferRequest",
+      listener,
+    );
+    return () => subscription?.remove();
   },
 
   addPeerFoundListener(listener: (device: Device) => void): () => void {

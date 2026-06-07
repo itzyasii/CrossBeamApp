@@ -87,11 +87,11 @@ const TABS: TabConfig[] = [
 import { Modal, Linking, BackHandler } from "react-native";
 import { FocusablePressable } from "@/components/FocusablePressable";
 import * as KeepAwake from "expo-keep-awake";
-import {
-  IncomingApprovalRequest,
-  platformFeatureService,
-} from "@/services/platformFeatureService";
+import { platformFeatureService } from "@/services/platformFeatureService";
+import { notificationService } from "@/services/notificationService";
 import { Device } from "@/types/domain";
+import { IncomingTransferApprovalModal } from "@/components/IncomingTransferApprovalModal";
+import { useIncomingTransferApprovals } from "@/hooks/useIncomingTransferApprovals";
 
 export default function App() {
   const { colors, isDark } = useTheme();
@@ -119,7 +119,6 @@ export default function App() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
   const [targetDevice, setTargetDevice] = useState<Device | null>(null);
-  const [approvals, setApprovals] = useState<IncomingApprovalRequest[]>([]);
   const insets = useSafeAreaInsets();
   const [tabIndex, setTabIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -132,6 +131,8 @@ export default function App() {
   } = usePermissions();
   const { devices, isRefreshing, statusMessage, refreshDevices } =
     useDeviceDiscovery(discoveryEnabled);
+  const { approvals, activeApproval, handleApprovalAction } =
+    useIncomingTransferApprovals(devices);
   const { sharedFiles, setSharedFiles } = useShareIntent();
   const {
     transfers,
@@ -142,10 +143,6 @@ export default function App() {
     startTransfer,
     addSelectedFiles,
   } = useTransferManager(devices);
-
-  const loadApprovals = useCallback(async () => {
-    setApprovals(await platformFeatureService.getApprovals());
-  }, []);
 
   // Handle Back Button for TV and Android
   useEffect(() => {
@@ -164,6 +161,10 @@ export default function App() {
       }
       if (showDevicePicker) {
         setShowDevicePicker(false);
+        return true;
+      }
+      if (activeApproval) {
+        void handleApprovalAction(activeApproval.id, "rejected");
         return true;
       }
       if (drawerOpen) {
@@ -185,6 +186,8 @@ export default function App() {
     showQrPairing,
     showPrivacyModal,
     showTermsModal,
+    activeApproval,
+    handleApprovalAction,
   ]);
 
   // Keep screen on during active transfers (especially for TV)
@@ -246,8 +249,8 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    void loadApprovals();
-  }, [loadApprovals, transfers.length]);
+    void notificationService.requestPermissions();
+  }, []);
 
   const pagerRef = useRef<FlatList>(null);
   const goToTab = useCallback((idx: number) => {
@@ -360,13 +363,6 @@ export default function App() {
       selectedFiles,
     );
   }, [selectedFiles]);
-
-  const handleApprovalAction = useCallback(
-    async (id: string, action: "accepted" | "rejected" | "trusted") => {
-      setApprovals(await platformFeatureService.updateApproval(id, action));
-    },
-    [],
-  );
 
   // Main app swipe gesture (new API)
   const mainSwipeGesture = Gesture.Pan()
@@ -930,6 +926,29 @@ export default function App() {
               </View>
             </BlurView>
           </Modal>
+
+          {/* Incoming transfer approval modal (shows when an approval is active) */}
+          <IncomingTransferApprovalModal
+            approval={activeApproval}
+            onAccept={() =>
+              void (
+                activeApproval &&
+                handleApprovalAction(activeApproval.id, "accepted")
+              )
+            }
+            onReject={() =>
+              void (
+                activeApproval &&
+                handleApprovalAction(activeApproval.id, "rejected")
+              )
+            }
+            onTrust={() =>
+              void (
+                activeApproval &&
+                handleApprovalAction(activeApproval.id, "trusted")
+              )
+            }
+          />
         </View>
       </GestureDetector>
     </GestureHandlerRootView>

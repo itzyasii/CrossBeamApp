@@ -21,6 +21,7 @@ export type IncomingApprovalStatus =
 
 export type IncomingApprovalRequest = {
   id: string;
+  transferId: string;
   fromDevice: Device;
   fileNames: string[];
   sizeBytes: number;
@@ -94,6 +95,13 @@ export const platformFeatureService = {
     request: Omit<IncomingApprovalRequest, "id" | "requestedAt" | "status">,
   ): Promise<IncomingApprovalRequest> {
     const approvals = await this.getApprovals();
+    const existingPending = approvals.find(
+      (approval) =>
+        approval.transferId === request.transferId &&
+        approval.status === "pending",
+    );
+    if (existingPending) return existingPending;
+
     const approval: IncomingApprovalRequest = {
       ...request,
       id: generateId(),

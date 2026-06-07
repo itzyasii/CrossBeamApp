@@ -77,28 +77,6 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
         void saveTransferHistory(newJob as any);
 
         if (!existing) {
-          void (async () => {
-            const freeDiskBytes =
-              await platformFeatureService.getFreeDiskBytes();
-            await platformFeatureService.queueApproval({
-              fromDevice: {
-                id: event.peerId,
-                name:
-                  knownDevices.find((d) => d.id === event.peerId)?.name ||
-                  event.peerId,
-                platform: "android",
-                connection: "local-network",
-                lastSeenAt: Date.now(),
-                isTrusted: false,
-              },
-              fileNames: event.fileName
-                ? [event.fileName]
-                : ["Incoming transfer"],
-              sizeBytes: event.totalBytes,
-              storageOk: freeDiskBytes <= 0 || freeDiskBytes > event.totalBytes,
-            });
-          })();
-
           return [newJob, ...current];
         }
         return current.map((job) =>

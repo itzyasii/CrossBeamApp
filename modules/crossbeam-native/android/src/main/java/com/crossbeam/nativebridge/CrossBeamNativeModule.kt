@@ -39,6 +39,8 @@ import android.os.ParcelUuid
 import android.content.res.Configuration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.math.max
@@ -82,6 +84,8 @@ class CrossBeamNativeModule : Module() {
   private val activeTransferCount = AtomicInteger(0)
   private val cancelledTransfers = ConcurrentHashMap.newKeySet<String>()
   private val pausedTransfers = ConcurrentHashMap.newKeySet<String>()
+  private val pendingIncomingApprovals = ConcurrentHashMap<String, CountDownLatch>()
+  private val incomingApprovalResults = ConcurrentHashMap<String, Boolean>()
   private val serviceType = "_crossbeam._tcp."
   private val protocolMagic = "CROSSBEAM1"
   private val chunkedProtocolVersion = 2
@@ -278,6 +282,7 @@ class CrossBeamNativeModule : Module() {
       "onPeerFound",
       "onPeerLost",
       "onTransferProgress",
+      "onIncomingTransferRequest",
       "onWiFiDirectPeersChanged",
       "onWiFiDirectConnectionChanged"
     )
@@ -345,6 +350,11 @@ class CrossBeamNativeModule : Module() {
 
     AsyncFunction("getDiscoveredPeers") {
       visiblePeers()
+    }
+
+    AsyncFunction("respondToIncomingTransfer") { transferId: String, accepted: Boolean ->
+      incomingApprovalResults[transferId] = accepted
+      pendingIncomingApprovals.remove(transferId)?.countDown()
     }
 
     AsyncFunction("sendFiles") { request: Map<String, Any?> ->
@@ -449,6 +459,44 @@ class CrossBeamNativeModule : Module() {
 
   private fun localPlatform(context: Context): String =
     if (isAndroidTv(context)) "android-tv" else "android"
+
+  private fun resolvePeerDisplayName(peerId: String): String {
+    peers.values.firstOrNull { (it["host"] as? String) == peerId }?.let { peer ->
+      (peer["name"] as? String)?.takeIf { !isPoorPeerName(it) }?.let { return it }
+    }
+    return if (isPoorPeerName(peerId)) "Nearby Device" else peerId
+  }
+
+  private fun waitForIncomingApproval(transferId: String, timeoutMs: Long = 120_000L): Boolean {
+    val latch = CountDownLatch(1)
+    pendingIncomingApprovals[transferId] = latch
+    return try {
+      val completed = latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+      completed && incomingApprovalResults.remove(transferId) == true
+    } finally {
+      pendingIncomingApprovals.remove(transferId)
+      incomingApprovalResults.remove(transferId)
+    }
+  }
+
+  private fun emitIncomingTransferRequest(
+    transferId: String,
+    peerId: String,
+    fileNames: List<String>,
+    sizeBytes: Long
+  ) {
+    sendEvent(
+      "onIncomingTransferRequest",
+      mapOf(
+        "transferId" to transferId,
+        "peerId" to peerId,
+        "peerName" to resolvePeerDisplayName(peerId),
+        "fileNames" to fileNames,
+        "sizeBytes" to sizeBytes,
+        "requestedAt" to System.currentTimeMillis()
+      )
+    )
+  }
 
   private fun inferPeerPlatform(name: String?, fallback: String = "android"): String {
     val normalized = name?.lowercase() ?: return fallback
@@ -970,6 +1018,25 @@ class CrossBeamNativeModule : Module() {
             }
 
             checkStorageSpace(downloadsRoot, batchTotal)
+
+            emitIncomingTransferRequest(
+              transferId,
+              peerId,
+              pendingFiles.map { it.name },
+              batchTotal
+            )
+            if (!waitForIncomingApproval(transferId)) {
+              emitTransfer(
+                transferId,
+                peerId,
+                pendingFiles.firstOrNull()?.name,
+                0,
+                batchTotal,
+                "rejected",
+                "Transfer rejected by receiver"
+              )
+              return@use
+            }
 
             var batchTransferred = 0L
             pendingFiles.forEach { header ->

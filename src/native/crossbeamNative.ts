@@ -142,12 +142,40 @@ export const nativeCrossBeam = {
     await CrossBeamNative.respondToIncomingTransfer(transferId, accepted);
   },
 
+  async showIncomingNotification(
+    transferId: string,
+    title: string,
+    body: string,
+  ): Promise<boolean> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return false;
+    try {
+      return await CrossBeamNative.showIncomingNotification?.(
+        transferId,
+        title,
+        body,
+      );
+    } catch (e) {
+      console.warn('[Native] showIncomingNotification failed:', e);
+      return false;
+    }
+  },
+
+  async dismissIncomingNotification(transferId: string): Promise<boolean> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return false;
+    try {
+      return await CrossBeamNative.dismissIncomingNotification?.(transferId);
+    } catch (e) {
+      console.warn('[Native] dismissIncomingNotification failed:', e);
+      return false;
+    }
+  },
+
   async startForegroundService(): Promise<boolean> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return false;
     try {
-      return await (CrossBeamNative as any).startForegroundService();
+      return await CrossBeamNative.startForegroundService?.();
     } catch (e) {
-      console.warn('[Native] startForegroundService failed:', e);
+      console.warn("[Native] startForegroundService failed:", e);
       return false;
     }
   },
@@ -155,9 +183,9 @@ export const nativeCrossBeam = {
   async stopForegroundService(): Promise<boolean> {
     if (!CrossBeamNative || !this.isRuntimeSupported()) return false;
     try {
-      return await (CrossBeamNative as any).stopForegroundService();
+      return await CrossBeamNative.stopForegroundService?.();
     } catch (e) {
-      console.warn('[Native] stopForegroundService failed:', e);
+      console.warn("[Native] stopForegroundService failed:", e);
       return false;
     }
   },

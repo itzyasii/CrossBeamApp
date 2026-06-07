@@ -1,7 +1,11 @@
-import { requireOptionalNativeModule } from 'expo-modules-core';
+import { requireOptionalNativeModule } from "expo-modules-core";
 
-export type NativePeerPlatform = 'android' | 'android-tv' | 'ios';
-export type NativePeerConnection = 'wifi-direct' | 'local-network' | 'multipeer' | 'ble';
+export type NativePeerPlatform = "android" | "android-tv" | "ios";
+export type NativePeerConnection =
+  | "wifi-direct"
+  | "local-network"
+  | "multipeer"
+  | "ble";
 
 export type NativePeer = {
   id: string;
@@ -44,13 +48,19 @@ export type NativeTransferEvent = {
   mimeType?: string;
   bytesTransferred: number;
   totalBytes: number;
-  status: 'queued' | 'in-progress' | 'paused' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | "queued"
+    | "in-progress"
+    | "paused"
+    | "completed"
+    | "failed"
+    | "cancelled";
   errorMessage?: string;
   savedFilePath?: string;
 };
 
 export type NativeChunkProtocol = {
-  protocol: 'crossbeam-chunk-v2';
+  protocol: "crossbeam-chunk-v2";
   version: number;
   chunkSizeBytes: number;
   supportsChunkAck: boolean;
@@ -61,7 +71,7 @@ export type NativeChunkProtocol = {
 
 export type NativeBackgroundTransferConfig = {
   url: string;
-  method: 'GET' | 'POST' | 'PUT';
+  method: "GET" | "POST" | "PUT";
   headers?: Record<string, string>;
   timeout?: number;
   retryCount?: number;
@@ -72,7 +82,7 @@ export type NativeBackgroundTransferStatus = {
   progress: number;
   bytesTransferred: number;
   totalBytes: number;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'paused';
+  status: "pending" | "running" | "completed" | "failed" | "paused";
   error?: string;
 };
 
@@ -81,7 +91,9 @@ export type CrossBeamNativeEventsMap = {
   onPeerLost: (event: { id: string }) => void;
   onTransferProgress: (event: NativeTransferEvent) => void;
   onIncomingTransferRequest: (request: NativeIncomingTransferRequest) => void;
-  onBackgroundTransferProgress: (status: NativeBackgroundTransferStatus) => void;
+  onBackgroundTransferProgress: (
+    status: NativeBackgroundTransferStatus,
+  ) => void;
   onBackgroundTransferStatus: (status: NativeBackgroundTransferStatus) => void;
 };
 
@@ -100,7 +112,10 @@ export type CrossBeamNativeModule = {
   startDiscovery(): Promise<void>;
   stopDiscovery(): Promise<void>;
   getDiscoveredPeers(): Promise<NativePeer[]>;
-  respondToIncomingTransfer(transferId: string, accepted: boolean): Promise<void>;
+  respondToIncomingTransfer(
+    transferId: string,
+    accepted: boolean,
+  ): Promise<void>;
   sendFiles(request: NativeTransferRequest): Promise<{ transferId: string }>;
   cancelTransfer(transferId: string): Promise<void>;
   pauseTransfer(transferId: string): Promise<void>;
@@ -122,9 +137,18 @@ export type CrossBeamNativeModule = {
     callback: (status: NativeBackgroundTransferStatus) => void,
   ): (() => void) | null;
   configureBackgroundSession?(identifier: string): void;
+  showIncomingNotification?(
+    transferId: string,
+    title: string,
+    body: string,
+  ): Promise<boolean>;
+  dismissIncomingNotification?(transferId: string): Promise<boolean>;
+  startForegroundService?(): Promise<boolean>;
+  stopForegroundService?(): Promise<boolean>;
 };
 
-const nativeModule = requireOptionalNativeModule<CrossBeamNativeModule>('CrossBeamNative');
+const nativeModule =
+  requireOptionalNativeModule<CrossBeamNativeModule>("CrossBeamNative");
 
 export const CrossBeamNative = nativeModule;
 export const CrossBeamNativeEvents = nativeModule;

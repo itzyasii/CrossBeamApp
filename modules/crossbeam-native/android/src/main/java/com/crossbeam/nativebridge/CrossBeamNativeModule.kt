@@ -286,7 +286,7 @@ class CrossBeamNativeModule : Module() {
 
     OnCreate {
       val context = appContext.reactContext ?: return@OnCreate
-      INSTANCE = this
+      INSTANCE = this@CrossBeamNativeModule
       processPendingNotificationActions()
       val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
       bluetoothAdapter = bluetoothManager?.adapter

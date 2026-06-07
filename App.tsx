@@ -105,7 +105,7 @@ import { useIncomingTransferApprovals } from "@/hooks/useIncomingTransferApprova
 
 export default function App() {
   const { colors, isDark } = useTheme();
-  const DRAWER_BACKGROUND = "#050507";
+  const DRAWER_BACKGROUND = isDark ? colors.backgroundElevated : "#1b263b";
   const DRAWER_TEXT_PRIMARY = isDark ? colors.textPrimary : "#FFFFFF";
   const DRAWER_TEXT_SECONDARY = isDark
     ? colors.textSecondary
@@ -577,7 +577,10 @@ export default function App() {
           <BlurView
             intensity={20}
             tint="dark"
-            style={[S.tabBarWrap, { paddingBottom: insets.bottom }]}
+            style={[
+              S.tabBarWrap,
+              { paddingBottom: insets.bottom, backgroundColor: "#1b263b" },
+            ]}
           >
             <View style={S.tabBar}>
               {TABS.map((t, i) => {
@@ -597,9 +600,7 @@ export default function App() {
                       style={[
                         S.tabLabel,
                         {
-                          color: isActive
-                            ? colors.textPrimary
-                            : colors.textMuted,
+                          color: isActive ? colors.accent : colors.textMuted,
                         },
                       ]}
                     >

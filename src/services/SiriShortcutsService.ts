@@ -83,7 +83,7 @@ export const siriShortcutsService = {
       name: "Send File with CrossBeam",
       description: "Quick action to send files to nearby devices via CrossBeam",
       icon: "paperplane",
-      color: "#6366f1",
+      color: "#007ea7",
       actions: [
         {
           type: "send-file",
@@ -106,7 +106,7 @@ export const siriShortcutsService = {
       description:
         "Quick action to receive files from nearby devices via CrossBeam",
       icon: "tray.and.arrow.down",
-      color: "#06b6d4",
+      color: "#80ced7",
       actions: [
         {
           type: "receive-file",

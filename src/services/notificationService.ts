@@ -162,6 +162,17 @@ export const notificationService = {
   },
 
   dismissIncomingTransferRequest: async (transferId: string) => {
+    // Prefer native dismissal on Android (notifications created natively),
+    // otherwise fall back to expo-notifications dismissal.
+    if (Platform.OS === 'android') {
+      try {
+        await (nativeCrossBeam as any).dismissIncomingNotification(transferId);
+        return;
+      } catch (e) {
+        console.warn('[Notification] native dismissIncomingNotification failed:', e);
+      }
+    }
+
     const Notifications = await getNotifications();
     if (!Notifications) return;
     await Notifications.dismissNotificationAsync(`incoming-${transferId}`);

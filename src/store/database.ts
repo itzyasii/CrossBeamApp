@@ -4,7 +4,7 @@ import { TransferHistory, Device } from "@/types/domain";
 let db: SQLite.SQLiteDatabase | null = null;
 let initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-const parseFileNames = (value: unknown): string[] => {
+const parseStringArray = (value: unknown): string[] => {
   if (typeof value !== "string" || !value) return [];
   try {
     const parsed = JSON.parse(value);
@@ -15,6 +15,8 @@ const parseFileNames = (value: unknown): string[] => {
     return [];
   }
 };
+
+const parseFileNames = (value: unknown): string[] => parseStringArray(value);
 
 export const initDatabase = async () => {
   if (db) return db;
@@ -39,7 +41,9 @@ export const initDatabase = async () => {
           startedAt INTEGER,
           updatedAt INTEGER,
           errorMessage TEXT,
-          mimeType TEXT
+          mimeType TEXT,
+          localFilePaths TEXT,
+          savedFilePaths TEXT
         );
         CREATE TABLE IF NOT EXISTS devices (
           id TEXT PRIMARY KEY NOT NULL,
@@ -49,6 +53,12 @@ export const initDatabase = async () => {
           lastSeenAt INTEGER NOT NULL
         );
       `);
+      await db.execAsync(`
+        ALTER TABLE transfers ADD COLUMN localFilePaths TEXT;
+      `).catch(() => {});
+      await db.execAsync(`
+        ALTER TABLE transfers ADD COLUMN savedFilePaths TEXT;
+      `).catch(() => {});
       return db;
     } catch (error) {
       console.error("[Database] Initialization failed:", error);
@@ -82,6 +92,8 @@ export const getTransferHistory = async (): Promise<TransferHistory[]> => {
       updatedAt: row.updatedAt,
       errorMessage: row.errorMessage,
       mimeType: row.mimeType,
+      localFilePaths: parseStringArray(row.localFilePaths),
+      savedFilePaths: parseStringArray(row.savedFilePaths),
     }));
   } catch (e) {
     console.error("[Database] getTransferHistory error:", e);
@@ -102,8 +114,8 @@ export const saveTransferHistory = async (transfer: TransferHistory) => {
   try {
     const database = await initDatabase();
     await database.runAsync(
-      `INSERT OR REPLACE INTO transfers (id, fileName, fileNames, sizeBytes, bytesTransferred, progress, status, fromDeviceName, toDeviceName, startedAt, updatedAt, errorMessage, mimeType)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO transfers (id, fileName, fileNames, sizeBytes, bytesTransferred, progress, status, fromDeviceName, toDeviceName, startedAt, updatedAt, errorMessage, mimeType, localFilePaths, savedFilePaths)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         transfer.id,
         transfer.fileName ?? null,
@@ -118,6 +130,8 @@ export const saveTransferHistory = async (transfer: TransferHistory) => {
         transfer.updatedAt ?? Date.now(),
         transfer.errorMessage ?? null,
         transfer.mimeType ?? null,
+        JSON.stringify(transfer.localFilePaths ?? []),
+        JSON.stringify(transfer.savedFilePaths ?? []),
       ],
     );
   } catch (e) {

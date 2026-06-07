@@ -182,7 +182,17 @@ export const platformFeatureService = {
       checksum: syntheticChecksum(job),
       durationMs,
       averageBytesPerSecond: Math.floor(job.sizeBytes / (durationMs / 1000)),
-      savedPath: job.toDeviceName === "This Device" ? "Downloads/CrossBeam" : undefined,
+      savedPath:
+        job.toDeviceName === "This Device"
+          ? job.savedFilePaths?.[0] ??
+            (job.mimeType?.startsWith("image/")
+              ? "Download/CrossBeam/Images"
+              : job.mimeType?.startsWith("video/")
+                ? "Download/CrossBeam/Videos"
+                : job.mimeType?.startsWith("audio/")
+                  ? "Download/CrossBeam/Audio"
+                  : "Download/CrossBeam/Others")
+          : job.localFilePaths?.[0],
       verifiedAt: Date.now(),
     };
     await writeJson(INTEGRITY_KEY, [report, ...reports].slice(0, 100));

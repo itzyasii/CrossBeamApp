@@ -22,6 +22,7 @@ import { Device } from "@/types/domain";
 const toDevice = (peer: NativePeer): Device => ({
   id: peer.id,
   name: peer.name,
+  deviceKey: peer.deviceKey,
   platform:
     peer.platform === "android-tv"
       ? "android-tv"

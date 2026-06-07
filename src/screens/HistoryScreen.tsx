@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Linking,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -145,6 +147,16 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
     );
   };
 
+  const toFileUri = (path: string): string => {
+    if (path.startsWith("file://") || path.startsWith("content://")) {
+      return path;
+    }
+    if (path.startsWith("/")) {
+      return `file://${path}`;
+    }
+    return `file:///storage/emulated/0/${path.replace(/^\/+/, "")}`;
+  };
+
   const handleJobPress = async (job: TransferJob) => {
     if (job.status !== "completed") return;
     try {
@@ -153,34 +165,48 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
 
       const report = reports[job.id];
       const mimeType = job.mimeType || "";
-      
-      const subfolder = 
-        mimeType.startsWith("image/") ? "Images" :
-        mimeType.startsWith("video/") ? "Videos" :
-        mimeType.startsWith("audio/") ? "Audio" :
-        (mimeType === "application/pdf" || mimeType.startsWith("text/") || /word|excel|powerpoint/.test(mimeType)) ? "Documents" :
-        "Others";
+      const isReceived = job.toDeviceName === "This Device";
+
+      const subfolder =
+        mimeType.startsWith("image/")
+          ? "Images"
+          : mimeType.startsWith("video/")
+            ? "Videos"
+            : mimeType.startsWith("audio/")
+              ? "Audio"
+              : mimeType === "application/pdf" ||
+                  mimeType.startsWith("text/") ||
+                  /word|excel|powerpoint/.test(mimeType)
+                ? "Documents"
+                : "Others";
+
+      const candidatePaths = [
+        ...(job.savedFilePaths ?? []),
+        ...(job.localFilePaths ?? []),
+        ...(report?.savedPath && !report.savedPath.startsWith("file://")
+          ? [report.savedPath]
+          : report?.savedPath
+            ? [report.savedPath]
+            : []),
+      ];
 
       const possibleUris = [
-        // Structured CrossBeam path
-        `file:///storage/emulated/0/Download/CrossBeam/${subfolder}/${fileName}`,
-        `file:///storage/emulated/0/Downloads/CrossBeam/${subfolder}/${fileName}`,
-        `file:///sdcard/Download/CrossBeam/${subfolder}/${fileName}`,
-        
-        // Fallback to legacy flat path
-        `file:///storage/emulated/0/Download/CrossBeam/${fileName}`,
-        `file:///storage/emulated/0/Downloads/CrossBeam/${fileName}`,
-        `file:///sdcard/Download/CrossBeam/${fileName}`,
-        
-        // Use the saved path from report if available
-        ...(report?.savedPath ? [`file:///storage/emulated/0/${report.savedPath}/${fileName}`] : []),
-        
+        ...candidatePaths.map(toFileUri),
+        ...(isReceived
+          ? [
+              `file:///storage/emulated/0/Download/CrossBeam/${subfolder}/${fileName}`,
+              `file:///storage/emulated/0/Downloads/CrossBeam/${subfolder}/${fileName}`,
+              `file:///sdcard/Download/CrossBeam/${subfolder}/${fileName}`,
+              `file:///storage/emulated/0/Download/CrossBeam/${fileName}`,
+              `file:///storage/emulated/0/Downloads/CrossBeam/${fileName}`,
+            ]
+          : []),
         `${FileSystem.documentDirectory}CrossBeam/${fileName}`,
         `${FileSystem.cacheDirectory}${fileName}`,
         `${FileSystem.documentDirectory}${fileName}`,
       ];
 
-      let foundUri = null;
+      let foundUri: string | null = null;
       for (const uri of possibleUris) {
         try {
           const info = await FileSystem.getInfoAsync(uri);
@@ -193,13 +219,30 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
         }
       }
 
-      if (foundUri && (await Sharing.isAvailableAsync())) {
-        await Sharing.shareAsync(foundUri);
-      } else {
+      if (!foundUri) {
         Alert.alert(
           "File Unavailable",
           `The file "${fileName}" could not be located on disk. It may have been moved or deleted.`,
         );
+        return;
+      }
+
+      if (Platform.OS === "android") {
+        try {
+          const contentUri = await FileSystem.getContentUriAsync(foundUri);
+          await Linking.openURL(contentUri);
+          return;
+        } catch {
+          // Fall back to share sheet below.
+        }
+      }
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(foundUri, {
+          mimeType: mimeType || undefined,
+        });
+      } else {
+        await Linking.openURL(foundUri);
       }
     } catch (err) {
       console.warn(err);

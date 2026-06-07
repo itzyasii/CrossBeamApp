@@ -60,7 +60,15 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
             totalBytes: event.totalBytes,
             progress,
             status: effectiveStatus as any,
-            mimeType: event.mimeType, // Store mimeType for path resolution
+            mimeType: event.mimeType ?? existing.mimeType,
+            savedFilePaths: event.savedFilePath
+              ? [
+                  ...new Set([
+                    ...(existing.savedFilePaths ?? []),
+                    event.savedFilePath,
+                  ]),
+                ]
+              : existing.savedFilePaths,
             updatedAt: Date.now(),
             errorMessage: event.errorMessage,
           };
@@ -160,6 +168,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     }
 
     const now = Date.now();
+    const sourcePaths = selectedFiles.map((file) => file.uri);
     const baseJob: TransferJob = {
       id: `${now}-pending`,
       fileNames: selectedFiles.map((file) => file.name),
@@ -174,6 +183,8 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
       encrypted: true,
       startedAt: now,
       updatedAt: now,
+      localFilePaths: sourcePaths,
+      mimeType: selectedFiles[0]?.mimeType,
     };
 
     setTransfers((current) => [baseJob, ...current]);
@@ -196,11 +207,19 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
                 ...job,
                 id: result.transferId,
                 status: "in-progress",
+                localFilePaths: sourcePaths,
                 updatedAt: Date.now(),
               }
             : job,
         ),
       );
+      void saveTransferHistory({
+        ...baseJob,
+        id: result.transferId,
+        status: "in-progress",
+        localFilePaths: sourcePaths,
+        updatedAt: Date.now(),
+      });
       setTransferError(null);
     } catch (error) {
       const message = String(error);

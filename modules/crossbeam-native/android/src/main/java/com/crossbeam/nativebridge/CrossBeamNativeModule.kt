@@ -95,6 +95,160 @@ class CrossBeamNativeModule : Module() {
   private val bleServiceUuid = UUID.fromString("63626561-6d2d-7032-702d-646973636f76") // "cbeam-p2p-discov"
   private var bleAdvertiseCallback: AdvertiseCallback? = null
   private var bleScanCallback: ScanCallback? = null
+  private var localDeviceKey: String? = null
+
+  private fun appContext(): Context? = appContext.reactContext
+
+  private fun getOrCreateDeviceKey(context: Context): String {
+    localDeviceKey?.let { return it }
+    val prefs = context.getSharedPreferences("crossbeam", Context.MODE_PRIVATE)
+    val stored = prefs.getString("deviceKey", null)?.takeIf { it.isNotBlank() }
+    if (stored != null) {
+      localDeviceKey = stored
+      return stored
+    }
+    val generated = UUID.randomUUID().toString().replace("-", "").take(12)
+    prefs.edit().putString("deviceKey", generated).apply()
+    localDeviceKey = generated
+    return generated
+  }
+
+  private fun getFriendlyDeviceName(context: Context): String {
+    if (hasBluetoothConnectPermission(context)) {
+      bluetoothAdapter?.name?.takeIf { it.isNotBlank() }?.let { return it }
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+      val settingsName = android.provider.Settings.Global.getString(
+        context.contentResolver,
+        android.provider.Settings.Global.DEVICE_NAME
+      )
+      if (!settingsName.isNullOrBlank()) return settingsName
+    }
+    return Build.MODEL?.takeIf { it.isNotBlank() }
+      ?: Build.DEVICE?.takeIf { it.isNotBlank() }
+      ?: "CrossBeam Device"
+  }
+
+  private fun canonicalPeerId(deviceKey: String) = "peer-$deviceKey"
+
+  private fun isPoorPeerName(name: String?): Boolean {
+    if (name.isNullOrBlank()) return true
+    if (name == "Unknown BLE Peer") return true
+    if (Regex("^(\\d{1,3}\\.){3}\\d{1,3}$").matches(name)) return true
+    if (name.startsWith("ble-") || name.startsWith("peer-")) return true
+    return false
+  }
+
+  private fun bestPeerName(primary: String?, fallback: String?): String {
+    if (!isPoorPeerName(primary)) return primary!!
+    if (!isPoorPeerName(fallback)) return fallback!!
+    return primary?.takeIf { it.isNotBlank() }
+      ?: fallback?.takeIf { it.isNotBlank() }
+      ?: "Nearby Device"
+  }
+
+  private fun deviceKeyFromServiceName(serviceName: String): String? {
+    if (!serviceName.startsWith("CrossBeam-")) return null
+    return serviceName.removePrefix("CrossBeam-").takeIf { it.isNotBlank() }
+  }
+
+  private fun hasTransferEndpoint(peer: Map<String, Any?>): Boolean {
+    val host = peer["host"] as? String
+    val port = peer["port"] as? Number
+    return !host.isNullOrBlank() && port != null && port.toInt() > 0
+  }
+
+  private fun mergePeerMaps(a: Map<String, Any?>, b: Map<String, Any?>): Map<String, Any?> {
+    val transferPeer = when {
+      hasTransferEndpoint(b) -> b
+      hasTransferEndpoint(a) -> a
+      else -> a
+    }
+    val other = if (transferPeer == b) a else b
+    val deviceKey = (transferPeer["deviceKey"] as? String)
+      ?: (other["deviceKey"] as? String)
+      ?: transferPeer["id"] as String
+
+    return mapOf(
+      "id" to canonicalPeerId(deviceKey),
+      "deviceKey" to deviceKey,
+      "name" to bestPeerName(transferPeer["name"] as? String, other["name"] as? String),
+      "platform" to (transferPeer["platform"] ?: other["platform"] ?: "android"),
+      "connection" to if (hasTransferEndpoint(transferPeer)) "local-network" else (transferPeer["connection"] ?: "ble"),
+      "host" to transferPeer["host"],
+      "port" to transferPeer["port"],
+      "isTrusted" to false,
+      "lastSeenAt" to max(
+        (transferPeer["lastSeenAt"] as? Number)?.toLong() ?: 0L,
+        (other["lastSeenAt"] as? Number)?.toLong() ?: 0L
+      )
+    )
+  }
+
+  private fun findPeerByDeviceKey(deviceKey: String): Map<String, Any?>? =
+    peers.values.firstOrNull { (it["deviceKey"] as? String) == deviceKey }
+
+  private fun removePeersExcept(keepId: String, deviceKey: String) {
+    peers.entries.removeIf { entry ->
+      entry.key != keepId && (entry.value["deviceKey"] as? String) == deviceKey
+    }
+  }
+
+  private fun upsertPeer(incoming: Map<String, Any?>): Map<String, Any?> {
+    val deviceKey = incoming["deviceKey"] as? String ?: incoming["id"] as String
+    val normalized = incoming.toMutableMap().apply {
+      put("deviceKey", deviceKey)
+      put("id", canonicalPeerId(deviceKey))
+    }
+
+    val existing = findPeerByDeviceKey(deviceKey)
+      ?: peers[normalized["id"] as String]
+      ?: peers[incoming["id"] as String]
+
+    val merged = if (existing != null) mergePeerMaps(normalized, existing) else normalized
+    removePeersExcept(merged["id"] as String, deviceKey)
+    peers[merged["id"] as String] = merged
+    sendEvent("onPeerFound", merged)
+    return merged
+  }
+
+  private fun visiblePeers(): List<Map<String, Any?>> {
+    val grouped = peers.values.groupBy { it["deviceKey"] as? String ?: it["id"] as String }
+    return grouped.values.map { group ->
+      group.reduce { acc, peer -> mergePeerMaps(acc, peer) }
+    }
+  }
+
+  private fun resolvePeer(peerId: String): Map<String, Any?>? {
+    peers[peerId]?.let { peer ->
+      if (hasTransferEndpoint(peer)) return peer
+      val deviceKey = peer["deviceKey"] as? String ?: return null
+      return findPeerByDeviceKey(deviceKey)?.takeIf { hasTransferEndpoint(it) }
+    }
+
+    val deviceKey = when {
+      peerId.startsWith("peer-") -> peerId.removePrefix("peer-")
+      peerId.startsWith("ble-") -> peerId.removePrefix("ble-")
+      else -> deviceKeyFromServiceName(peerId)
+    }
+
+    if (!deviceKey.isNullOrBlank()) {
+      findPeerByDeviceKey(deviceKey)?.takeIf { hasTransferEndpoint(it) }?.let { return it }
+    }
+
+    return peers.values.firstOrNull { it["id"] == peerId && hasTransferEndpoint(it) }
+  }
+
+  private fun parseBleDeviceKey(result: ScanResult): String? {
+    val serviceData = result.scanRecord?.getServiceData(ParcelUuid(bleServiceUuid))
+    return serviceData?.toString(Charsets.UTF_8)?.takeIf { it.isNotBlank() }
+  }
+
+  private fun parseBleDeviceName(result: ScanResult): String? {
+    result.scanRecord?.deviceName?.takeIf { !isPoorPeerName(it) }?.let { return it }
+    result.device.name?.takeIf { !isPoorPeerName(it) }?.let { return it }
+    return null
+  }
 
   override fun definition() = ModuleDefinition {
     Name("CrossBeamNative")
@@ -190,7 +344,7 @@ class CrossBeamNativeModule : Module() {
     }
 
     AsyncFunction("getDiscoveredPeers") {
-      peers.values.toList()
+      visiblePeers()
     }
 
     AsyncFunction("sendFiles") { request: Map<String, Any?> ->
@@ -199,14 +353,15 @@ class CrossBeamNativeModule : Module() {
       @Suppress("UNCHECKED_CAST")
       val files = request["files"] as? List<Map<String, Any?>>
         ?: throw IllegalArgumentException("Missing files")
-      val peer = peers[peerId]
+      val peer = resolvePeer(peerId)
         ?: throw IllegalArgumentException("Peer is not available")
       val host = peer["host"] as? String
         ?: throw IllegalArgumentException("Peer host is unavailable")
       val port = (peer["port"] as? Number)?.toInt()
         ?: throw IllegalArgumentException("Peer port is unavailable")
       val transferId = UUID.randomUUID().toString()
-      sendFilesToPeer(transferId, host, port, peerId, files)
+      val resolvedPeerId = peer["id"] as String
+      sendFilesToPeer(transferId, host, port, resolvedPeerId, files)
       mapOf("transferId" to transferId)
     }
 
@@ -455,11 +610,13 @@ class CrossBeamNativeModule : Module() {
 
   private fun registerLocalService() {
     if (registrationListener != null) return
-    val context = appContext.reactContext ?: return
+    val context = appContext() ?: return
     val port = serverSocket?.localPort ?: return
     acquireMulticastLock(context)
     val nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return
-    val serviceName = "CrossBeam-${Build.MODEL ?: Build.DEVICE ?: UUID.randomUUID()}"
+    val deviceKey = getOrCreateDeviceKey(context)
+    val friendlyName = getFriendlyDeviceName(context)
+    val serviceName = "CrossBeam-$deviceKey"
     localServiceName = serviceName
 
     val serviceInfo = NsdServiceInfo().apply {
@@ -468,6 +625,8 @@ class CrossBeamNativeModule : Module() {
       this.port = port
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
         setAttribute("platform", localPlatform(context))
+        setAttribute("deviceName", friendlyName)
+        setAttribute("deviceKey", deviceKey)
       }
     }
 
@@ -532,34 +691,42 @@ class CrossBeamNativeModule : Module() {
 
           override fun onServiceResolved(resolved: NsdServiceInfo) {
             val host: InetAddress? = resolved.host
-            val id = "${resolved.serviceName}-${host?.hostAddress ?: UUID.randomUUID()}"
-            val advertisedPlatform =
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                resolved.attributes["platform"]?.toString(Charsets.UTF_8)
-              } else {
-                null
-              }
+            val attributes =
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) resolved.attributes else emptyMap()
+            val advertisedPlatform = attributes["platform"]?.toString(Charsets.UTF_8)
+            val advertisedName = attributes["deviceName"]?.toString(Charsets.UTF_8)
+            val advertisedKey = attributes["deviceKey"]?.toString(Charsets.UTF_8)
+              ?: deviceKeyFromServiceName(resolved.serviceName)
+              ?: resolved.serviceName
+            val displayName = bestPeerName(
+              advertisedName,
+              resolved.serviceName.takeUnless { it.startsWith("CrossBeam-") }
+            )
             val peer = mapOf(
-              "id" to id,
-              "name" to resolved.serviceName,
-              "platform" to (advertisedPlatform ?: inferPeerPlatform(resolved.serviceName)),
+              "id" to canonicalPeerId(advertisedKey),
+              "deviceKey" to advertisedKey,
+              "name" to displayName,
+              "platform" to (advertisedPlatform ?: inferPeerPlatform(displayName)),
               "connection" to "local-network",
               "host" to host?.hostAddress,
               "port" to resolved.port,
               "isTrusted" to false,
               "lastSeenAt" to System.currentTimeMillis()
             )
-            peers[id] = peer
-            sendEvent("onPeerFound", peer)
+            upsertPeer(peer)
           }
         })
       }
 
       override fun onServiceLost(serviceInfo: NsdServiceInfo) {
-        val entry = peers.entries.firstOrNull { it.value["name"] == serviceInfo.serviceName }
-        if (entry != null) {
-          peers.remove(entry.key)
-          sendEvent("onPeerLost", mapOf("id" to entry.key))
+        val deviceKey = deviceKeyFromServiceName(serviceInfo.serviceName)
+        val lostId = if (deviceKey != null) {
+          canonicalPeerId(deviceKey)
+        } else {
+          peers.entries.firstOrNull { it.value["name"] == serviceInfo.serviceName }?.key
+        }
+        if (lostId != null && peers.remove(lostId) != null) {
+          sendEvent("onPeerLost", mapOf("id" to lostId))
         }
       }
     }
@@ -578,7 +745,13 @@ class CrossBeamNativeModule : Module() {
       // Android throws when discovery already stopped; the desired state is still stopped.
     } finally {
       discoveryListener = null
-      peers.clear()
+      val lostIds = peers.entries
+        .filter { (_, peer) -> peer["connection"] == "local-network" || peer.containsKey("host") }
+        .map { it.key }
+      lostIds.forEach { id ->
+        peers.remove(id)
+        sendEvent("onPeerLost", mapOf("id" to id))
+      }
       releaseMulticastLock()
     }
   }
@@ -851,6 +1024,17 @@ class CrossBeamNativeModule : Module() {
               if (!partial.renameTo(destination)) throw IllegalStateException("Could not save received file")
               
               MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf(header.mimeType), null)
+              emitTransfer(
+                transferId,
+                peerId,
+                header.name,
+                batchTransferred,
+                batchTotal,
+                "in-progress",
+                null,
+                header.mimeType,
+                destination.absolutePath
+              )
             }
             emitTransfer(transferId, peerId, null, batchTotal, batchTotal, "completed", null)
           }
@@ -864,12 +1048,15 @@ class CrossBeamNativeModule : Module() {
   }
 
   private fun startBleDiscovery() {
-    val context = appContext.reactContext ?: return
+    val context = appContext() ?: return
     if (!hasBluetoothScanPermission(context) || !hasBluetoothConnectPermission(context)) return
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     bluetoothAdapter = bluetoothManager?.adapter
 
     if (bluetoothAdapter == null || bluetoothAdapter?.isEnabled == false) return
+
+    val deviceKey = getOrCreateDeviceKey(context)
+    val friendlyName = getFriendlyDeviceName(context)
 
     bleAdvertiser = if (hasBluetoothAdvertisePermission(context)) {
       bluetoothAdapter?.bluetoothLeAdvertiser
@@ -889,6 +1076,11 @@ class CrossBeamNativeModule : Module() {
     val data = AdvertiseData.Builder()
       .setIncludeDeviceName(false)
       .addServiceUuid(ParcelUuid(bleServiceUuid))
+      .addServiceData(ParcelUuid(bleServiceUuid), deviceKey.toByteArray(Charsets.UTF_8))
+      .build()
+
+    val scanResponse = AdvertiseData.Builder()
+      .setIncludeDeviceName(true)
       .build()
 
     bleAdvertiseCallback = object : AdvertiseCallback() {
@@ -899,7 +1091,7 @@ class CrossBeamNativeModule : Module() {
     }
 
     if (hasBluetoothAdvertisePermission(context)) {
-      bleAdvertiser?.startAdvertising(settings, data, bleAdvertiseCallback)
+      bleAdvertiser?.startAdvertising(settings, data, scanResponse, bleAdvertiseCallback)
     }
 
     // --- Start Scanning ---
@@ -909,22 +1101,19 @@ class CrossBeamNativeModule : Module() {
 
     bleScanCallback = object : ScanCallback() {
       override fun onScanResult(callbackType: Int, result: ScanResult) {
-        val device = result.device
-        val name = result.scanRecord?.deviceName ?: "Unknown BLE Peer"
-        val id = "ble-${result.device.address}"
-        
-        if (peers.containsKey(id)) return
+        val deviceKey = parseBleDeviceKey(result) ?: result.device.address
+        val name = parseBleDeviceName(result) ?: "Nearby Device"
 
         val peer = mapOf(
-          "id" to id,
+          "id" to canonicalPeerId(deviceKey),
+          "deviceKey" to deviceKey,
           "name" to name,
           "platform" to inferPeerPlatform(name),
           "connection" to "ble",
           "isTrusted" to false,
           "lastSeenAt" to System.currentTimeMillis()
         )
-        peers[id] = peer
-        sendEvent("onPeerFound", peer)
+        upsertPeer(peer)
       }
 
       override fun onScanFailed(errorCode: Int) {
@@ -936,7 +1125,7 @@ class CrossBeamNativeModule : Module() {
   }
 
   private fun stopBleDiscovery() {
-    val context = appContext.reactContext
+    val context = appContext()
     try {
       if (context == null || hasBluetoothAdvertisePermission(context)) {
         bleAdvertiser?.stopAdvertising(bleAdvertiseCallback)
@@ -947,6 +1136,9 @@ class CrossBeamNativeModule : Module() {
     } catch (_: Exception) {}
     bleAdvertiseCallback = null
     bleScanCallback = null
+    peers.entries.removeIf { (_, peer) ->
+      peer["connection"] == "ble" && !hasTransferEndpoint(peer)
+    }
   }
 
   private fun calculateSha256(context: Context, uri: Uri): String {
@@ -991,7 +1183,8 @@ class CrossBeamNativeModule : Module() {
     totalBytes: Long,
     status: String,
     errorMessage: String?,
-    mimeType: String? = null
+    mimeType: String? = null,
+    savedFilePath: String? = null
   ) {
     sendEvent(
       "onTransferProgress",
@@ -1003,7 +1196,8 @@ class CrossBeamNativeModule : Module() {
         "bytesTransferred" to bytesTransferred,
         "totalBytes" to totalBytes,
         "status" to status,
-        "errorMessage" to errorMessage
+        "errorMessage" to errorMessage,
+        "savedFilePath" to savedFilePath
       )
     )
   }

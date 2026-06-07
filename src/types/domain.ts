@@ -1,4 +1,4 @@
-export type ConnectionType = "wifi-direct" | "hotspot" | "lan" | "local-network" | "multipeer" | "ble";
+  export type ConnectionType = "wifi-direct" | "hotspot" | "lan" | "local-network" | "multipeer" | "ble";
 
 export type DevicePlatform = "android" | "ios" | "android-tv";
 
@@ -7,6 +7,7 @@ export type Device = {
   name: string;
   platform: DevicePlatform;
   connection: ConnectionType;
+  deviceKey?: string;
   lastSeenAt: number;
   isTrusted?: boolean;
 };
@@ -49,6 +50,8 @@ export type TransferJob = {
   updatedAt: number;
   errorMessage?: string;
   mimeType?: string;
+  localFilePaths?: string[];
+  savedFilePaths?: string[];
 };
 
 export type IncomingTransferRequest = {

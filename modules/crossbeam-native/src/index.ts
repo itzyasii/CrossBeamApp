@@ -8,6 +8,7 @@ export type NativePeer = {
   name: string;
   platform: NativePeerPlatform;
   connection: NativePeerConnection;
+  deviceKey?: string;
   host?: string;
   port?: number;
   isTrusted: boolean;
@@ -36,6 +37,7 @@ export type NativeTransferEvent = {
   totalBytes: number;
   status: 'queued' | 'in-progress' | 'paused' | 'completed' | 'failed' | 'cancelled';
   errorMessage?: string;
+  savedFilePath?: string;
 };
 
 export type NativeChunkProtocol = {

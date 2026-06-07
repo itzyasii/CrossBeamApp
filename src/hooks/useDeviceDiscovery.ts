@@ -8,6 +8,7 @@ import {
   stopNearbyDiscovery,
 } from '@/services/deviceDiscovery';
 import { Device } from '@/types/domain';
+import { mergeDiscoveredDevices } from '@/utils/deviceMerge';
 import { nativeCrossBeam } from '@/native/crossbeamNative';
 import { haptics } from '@/services/haptics';
 
@@ -24,7 +25,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   const refreshDevices = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const result = await discoverNearbyDevices();
+      const result = mergeDiscoveredDevices(await discoverNearbyDevices());
       const capabilities = await nativeCrossBeam.getCapabilities();
       setDevices(result);
       setLastRefreshAt(Date.now());
@@ -67,27 +68,24 @@ export const useDeviceDiscovery = (enabled = true) => {
 
     const removeFound = addNearbyDeviceFoundListener((device) => {
       setDevices((current) => {
-        const existingById = current.find((item) => item.id === device.id);
-        const existingByName = current.find((item) => item.name === device.name);
-        
-        const isIpLike = /^(\d{1,3}\.){3}\d{1,3}$/.test(device.name);
-        if (isIpLike && existingById && !/^(\d{1,3}\.){3}\d{1,3}$/.test(existingById.name)) {
-          device.name = existingById.name;
-        }
-
-        const alreadyFound = existingById || existingByName;
+        const merged = mergeDiscoveredDevices([device, ...current]);
+        const alreadyFound = current.some(
+          (item) =>
+            item.id === device.id ||
+            (item.deviceKey && item.deviceKey === device.deviceKey),
+        );
         if (!alreadyFound) {
           void haptics.light();
         }
-        
-        const existing = current.filter((item) => item.id !== device.id && item.name !== device.name);
-        return [device, ...existing];
+        return merged;
       });
       setLastRefreshAt(Date.now());
     });
 
     const removeLost = addNearbyDeviceLostListener((id) => {
-      setDevices((current) => current.filter((device) => device.id !== id));
+      setDevices((current) =>
+        current.filter((device) => device.id !== id && device.deviceKey !== id),
+      );
       setLastRefreshAt(Date.now());
     });
 

@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Camera,
   History,
@@ -88,10 +82,10 @@ export function HomeScreen({
     0,
   );
   const discoveryActionLabel = isRefreshing
-    ? "Scanning"
+    ? "Finding devices"
     : discoveryEnabled
       ? "Refresh"
-      : "Start Scanning";
+      : "Find devices";
 
   return (
     <ScrollView
@@ -111,12 +105,82 @@ export function HomeScreen({
                 Ready to Receive
               </Text>
               <Text style={[S.tvStatusSub, { color: colors.textSecondary }]}>
-                Visible to nearby devices as "Living Room TV"
+                Visible nearby as "Living Room TV"
               </Text>
             </View>
           </View>
         </GlassCard>
       )}
+
+      <View style={S.actionHub}>
+        <View style={S.mainButtons}>
+          <FocusablePressable
+            onPress={onPickFiles}
+            style={[
+              S.bigBtn,
+              { backgroundColor: colors.accent },
+              Platform.isTV && { flex: 1 },
+            ]}
+          >
+            <View style={S.btnIcon}>
+              <Plus size={32} color="#FFF" strokeWidth={2.5} />
+            </View>
+            <Text style={S.btnLabel}>Send Files</Text>
+          </FocusablePressable>
+
+          <FocusablePressable
+            onPress={onOpenScanner}
+            style={[
+              S.bigBtn,
+              {
+                backgroundColor: colors.surfaceHover,
+                borderWidth: 1,
+                borderColor: colors.borderStrong,
+              },
+              Platform.isTV && { display: "none" },
+            ]}
+          >
+            <View style={S.btnIcon}>
+              <Camera size={32} color={colors.textPrimary} strokeWidth={2} />
+            </View>
+            <Text style={[S.btnLabel, { color: colors.textPrimary }]}>
+              Scan code
+            </Text>
+          </FocusablePressable>
+        </View>
+
+        {hasFiles && (
+          <GlassCard animate style={S.selectionCard} accentBorder>
+            <View style={S.selectionHeader}>
+              <Text style={[S.selectionTitle, { color: colors.textPrimary }]}>
+                {selectedFiles.length} item{selectedFiles.length > 1 ? "s" : ""}{" "}
+                ready
+              </Text>
+              <FocusablePressable onPress={onClearFiles}>
+                <X size={18} color={colors.error} />
+              </FocusablePressable>
+            </View>
+            <Text style={[S.selectionSub, { color: colors.textSecondary }]}>
+              Total size: {formatSize(totalSelectedBytes)}
+            </Text>
+            <FocusablePressable
+              onPress={() => onStartTransfer()}
+              style={[S.sendNowBtn, { backgroundColor: colors.success }]}
+            >
+              <Send size={18} color="#FFF" />
+              <Text style={S.sendNowText}>Send Now</Text>
+            </FocusablePressable>
+          </GlassCard>
+        )}
+
+        {transferError && (
+          <GlassCard style={S.transferErrorCard}>
+            <Text style={[S.transferErrorText, { color: colors.warning }]}>
+              {transferError}
+            </Text>
+          </GlassCard>
+        )}
+      </View>
 
       <GlassCard style={S.platformCard}>
         <View style={S.platformHeader}>
@@ -130,6 +194,9 @@ export function HomeScreen({
           </View>
           <View style={S.platformCopy}>
             <Text style={[S.platformTitle, { color: colors.textPrimary }]}>
+              This device
+            </Text>
+            <Text style={[S.platformSub, { color: colors.textSecondary }]}>
               Your {getRuntimePlatformLabel()}
             </Text>
             <Text
@@ -181,81 +248,11 @@ export function HomeScreen({
                 { color: colors.textSecondary },
               ]}
             >
-              Search
+              Find devices
             </Text>
           </FocusablePressable>
         </View>
       </GlassCard>
-
-      <View style={S.actionHub}>
-        <View style={S.mainButtons}>
-          <FocusablePressable
-            onPress={onPickFiles}
-            style={[
-              S.bigBtn,
-              { backgroundColor: colors.accent },
-              Platform.isTV && { flex: 1 },
-            ]}
-          >
-            <View style={S.btnIcon}>
-              <Plus size={32} color="#FFF" strokeWidth={2.5} />
-            </View>
-            <Text style={S.btnLabel}>Send Files</Text>
-          </FocusablePressable>
-
-          <FocusablePressable
-            onPress={onOpenScanner}
-            style={[
-              S.bigBtn,
-              {
-                backgroundColor: colors.surfaceHover,
-                borderWidth: 1,
-                borderColor: colors.borderStrong,
-              },
-              Platform.isTV && { display: "none" },
-            ]}
-          >
-            <View style={S.btnIcon}>
-              <Camera size={32} color={colors.textPrimary} strokeWidth={2} />
-            </View>
-            <Text style={[S.btnLabel, { color: colors.textPrimary }]}>
-              Scan QR
-            </Text>
-          </FocusablePressable>
-        </View>
-
-        {hasFiles && (
-          <GlassCard animate style={S.selectionCard} accentBorder>
-            <View style={S.selectionHeader}>
-              <Text style={[S.selectionTitle, { color: colors.textPrimary }]}>
-                {selectedFiles.length} item{selectedFiles.length > 1 ? "s" : ""}{" "}
-                ready
-              </Text>
-              <FocusablePressable onPress={onClearFiles}>
-                <X size={18} color={colors.error} />
-              </FocusablePressable>
-            </View>
-            <Text style={[S.selectionSub, { color: colors.textSecondary }]}>
-              Total size: {formatSize(totalSelectedBytes)}
-            </Text>
-            <FocusablePressable
-              onPress={() => onStartTransfer()}
-              style={[S.sendNowBtn, { backgroundColor: colors.success }]}
-            >
-              <Send size={18} color="#FFF" />
-              <Text style={S.sendNowText}>Send Now</Text>
-            </FocusablePressable>
-          </GlassCard>
-        )}
-
-        {transferError && (
-          <GlassCard style={S.transferErrorCard}>
-            <Text style={[S.transferErrorText, { color: colors.warning }]}>
-              {transferError}
-            </Text>
-          </GlassCard>
-        )}
-      </View>
 
       {approvals.length > 0 && (
         <View style={S.section}>
@@ -367,16 +364,16 @@ export function HomeScreen({
             <View style={S.emptyContent}>
               <Text style={[S.emptyText, { color: colors.textSecondary }]}>
                 {discoveryEnabled
-                  ? "Looking for devices nearby..."
-                  : "Scanning is paused."}
+                  ? "Finding nearby devices..."
+                  : "Finding devices is paused."}
               </Text>
               {!discoveryEnabled && (
                 <FocusablePressable
                   onPress={onStartDiscovery}
                   style={[S.emptyButton, { backgroundColor: colors.accent }]}
                 >
-                  <RefreshCcw size={14} color="#FFFFFF" strokeWidth={2.5} />
-                  <Text style={S.emptyButtonText}>Start Scanning</Text>
+                  <RefreshCcw size={14} color="#FFFFFF" strokeWidth={4} />
+                  <Text style={S.emptyButtonText}>Find devices</Text>
                 </FocusablePressable>
               )}
             </View>
@@ -561,7 +558,8 @@ const S = StyleSheet.create({
   discoveryPrimaryText: { fontSize: 13, fontWeight: "900" },
   discoverySecondary: {
     minHeight: 46,
-    minWidth: 96,
+    minWidth: 130,
+    paddingHorizontal: SPACING.lg,
     borderWidth: 1,
     borderRadius: RADIUS.md,
     flexDirection: "row",
@@ -570,6 +568,14 @@ const S = StyleSheet.create({
     gap: SPACING.xs,
   },
   discoverySecondaryText: { fontSize: 13, fontWeight: "900" },
+
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  brandLabel: { fontSize: 15, fontWeight: "900" },
 
   actionHub: { gap: SPACING.md, marginBottom: SPACING.xl },
   mainButtons: { flexDirection: "row", gap: SPACING.md },

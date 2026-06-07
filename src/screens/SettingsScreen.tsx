@@ -102,7 +102,9 @@ export const SettingsScreen: React.FC = () => {
     useAppStore();
   const [settings, setSettings] = useState<SettingsState>(DEFAULTS);
   const [storageBytes, setStorageBytes] = useState(0);
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsReport | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsReport | null>(
+    null,
+  );
   const chunkPlan = chunkedTransferService.getPlan();
 
   useEffect(() => {
@@ -178,7 +180,7 @@ export const SettingsScreen: React.FC = () => {
       <View style={S.header}>
         <Text style={[S.title, { color: colors.textPrimary }]}>Settings</Text>
         <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-          Configure your app preferences and appearance.
+          Choose the settings you want.
         </Text>
       </View>
 
@@ -216,7 +218,7 @@ export const SettingsScreen: React.FC = () => {
       {diagnostics && (
         <View style={S.section}>
           <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-            DEVICE HEALTH
+            STATUS
           </Text>
           <GlassCard padding={SPACING.md}>
             <View style={S.diagnosticsGrid}>
@@ -227,7 +229,9 @@ export const SettingsScreen: React.FC = () => {
                 },
                 {
                   label: "Native bridge",
-                  value: diagnostics.nativeAvailable ? "Available" : "Unavailable",
+                  value: diagnostics.nativeAvailable
+                    ? "Available"
+                    : "Unavailable",
                 },
                 {
                   label: "Wi-Fi",
@@ -248,7 +252,10 @@ export const SettingsScreen: React.FC = () => {
               ].map((item) => (
                 <View key={item.label} style={S.diagnosticItem}>
                   <View
-                    style={[S.iconBox, { backgroundColor: colors.surfaceHover }]}
+                    style={[
+                      S.iconBox,
+                      { backgroundColor: colors.surfaceHover },
+                    ]}
                   >
                     <Activity
                       size={17}
@@ -350,13 +357,13 @@ export const SettingsScreen: React.FC = () => {
 
       <View style={S.section}>
         <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-          TRANSFER SETTINGS
+          TRANSFERS
         </Text>
         <GlassCard padding={0}>
           <SettingRow
             icon={Bell}
             title="Transfer notifications"
-            description="Alerts for incoming and outgoing beams."
+            description="Get a simple alert when files are incoming or sent."
             value={settings.notifications}
             onValueChange={(value) => updateSetting("notifications", value)}
           />
@@ -364,7 +371,7 @@ export const SettingsScreen: React.FC = () => {
           <SettingRow
             icon={Smartphone}
             title="Auto-accept trusted devices"
-            description="Skip confirmation for paired hardware only."
+            description="Skip extra steps for devices you already trust."
             value={settings.autoTransfer}
             onValueChange={(value) => updateSetting("autoTransfer", value)}
           />
@@ -372,7 +379,7 @@ export const SettingsScreen: React.FC = () => {
           <SettingRow
             icon={Wifi}
             title="Use metered networks"
-            description="Allow transfers over cellular or metered Wi-Fi."
+            description="Allow transfers over cellular or limited Wi-Fi."
             value={settings.useMeteredNetworks}
             onValueChange={(value) =>
               updateSetting("useMeteredNetworks", value)
@@ -383,50 +390,50 @@ export const SettingsScreen: React.FC = () => {
 
       <View style={S.section}>
         <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-          SECURITY & PRIVACY
+          PRIVACY & SECURITY
         </Text>
         <GlassCard padding={0}>
           <SettingRow
             icon={ShieldCheck}
-            title="Biometric Lock"
-            description="Require authentication to open the app."
+            title="App lock"
+            description="Require fingerprint or face to open the app."
             value={biometricLockEnabled}
             onValueChange={setBiometricLock}
           />
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={LockKeyhole}
-            title="Strict Privacy Mode"
-            description="Only allow fully secure connections."
+            title="Secure mode"
+            description="Use extra protection for device connections."
             value={settings.requireEncryption}
             onValueChange={(value) => updateSetting("requireEncryption", value)}
           />
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={ShieldCheck}
-            title="Verify file transfers"
-            description="Ensure files are transferred without corruption."
+            title="Check transfers"
+            description="Make sure files arrive safely."
             value={settings.verifyChecksum}
             onValueChange={(value) => updateSetting("verifyChecksum", value)}
           />
         </GlassCard>
       </View>
 
-
-
       <View style={S.section}>
         <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-          PRIVACY
+          KEEP IT PRIVATE
         </Text>
         <GlassCard padding={0}>
           {[
-            "Files transfer locally between devices; CrossBeam does not require a cloud relay.",
-            "Discovery uses local network transports exposed by the current platform.",
-            "Secure storage uses Android Keystore or iOS Keychain when the native bridge is available.",
-            "Transfer history, trusted devices, collections, and diagnostics stay on this device.",
+            "Files move directly between nearby devices without a cloud relay.",
+            "Discovery happens locally on your network.",
+            "Trusted device settings stay on this device only.",
+            "Transfer history and settings stay private here.",
           ].map((line) => (
             <View key={line} style={S.auditRow}>
-              <View style={[S.iconBox, { backgroundColor: colors.successMuted }]}>
+              <View
+                style={[S.iconBox, { backgroundColor: colors.successMuted }]}
+              >
                 <Eye size={17} color={colors.success} strokeWidth={2.4} />
               </View>
               <Text style={[S.auditText, { color: colors.textSecondary }]}>
@@ -559,7 +566,11 @@ const S = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: "800",
   },
-  blockedList: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.md, gap: 4 },
+  blockedList: {
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    gap: 4,
+  },
   blockedText: { fontSize: FONT_SIZE.xs, fontWeight: "800" },
   auditRow: {
     minHeight: 64,
@@ -569,7 +580,12 @@ const S = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
   },
-  auditText: { flex: 1, fontSize: FONT_SIZE.sm, lineHeight: 19, fontWeight: "600" },
+  auditText: {
+    flex: 1,
+    fontSize: FONT_SIZE.sm,
+    lineHeight: 19,
+    fontWeight: "600",
+  },
   protocolGrid: { gap: SPACING.sm },
   protocolItem: {
     flexDirection: "row",
@@ -578,7 +594,11 @@ const S = StyleSheet.create({
     gap: SPACING.md,
   },
   footerLabel: { fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
-  footerValue: { fontSize: FONT_SIZE.sm, fontWeight: "800", textAlign: "right" },
+  footerValue: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "800",
+    textAlign: "right",
+  },
 
   appearanceRow: {
     flexDirection: "row",

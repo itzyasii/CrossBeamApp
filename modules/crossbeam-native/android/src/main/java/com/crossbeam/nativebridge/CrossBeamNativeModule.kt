@@ -69,10 +69,24 @@ import android.content.BroadcastReceiver
 class CrossBeamNativeModule : Module() {
   companion object {
     private var INSTANCE: CrossBeamNativeModule? = null
+    private val pendingNotificationActions = ConcurrentHashMap<String, Boolean>()
 
     @JvmStatic
     fun handleNotificationActionFromReceiver(transferId: String, accepted: Boolean) {
       INSTANCE?.onNotificationAction(transferId, accepted)
+        ?: run {
+          pendingNotificationActions[transferId] = accepted
+        }
+    }
+
+    @JvmStatic
+    fun processPendingNotificationActions() {
+      val instance = INSTANCE ?: return
+      val snapshot = HashMap(pendingNotificationActions)
+      pendingNotificationActions.clear()
+      snapshot.forEach { (transferId, accepted) ->
+        instance.onNotificationAction(transferId, accepted)
+      }
     }
   }
   private var wifiP2pManager: WifiP2pManager? = null
@@ -273,6 +287,7 @@ class CrossBeamNativeModule : Module() {
     OnCreate {
       val context = appContext.reactContext ?: return@OnCreate
       INSTANCE = this
+      processPendingNotificationActions()
       val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
       bluetoothAdapter = bluetoothManager?.adapter
       if (bluetoothAdapter != null) {

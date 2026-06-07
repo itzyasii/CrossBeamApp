@@ -2,6 +2,7 @@ import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
 import { IncomingApprovalRequest } from '@/services/platformFeatureService';
+import { nativeCrossBeam } from '@/native/crossbeamNative';
 import { formatBytes } from '@/utils/helpers';
 
 type NotificationsModule = typeof import('expo-notifications');
@@ -112,6 +113,26 @@ export const notificationService = {
   },
 
   showIncomingTransferRequest: async (approval: IncomingApprovalRequest) => {
+    // For Android, prefer the native notification with broadcast actions so
+    // notification actions can be handled without launching the JS app.
+    if (Platform.OS === 'android') {
+      try {
+        const fileSummary =
+          approval.fileNames.length > 1
+            ? `${approval.fileNames.length} files`
+            : approval.fileNames[0] ?? 'Unknown file';
+        await nativeCrossBeam.showIncomingNotification(
+          approval.transferId,
+          'Incoming transfer',
+          `${approval.fromDevice.name} wants to send ${fileSummary} (${formatBytes(approval.sizeBytes)})`,
+        );
+        return;
+      } catch (e) {
+        // fall back to expo notifications if native fails
+        console.warn('[Notification] native showIncomingNotification failed:', e);
+      }
+    }
+
     const Notifications = await getNotifications();
     if (!Notifications) return;
 

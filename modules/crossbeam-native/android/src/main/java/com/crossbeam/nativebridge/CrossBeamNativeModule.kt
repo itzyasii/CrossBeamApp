@@ -56,6 +56,11 @@ import javax.crypto.spec.GCMParameterSpec
 import android.util.Base64
 
 import android.net.wifi.p2p.WifiP2pConfig
+import android.app.NotificationManager
+import android.app.NotificationChannel
+import android.app.PendingIntent
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.content.IntentFilter
@@ -333,6 +338,49 @@ class CrossBeamNativeModule : Module() {
         "supportsResume" to true,
         "supportsRetry" to true
       )
+    }
+
+    AsyncFunction("showIncomingNotification") { transferId: String, title: String, body: String ->
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      val channelId = "incoming-transfers"
+      val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return@AsyncFunction false
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val chan = NotificationChannel(channelId, "Incoming Transfers", NotificationManager.IMPORTANCE_HIGH)
+        chan.enableVibration(true)
+        chan.vibrationPattern = longArrayOf(0, 250, 180, 250)
+        nm.createNotificationChannel(chan)
+      }
+
+      val acceptIntent = Intent("com.crossbeam.ACTION_INCOMING_TRANSFER").apply {
+        putExtra("transferId", transferId)
+        putExtra("action", "accept")
+      }
+      val rejectIntent = Intent("com.crossbeam.ACTION_INCOMING_TRANSFER").apply {
+        putExtra("transferId", transferId)
+        putExtra("action", "reject")
+      }
+
+      val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+      val acceptPending = PendingIntent.getBroadcast(context, transferId.hashCode(), acceptIntent, flags)
+      val rejectPending = PendingIntent.getBroadcast(context, transferId.hashCode() xor 0x1, rejectIntent, flags)
+
+      val builder = NotificationCompat.Builder(context, channelId)
+        .setContentTitle(title)
+        .setContentText(body)
+        .setSmallIcon(android.R.drawable.stat_sys_upload)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setAutoCancel(true)
+        .addAction(0, "Accept", acceptPending)
+        .addAction(0, "Reject", rejectPending)
+
+      NotificationManagerCompat.from(context).notify(transferId.hashCode(), builder.build())
+      true
+    }
+
+    AsyncFunction("dismissIncomingNotification") { transferId: String ->
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      NotificationManagerCompat.from(context).cancel(transferId.hashCode())
+      true
     }
 
     AsyncFunction("startDiscovery") {

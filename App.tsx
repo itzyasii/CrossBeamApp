@@ -147,6 +147,8 @@ export default function App() {
   const {
     transfers,
     transferError,
+    transferStatus,
+    isSending,
     selectedFiles,
     pickFiles,
     clearSelectedFiles,
@@ -504,6 +506,8 @@ export default function App() {
                       devices={devices}
                       transfers={transfers}
                       transferError={transferError}
+                      transferStatus={transferStatus}
+                      isSending={isSending}
                       selectedFiles={selectedFiles}
                       statusMessage={statusMessage}
                       isRefreshing={isRefreshing}

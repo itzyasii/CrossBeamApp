@@ -12,6 +12,8 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferStatus, setTransferStatus] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     // Buffer incoming progress events and apply them in a debounced batch
@@ -127,6 +129,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
 
   const pickFiles = async () => {
     setTransferError(null);
+    setTransferStatus(null);
 
     if (Platform.isTV) {
       setTransferError(
@@ -165,17 +168,24 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
       ...files.filter((f) => !current.some((c) => c.id === f.id)),
     ]);
     setTransferError(null);
+    setTransferStatus(null);
   };
 
   const clearSelectedFiles = () => {
     setSelectedFiles([]);
     setTransferError(null);
+    setTransferStatus(null);
   };
 
   const startTransfer = async (
     targetDeviceId: string | null,
     targetDeviceName: string,
   ) => {
+    if (isSending) {
+      setTransferError("Preparing your transfer. Please wait a moment.");
+      return;
+    }
+
     if (selectedFiles.length === 0) {
       setTransferError("Select one or more files before starting a transfer.");
       return;
@@ -185,6 +195,15 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
       setTransferError("Select a discovered peer before starting a transfer.");
       return;
     }
+
+    const inProgressLabel =
+      selectedFiles.length > 1
+        ? `Sending ${selectedFiles.length} files to ${targetDeviceName}`
+        : `Sending ${selectedFiles[0]?.name || "file"} to ${targetDeviceName}`;
+
+    setTransferError(null);
+    setTransferStatus(inProgressLabel);
+    setIsSending(true);
 
     const now = Date.now();
     const sourcePaths = selectedFiles.map((file) => file.uri);
@@ -243,6 +262,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     } catch (error) {
       const message = String(error);
       setTransferError(message);
+      setTransferStatus(null);
       setTransfers((current) =>
         current.map((job) =>
           job.id === baseJob.id
@@ -256,6 +276,8 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
             : job,
         ),
       );
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -297,6 +319,12 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     [transfers],
   );
 
+  useEffect(() => {
+    if (!activeTransferExists) {
+      setTransferStatus(null);
+    }
+  }, [activeTransferExists]);
+
   // Ensure Android foreground service runs while transfers are active
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -311,6 +339,8 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     transfers,
     selectedFiles,
     transferError,
+    transferStatus,
+    isSending,
     pickFiles,
     addSelectedFiles,
     clearSelectedFiles,

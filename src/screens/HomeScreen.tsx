@@ -35,6 +35,8 @@ type Props = {
   onOpenScanner: () => void;
   onGoToTab: (tab: string) => void;
   onClearFiles: () => void;
+  transferStatus?: string | null;
+  isSending?: boolean;
   statusMessage?: string;
   isRefreshing?: boolean;
   discoveryEnabled?: boolean;
@@ -59,6 +61,8 @@ export function HomeScreen({
   devices,
   transfers,
   transferError,
+  transferStatus,
+  isSending,
   selectedFiles,
   onStartDiscovery,
   onPickFiles,
@@ -165,11 +169,25 @@ export function HomeScreen({
             </Text>
             <FocusablePressable
               onPress={() => onStartTransfer()}
-              style={[S.sendNowBtn, { backgroundColor: colors.success }]}
+              style={[
+                S.sendNowBtn,
+                { backgroundColor: colors.success },
+                isSending && { opacity: 0.75 },
+              ]}
             >
               <Send size={18} color="#FFF" />
-              <Text style={S.sendNowText}>Send Now</Text>
+              <Text style={S.sendNowText}>
+                {isSending ? "Sending..." : "Send Now"}
+              </Text>
             </FocusablePressable>
+          </GlassCard>
+        )}
+
+        {transferStatus && !transferError && (
+          <GlassCard style={S.transferStatusCard} accentBorder>
+            <Text style={[S.transferStatusText, { color: colors.accent }]}>
+              {transferStatus}
+            </Text>
           </GlassCard>
         )}
 
@@ -626,6 +644,15 @@ const S = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   saveCollectionText: { fontSize: 13, fontWeight: "800" },
+  transferStatusCard: {
+    paddingVertical: SPACING.md,
+  },
+  transferStatusText: {
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 18,
+  },
   transferErrorCard: {
     borderStyle: "dashed",
     paddingVertical: SPACING.md,

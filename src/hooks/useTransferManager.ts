@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 
@@ -14,76 +14,115 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   const [transferError, setTransferError] = useState<string | null>(null);
 
   useEffect(() => {
-    return nativeCrossBeam.addTransferProgressListener((event) => {
+    // Buffer incoming progress events and apply them in a debounced batch
+    const pending = new Map<string, TransferJob>();
+    const timerRef = { current: 0 } as { current: number };
+
+    const flush = () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = 0;
+      }
+
+      if (pending.size === 0) return;
+
+      const updates = Array.from(pending.values());
+      pending.clear();
+
       setTransfers((current) => {
-        const progress =
-          event.totalBytes > 0 ? event.bytesTransferred / event.totalBytes : 0;
+        const merged = [...current];
+        updates.forEach((u) => {
+          const idx = merged.findIndex((j) => j.id === u.id);
+          if (idx === -1) {
+            merged.unshift(u);
+          } else {
+            merged[idx] = u;
+          }
+        });
+        return merged;
+      });
+
+      // Persist updates to DB in background
+      void (async () => {
+        try {
+          await Promise.all(updates.map((u) => saveTransferHistory(u as any)));
+        } catch (e) {
+          // swallow DB errors — already logged in saveTransferHistory
+        }
+      })();
+    };
+
+    const listener = nativeCrossBeam.addTransferProgressListener((event) => {
+      const progress =
+        event.totalBytes > 0 ? event.bytesTransferred / event.totalBytes : 0;
+      // If progress is 100% but status hasn't updated, treat as completed
+      const effectiveStatus =
+        progress >= 1 && event.status === "in-progress"
+          ? "completed"
+          : event.status;
+
+      setTransfers((current) => {
         const existing = current.find((job) => job.id === event.transferId);
+        const base: TransferJob = existing ?? {
+          id: event.transferId,
+          fileNames: event.fileName ? [event.fileName] : ["Incoming transfer"],
+          fileName: event.fileName,
+          sizeBytes: event.totalBytes,
+          bytesTransferred: event.bytesTransferred,
+          totalBytes: event.totalBytes,
+          progress,
+          status: effectiveStatus as any,
+          fromDeviceName:
+            knownDevices.find((d) => d.id === event.peerId)?.name ||
+            event.peerId,
+          toDeviceName: "This Device",
+          encrypted: true,
+          startedAt: Date.now(),
+          updatedAt: Date.now(),
+          errorMessage: event.errorMessage,
+        };
 
-        // Fix: If progress is 100%, we treat it as completed for history,
-        // as some builds might not fire the 'completed' status event correctly.
-        const effectiveStatus =
-          progress >= 1 && event.status === "in-progress"
-            ? "completed"
-            : event.status;
+        const updated: TransferJob = existing
+          ? {
+              ...existing,
+              fileNames:
+                event.fileName && !existing.fileNames.includes(event.fileName)
+                  ? [...existing.fileNames, event.fileName]
+                  : existing.fileNames,
+              bytesTransferred: event.bytesTransferred,
+              totalBytes: event.totalBytes,
+              progress,
+              status: effectiveStatus as any,
+              mimeType: event.mimeType ?? existing.mimeType,
+              savedFilePaths: event.savedFilePath
+                ? [
+                    ...new Set([
+                      ...(existing.savedFilePaths ?? []),
+                      event.savedFilePath,
+                    ]),
+                  ]
+                : existing.savedFilePaths,
+              updatedAt: Date.now(),
+              errorMessage: event.errorMessage,
+            }
+          : base;
 
-        let newJob: TransferJob;
-        if (!existing) {
-          newJob = {
-            id: event.transferId,
-            fileNames: event.fileName
-              ? [event.fileName]
-              : ["Incoming transfer"],
-            fileName: event.fileName,
-            sizeBytes: event.totalBytes,
-            bytesTransferred: event.bytesTransferred,
-            totalBytes: event.totalBytes,
-            progress,
-            status: effectiveStatus as any,
-            fromDeviceName:
-              knownDevices.find((d) => d.id === event.peerId)?.name ||
-              event.peerId,
-            toDeviceName: "This Device",
-            encrypted: true,
-            startedAt: Date.now(),
-            updatedAt: Date.now(),
-            errorMessage: event.errorMessage,
-          };
-        } else {
-          newJob = {
-            ...existing,
-            fileNames:
-              event.fileName && !existing.fileNames.includes(event.fileName)
-                ? [...existing.fileNames, event.fileName]
-                : existing.fileNames,
-            bytesTransferred: event.bytesTransferred,
-            totalBytes: event.totalBytes,
-            progress,
-            status: effectiveStatus as any,
-            mimeType: event.mimeType ?? existing.mimeType,
-            savedFilePaths: event.savedFilePath
-              ? [
-                  ...new Set([
-                    ...(existing.savedFilePaths ?? []),
-                    event.savedFilePath,
-                  ]),
-                ]
-              : existing.savedFilePaths,
-            updatedAt: Date.now(),
-            errorMessage: event.errorMessage,
-          };
-        }
+        // Buffer the update
+        pending.set(event.transferId, updated);
 
-        void saveTransferHistory(newJob as any);
+        // Schedule a flush (debounced)
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(flush, 250) as unknown as number;
 
-        if (!existing) {
-          return [newJob, ...current];
-        }
-        return current.map((job) =>
-          job.id === event.transferId ? newJob : job,
-        );
+        // Return current state immediately — UI will re-render on flush
+        return current;
       });
     });
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      listener?.();
+    };
   }, []);
 
   const pickFiles = async () => {

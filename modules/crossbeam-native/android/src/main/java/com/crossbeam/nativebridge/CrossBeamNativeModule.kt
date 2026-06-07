@@ -62,6 +62,14 @@ import android.content.IntentFilter
 import android.content.BroadcastReceiver
 
 class CrossBeamNativeModule : Module() {
+  companion object {
+    private var INSTANCE: CrossBeamNativeModule? = null
+
+    @JvmStatic
+    fun handleNotificationActionFromReceiver(transferId: String, accepted: Boolean) {
+      INSTANCE?.onNotificationAction(transferId, accepted)
+    }
+  }
   private var wifiP2pManager: WifiP2pManager? = null
   private var wifiP2pChannel: WifiP2pManager.Channel? = null
   private var wifiP2pReceiver: BroadcastReceiver? = null
@@ -259,6 +267,7 @@ class CrossBeamNativeModule : Module() {
 
     OnCreate {
       val context = appContext.reactContext ?: return@OnCreate
+      INSTANCE = this
       val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
       bluetoothAdapter = bluetoothManager?.adapter
       if (bluetoothAdapter != null) {
@@ -353,6 +362,21 @@ class CrossBeamNativeModule : Module() {
     }
 
     AsyncFunction("respondToIncomingTransfer") { transferId: String, accepted: Boolean ->
+      incomingApprovalResults[transferId] = accepted
+      pendingIncomingApprovals.remove(transferId)?.countDown()
+    }
+
+    // Called from native BroadcastReceiver to handle notification action without JS
+    // This delegates to the same approval flow used by JS responders.
+    AsyncFunction("_noop_for_receiver") {
+      // placeholder to ensure module exports exist for the receiver path
+      true
+    }
+
+    // Instance-level handler invoked by companion when receiver receives an action
+    // Not exposed to JS directly.
+    // (keeps access to pendingIncomingApprovals map)
+    fun onNotificationAction(transferId: String, accepted: Boolean) {
       incomingApprovalResults[transferId] = accepted
       pendingIncomingApprovals.remove(transferId)?.countDown()
     }

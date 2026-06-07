@@ -45,14 +45,14 @@ const getNotifications = async () => {
           {
             identifier: 'accept',
             buttonTitle: 'Accept',
-            options: { opensAppToForeground: true },
+            options: { opensAppToForeground: false },
           },
           {
             identifier: 'reject',
             buttonTitle: 'Reject',
             options: {
               isDestructive: true,
-              opensAppToForeground: true,
+              opensAppToForeground: false,
             },
           },
         ]);

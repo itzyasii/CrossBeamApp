@@ -56,5 +56,10 @@
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
     </activity>
+    <receiver android:name="com.crossbeam.nativebridge.NotificationActionReceiver" android:exported="true">
+      <intent-filter>
+        <action android:name="com.crossbeam.ACTION_INCOMING_TRANSFER" />
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

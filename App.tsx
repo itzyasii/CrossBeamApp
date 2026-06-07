@@ -17,14 +17,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as NavigationBar from "expo-navigation-bar";
 import * as SystemUI from "expo-system-ui";
 
-import {
-  HomeScreen,
-  HistoryScreen,
-  SettingsScreen,
-  QRPairingScreen,
-  DiscoverScreen,
-  DevicesScreen,
-} from "@/screens";
+import { HomeScreen, SettingsScreen } from "@/screens";
+
+const HistoryScreen = React.lazy(() =>
+  import("@/screens/HistoryScreen").then((m) => ({ default: m.HistoryScreen })),
+);
+const DiscoverScreen = React.lazy(() =>
+  import("@/screens/DiscoverScreen").then((m) => ({ default: m.DiscoverScreen })),
+);
+const DevicesScreen = React.lazy(() =>
+  import("@/screens/DevicesScreen").then((m) => ({ default: m.DevicesScreen })),
+);
+const QRPairingScreen = React.lazy(() =>
+  import("@/screens/QRPairingScreen").then((m) => ({ default: m.QRPairingScreen })),
+);
 import { CrossBeamLogo, CrossBeamWordmark } from "@/components/CrossBeamLogo";
 import { useDeviceDiscovery } from "@/hooks/useDeviceDiscovery";
 import { useTheme } from "@/hooks/useTheme";
@@ -456,7 +462,15 @@ export default function App() {
           </View>
 
           {showQrPairing && (
-            <QRPairingScreen onBack={() => setShowQrPairing(false)} />
+            <React.Suspense
+              fallback={
+                <View style={{ padding: 24 }}>
+                  <Text>Loading scanner…</Text>
+                </View>
+              }
+            >
+              <QRPairingScreen onBack={() => setShowQrPairing(false)} />
+            </React.Suspense>
           )}
 
           <FlatList
@@ -505,21 +519,45 @@ export default function App() {
                     />
                   )}
                   {t.id === "discover" && (
-                    <DiscoverScreen
-                      devices={devices}
-                      isRefreshing={isRefreshing}
-                      discoveryEnabled={discoveryEnabled}
-                      statusMessage={statusMessage}
-                      onRefresh={handleStartDiscovery}
-                    />
+                    <React.Suspense
+                      fallback={
+                        <View style={{ padding: 24 }}>
+                          <Text>Loading…</Text>
+                        </View>
+                      }
+                    >
+                      <DiscoverScreen
+                        devices={devices}
+                        isRefreshing={isRefreshing}
+                        discoveryEnabled={discoveryEnabled}
+                        statusMessage={statusMessage}
+                        onRefresh={handleStartDiscovery}
+                      />
+                    </React.Suspense>
                   )}
                   {t.id === "devices" && (
-                    <DevicesScreen
-                      onPairDevice={() => setShowQrPairing(true)}
-                    />
+                    <React.Suspense
+                      fallback={
+                        <View style={{ padding: 24 }}>
+                          <Text>Loading…</Text>
+                        </View>
+                      }
+                    >
+                      <DevicesScreen
+                        onPairDevice={() => setShowQrPairing(true)}
+                      />
+                    </React.Suspense>
                   )}
                   {t.id === "history" && (
-                    <HistoryScreen transfers={transfers} />
+                    <React.Suspense
+                      fallback={
+                        <View style={{ padding: 24 }}>
+                          <Text>Loading…</Text>
+                        </View>
+                      }
+                    >
+                      <HistoryScreen transfers={transfers} />
+                    </React.Suspense>
                   )}
                   {t.id === "settings" && <SettingsScreen />}
                 </View>

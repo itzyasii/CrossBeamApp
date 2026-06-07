@@ -462,14 +462,6 @@ class CrossBeamNativeModule : Module() {
       true
     }
 
-    // Instance-level handler invoked by companion when receiver receives an action
-    // Not exposed to JS directly.
-    // (keeps access to pendingIncomingApprovals map)
-    fun onNotificationAction(transferId: String, accepted: Boolean) {
-      incomingApprovalResults[transferId] = accepted
-      pendingIncomingApprovals.remove(transferId)?.countDown()
-    }
-
     AsyncFunction("sendFiles") { request: Map<String, Any?> ->
       val peerId = request["peerId"] as? String
         ?: throw IllegalArgumentException("Missing peerId")
@@ -537,6 +529,14 @@ class CrossBeamNativeModule : Module() {
       val decrypted = cipher.doFinal(encryption)
       String(decrypted, Charsets.UTF_8)
     }
+  }
+
+  // Instance-level handler invoked by companion when receiver receives an action
+  // Not exposed to JS directly.
+  // (keeps access to pendingIncomingApprovals map)
+  private fun onNotificationAction(transferId: String, accepted: Boolean) {
+    incomingApprovalResults[transferId] = accepted
+    pendingIncomingApprovals.remove(transferId)?.countDown()
   }
 
   private fun getOrCreateSecretKey(alias: String): SecretKey {

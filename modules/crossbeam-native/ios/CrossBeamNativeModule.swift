@@ -27,7 +27,7 @@ public final class CrossBeamNativeModule: Module {
   public func definition() -> ModuleDefinition {
     Name("CrossBeamNative")
 
-    Events("onPeerFound", "onPeerLost", "onTransferProgress")
+    Events("onPeerFound", "onPeerLost", "onTransferProgress", "onBackgroundTransferProgress", "onBackgroundTransferStatus")
 
     AsyncFunction("isAvailable") {
       return true
@@ -156,6 +156,31 @@ public final class CrossBeamNativeModule: Module {
 
     AsyncFunction("retrieveSecureValue") { (alias: String, encryptedValue: String) in
       return try self.retrieveKeychainValue(alias: alias)
+    }
+
+    AsyncFunction("configureBackgroundSession") { (identifier: String) in
+      self.configureBackgroundSession(identifier)
+      return true
+    }
+
+    AsyncFunction("startBackgroundTransfer") { (transferId: String, config: [String: Any]) in
+      return self.startBackgroundTransfer(transferId: transferId, config: config)
+    }
+
+    AsyncFunction("getBackgroundTransferStatus") { (transferId: String) in
+      return self.getBackgroundTransferStatus(transferId) ?? [:]
+    }
+
+    AsyncFunction("pauseBackgroundTransfer") { (transferId: String) in
+      return self.pauseBackgroundTransfer(transferId)
+    }
+
+    AsyncFunction("resumeBackgroundTransfer") { (transferId: String) in
+      return self.resumeBackgroundTransfer(transferId)
+    }
+
+    AsyncFunction("cancelBackgroundTransfer") { (transferId: String) in
+      return self.cancelBackgroundTransfer(transferId)
     }
   }
 
@@ -609,6 +634,106 @@ public final class CrossBeamNativeModule: Module {
 
   private func chunkAckKey(transferId: String, fileId: String) -> String {
     "\(transferId)|\(fileId)"
+  }
+
+  // MARK: - Background URLSession support
+  private var backgroundSession: URLSession?
+  private var backgroundTasks: [String: URLSessionTask] = [:]
+  private var backgroundTaskMap: [Int: String] = [:]
+  private var backgroundStatus: [String: [String: Any]] = [:]
+
+  public func configureBackgroundSession(_ identifier: String) {
+    let config = URLSessionConfiguration.background(withIdentifier: identifier)
+    config.httpMaximumConnectionsPerHost = 4
+    backgroundSession = URLSession(configuration: config, delegate: self, delegateQueue: OperationQueue())
+  }
+
+  public func startBackgroundTransfer(transferId: String, config: [String: Any]) -> Bool {
+    guard let session = backgroundSession else { return false }
+    guard let urlString = config["url"] as? String, let url = URL(string: urlString) else { return false }
+    let method = (config["method"] as? String)?.uppercased() ?? "GET"
+    var request = URLRequest(url: url)
+    request.httpMethod = method
+    if let headers = config["headers"] as? [String: String] {
+      for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+    }
+
+    let task: URLSessionTask
+    if method == "GET" {
+      task = session.downloadTask(with: request)
+    } else {
+      // For POST/PUT use empty body if none provided
+      if let fileUri = config["fileUri"] as? String, let fileUrl = URL(string: fileUri), FileManager.default.fileExists(atPath: fileUrl.path) {
+        task = session.uploadTask(with: request, fromFile: fileUrl)
+      } else {
+        task = session.uploadTask(with: request, from: Data())
+      }
+    }
+
+    backgroundTasks[transferId] = task
+    backgroundTaskMap[task.taskIdentifier] = transferId
+    backgroundStatus[transferId] = ["transferId": transferId, "status": "running", "progress": 0, "bytesTransferred": 0, "totalBytes": 0]
+    task.resume()
+    sendEvent("onBackgroundTransferStatus", backgroundStatus[transferId]!)
+    return true
+  }
+
+  public func getBackgroundTransferStatus(_ transferId: String) -> [String: Any]? {
+    return backgroundStatus[transferId]
+  }
+
+  public func pauseBackgroundTransfer(_ transferId: String) -> Bool {
+    guard let task = backgroundTasks[transferId] else { return false }
+    task.suspend()
+    backgroundStatus[transferId]?["status"] = "paused"
+    sendEvent("onBackgroundTransferStatus", backgroundStatus[transferId]!)
+    return true
+  }
+
+  public func resumeBackgroundTransfer(_ transferId: String) -> Bool {
+    guard let task = backgroundTasks[transferId] else { return false }
+    task.resume()
+    backgroundStatus[transferId]?["status"] = "running"
+    sendEvent("onBackgroundTransferStatus", backgroundStatus[transferId]!)
+    return true
+  }
+
+  public func cancelBackgroundTransfer(_ transferId: String) -> Bool {
+    guard let task = backgroundTasks[transferId] else { return false }
+    task.cancel()
+    backgroundStatus[transferId]?["status"] = "cancelled"
+    sendEvent("onBackgroundTransferStatus", backgroundStatus[transferId]!)
+    backgroundTasks.removeValue(forKey: transferId)
+    return true
+  }
+}
+
+extension CrossBeamNativeModule: URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, URLSessionDownloadDelegate {
+  public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    guard let transferId = backgroundTaskMap[task.taskIdentifier] else { return }
+    if let error = error {
+      backgroundStatus[transferId]?["status"] = "failed"
+      backgroundStatus[transferId]?["error"] = error.localizedDescription
+    } else {
+      backgroundStatus[transferId]?["status"] = "completed"
+    }
+    sendEvent("onBackgroundTransferStatus", backgroundStatus[transferId]!)
+    backgroundTasks.removeValue(forKey: transferId)
+    backgroundTaskMap.removeValue(forKey: task.taskIdentifier)
+  }
+
+  public func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+    guard let transferId = backgroundTaskMap[task.taskIdentifier] else { return }
+    let progress = totalBytesExpectedToSend > 0 ? Double(totalBytesSent) / Double(totalBytesExpectedToSend) : 0
+    backgroundStatus[transferId] = ["transferId": transferId, "status": "running", "progress": progress, "bytesTransferred": totalBytesSent, "totalBytes": totalBytesExpectedToSend]
+    sendEvent("onBackgroundTransferProgress", backgroundStatus[transferId]!)
+  }
+
+  public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    guard let transferId = backgroundTaskMap[downloadTask.taskIdentifier] else { return }
+    let progress = totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : 0
+    backgroundStatus[transferId] = ["transferId": transferId, "status": "running", "progress": progress, "bytesTransferred": totalBytesWritten, "totalBytes": totalBytesExpectedToWrite]
+    sendEvent("onBackgroundTransferProgress", backgroundStatus[transferId]!)
   }
 }
 

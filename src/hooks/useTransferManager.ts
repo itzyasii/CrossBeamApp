@@ -295,6 +295,16 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     [transfers],
   );
 
+  // Ensure Android foreground service runs while transfers are active
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    if (activeTransferExists) {
+      void nativeCrossBeam.startForegroundService().catch(() => {});
+    } else {
+      void nativeCrossBeam.stopForegroundService().catch(() => {});
+    }
+  }, [activeTransferExists]);
+
   return {
     transfers,
     selectedFiles,

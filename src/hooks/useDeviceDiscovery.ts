@@ -11,6 +11,7 @@ import { Device } from '@/types/domain';
 import { mergeDiscoveredDevices } from '@/utils/deviceMerge';
 import { nativeCrossBeam } from '@/native/crossbeamNative';
 import { haptics } from '@/services/haptics';
+import { Platform } from 'react-native';
 
 const AUTO_REFRESH_MS = 12_000;
 
@@ -64,6 +65,10 @@ export const useDeviceDiscovery = (enabled = true) => {
       })
       .finally(() => {
         if (mounted) void refreshDevices();
+        // Start foreground service on Android so discovery can continue in background
+        if (Platform.OS === 'android') {
+          void nativeCrossBeam.startForegroundService().catch(() => {});
+        }
       });
 
     const removeFound = addNearbyDeviceFoundListener((device) => {
@@ -94,6 +99,9 @@ export const useDeviceDiscovery = (enabled = true) => {
       removeFound();
       removeLost();
       void stopNearbyDiscovery();
+      if (Platform.OS === 'android') {
+        void nativeCrossBeam.stopForegroundService().catch(() => {});
+      }
     };
   }, [enabled, refreshDevices]);
 

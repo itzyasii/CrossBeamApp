@@ -142,6 +142,26 @@ export const nativeCrossBeam = {
     await CrossBeamNative.respondToIncomingTransfer(transferId, accepted);
   },
 
+  async startForegroundService(): Promise<boolean> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return false;
+    try {
+      return await (CrossBeamNative as any).startForegroundService();
+    } catch (e) {
+      console.warn('[Native] startForegroundService failed:', e);
+      return false;
+    }
+  },
+
+  async stopForegroundService(): Promise<boolean> {
+    if (!CrossBeamNative || !this.isRuntimeSupported()) return false;
+    try {
+      return await (CrossBeamNative as any).stopForegroundService();
+    } catch (e) {
+      console.warn('[Native] stopForegroundService failed:', e);
+      return false;
+    }
+  },
+
   addIncomingTransferRequestListener(
     listener: (request: NativeIncomingTransferRequest) => void,
   ): () => void {

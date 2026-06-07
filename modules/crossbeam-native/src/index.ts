@@ -81,6 +81,8 @@ export type CrossBeamNativeEventsMap = {
   onPeerLost: (event: { id: string }) => void;
   onTransferProgress: (event: NativeTransferEvent) => void;
   onIncomingTransferRequest: (request: NativeIncomingTransferRequest) => void;
+  onBackgroundTransferProgress: (status: NativeBackgroundTransferStatus) => void;
+  onBackgroundTransferStatus: (status: NativeBackgroundTransferStatus) => void;
 };
 
 export type NativeEventSubscription = {

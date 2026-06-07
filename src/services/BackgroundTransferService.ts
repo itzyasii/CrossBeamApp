@@ -129,13 +129,16 @@ export const backgroundTransferService = {
     callback: (status: BackgroundTransferStatus) => void,
   ): (() => void) | null {
     try {
-      if (!CrossBeamNative?.addBackgroundTransferListener) {
+      if (!CrossBeamNative?.addListener) {
         return null;
       }
 
-      const unsubscribe =
-        CrossBeamNative.addBackgroundTransferListener(callback);
-      return unsubscribe || null;
+      const subscription = CrossBeamNative.addListener(
+        "onBackgroundTransferStatus",
+        callback,
+      );
+
+      return subscription?.remove ? () => subscription.remove() : null;
     } catch (error) {
       console.error("Failed to add background transfer listener:", error);
       return null;

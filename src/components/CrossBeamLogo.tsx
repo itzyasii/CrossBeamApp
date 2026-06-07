@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Animated, Image, View } from "react-native";
+import { useTheme } from "@/hooks/useTheme";
 
 interface Props {
   size?: number;
@@ -7,6 +8,10 @@ interface Props {
 }
 
 export const CrossBeamLogo = ({ size = 100, animate = true }: Props) => {
+  const { isDark } = useTheme();
+  const source = isDark
+    ? require("../../assets/logo_dark_mode.png")
+    : require("../../assets/logo_light_mode.png");
   const pulse = React.useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -39,7 +44,7 @@ export const CrossBeamLogo = ({ size = 100, animate = true }: Props) => {
     >
       <Animated.View style={{ transform: [{ scale: pulse }] }}>
         <Image
-          source={require("../../assets/AppIcon.png")}
+          source={source}
           style={{ width: size, height: size }}
           resizeMode="contain"
         />
@@ -52,10 +57,17 @@ interface WordmarkProps {
   width?: number;
 }
 
-export const CrossBeamWordmark = ({ width = 220 }: WordmarkProps) => (
-  <Image
-    source={require("../../assets/Logo.png")}
-    style={{ width, height: width / 3 }}
-    resizeMode="contain"
-  />
-);
+export const CrossBeamWordmark = ({ width = 220 }: WordmarkProps) => {
+  const { isDark } = useTheme();
+  const source = isDark
+    ? require("../../assets/logo_main_dark.png")
+    : require("../../assets/logo_main.png");
+
+  return (
+    <Image
+      source={source}
+      style={{ width, height: width / 3 }}
+      resizeMode="contain"
+    />
+  );
+};

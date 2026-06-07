@@ -155,7 +155,7 @@ export const nativeCrossBeam = {
         body,
       );
     } catch (e) {
-      console.warn('[Native] showIncomingNotification failed:', e);
+      console.warn("[Native] showIncomingNotification failed:", e);
       return false;
     }
   },
@@ -165,7 +165,7 @@ export const nativeCrossBeam = {
     try {
       return await CrossBeamNative.dismissIncomingNotification?.(transferId);
     } catch (e) {
-      console.warn('[Native] dismissIncomingNotification failed:', e);
+      console.warn("[Native] dismissIncomingNotification failed:", e);
       return false;
     }
   },

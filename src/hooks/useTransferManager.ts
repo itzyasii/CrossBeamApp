@@ -129,7 +129,9 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     setTransferError(null);
 
     if (Platform.isTV) {
-      setTransferError("File picking is not available on TV. Send files from a phone or computer.");
+      setTransferError(
+        "File picking is not available on TV. Send files from a phone or computer.",
+      );
       return;
     }
 
@@ -297,7 +299,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
 
   // Ensure Android foreground service runs while transfers are active
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== "android") return;
     if (activeTransferExists) {
       void nativeCrossBeam.startForegroundService().catch(() => {});
     } else {

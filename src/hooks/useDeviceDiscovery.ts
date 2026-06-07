@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
 import {
   addNearbyDeviceFoundListener,
@@ -6,12 +6,12 @@ import {
   discoverNearbyDevices,
   startNearbyDiscovery,
   stopNearbyDiscovery,
-} from '@/services/deviceDiscovery';
-import { Device } from '@/types/domain';
-import { mergeDiscoveredDevices } from '@/utils/deviceMerge';
-import { nativeCrossBeam } from '@/native/crossbeamNative';
-import { haptics } from '@/services/haptics';
-import { Platform } from 'react-native';
+} from "@/services/deviceDiscovery";
+import { Device } from "@/types/domain";
+import { mergeDiscoveredDevices } from "@/utils/deviceMerge";
+import { nativeCrossBeam } from "@/native/crossbeamNative";
+import { haptics } from "@/services/haptics";
+import { Platform } from "react-native";
 
 const AUTO_REFRESH_MS = 12_000;
 
@@ -20,7 +20,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState(
-    'Scanning is paused. Tap to find nearby devices.',
+    "Scanning is paused. Tap to find nearby devices.",
   );
 
   const refreshDevices = useCallback(async () => {
@@ -35,7 +35,7 @@ export const useDeviceDiscovery = (enabled = true) => {
           ? `Found nearby devices ready for sharing.`
           : capabilities.length > 0
             ? `Scanning for nearby devices...`
-            : 'Device scanning is not available on this device.',
+            : "Device scanning is not available on this device.",
       );
     } catch (error) {
       setStatusMessage(String(error));
@@ -47,7 +47,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   useEffect(() => {
     if (!enabled) {
       setDevices([]);
-      setStatusMessage('Scanning is paused. Tap to find nearby devices.');
+      setStatusMessage("Scanning is paused. Tap to find nearby devices.");
       return;
     }
 
@@ -55,7 +55,7 @@ export const useDeviceDiscovery = (enabled = true) => {
     void startNearbyDiscovery()
       .then(() => {
         if (mounted) {
-          setStatusMessage('Scanning for nearby devices...');
+          setStatusMessage("Scanning for nearby devices...");
         }
       })
       .catch((error) => {
@@ -66,7 +66,7 @@ export const useDeviceDiscovery = (enabled = true) => {
       .finally(() => {
         if (mounted) void refreshDevices();
         // Start foreground service on Android so discovery can continue in background
-        if (Platform.OS === 'android') {
+        if (Platform.OS === "android") {
           void nativeCrossBeam.startForegroundService().catch(() => {});
         }
       });
@@ -99,7 +99,7 @@ export const useDeviceDiscovery = (enabled = true) => {
       removeFound();
       removeLost();
       void stopNearbyDiscovery();
-      if (Platform.OS === 'android') {
+      if (Platform.OS === "android") {
         void nativeCrossBeam.stopForegroundService().catch(() => {});
       }
     };

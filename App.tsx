@@ -23,13 +23,17 @@ const HistoryScreen = React.lazy(() =>
   import("@/screens/HistoryScreen").then((m) => ({ default: m.HistoryScreen })),
 );
 const DiscoverScreen = React.lazy(() =>
-  import("@/screens/DiscoverScreen").then((m) => ({ default: m.DiscoverScreen })),
+  import("@/screens/DiscoverScreen").then((m) => ({
+    default: m.DiscoverScreen,
+  })),
 );
 const DevicesScreen = React.lazy(() =>
   import("@/screens/DevicesScreen").then((m) => ({ default: m.DevicesScreen })),
 );
 const QRPairingScreen = React.lazy(() =>
-  import("@/screens/QRPairingScreen").then((m) => ({ default: m.QRPairingScreen })),
+  import("@/screens/QRPairingScreen").then((m) => ({
+    default: m.QRPairingScreen,
+  })),
 );
 import { CrossBeamLogo, CrossBeamWordmark } from "@/components/CrossBeamLogo";
 import { useDeviceDiscovery } from "@/hooks/useDeviceDiscovery";

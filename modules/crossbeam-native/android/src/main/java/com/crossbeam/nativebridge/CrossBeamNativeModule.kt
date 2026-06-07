@@ -383,6 +383,32 @@ class CrossBeamNativeModule : Module() {
       true
     }
 
+    AsyncFunction("startForegroundService") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      try {
+        val intent = Intent(context, ForegroundTransferService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          context.startForegroundService(intent)
+        } else {
+          context.startService(intent)
+        }
+        true
+      } catch (e: Exception) {
+        false
+      }
+    }
+
+    AsyncFunction("stopForegroundService") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      try {
+        val intent = Intent(context, ForegroundTransferService::class.java)
+        context.stopService(intent)
+        true
+      } catch (e: Exception) {
+        false
+      }
+    }
+
     AsyncFunction("startDiscovery") {
       runCatching { startTransferServer() }.onFailure { Log.e("CrossBeamNative", "Failed to start transfer server", it) }
       runCatching { registerLocalService() }.onFailure { Log.e("CrossBeamNative", "Failed to register local service", it) }

@@ -61,5 +61,6 @@
         <action android:name="com.crossbeam.ACTION_INCOMING_TRANSFER" />
       </intent-filter>
     </receiver>
+    <service android:name="com.crossbeam.nativebridge.ForegroundTransferService" android:exported="false" android:foregroundServiceType="connectedDevice|dataSync" />
   </application>
 </manifest>

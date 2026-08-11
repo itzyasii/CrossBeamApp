@@ -8,7 +8,7 @@ export type ChunkedTransferPlan = {
   supportsResume: boolean;
   supportsRetry: boolean;
   retryCount: number;
-  protocol: "crossbeam-chunk-v2";
+  protocol: "crossbeam-chunk-v2" | "crossbeam-chunk-v3";
   transport: "local-network-socket" | "multipeer-stream" | "tv-local-network-socket";
   supportsChunkAck: boolean;
 };
@@ -26,7 +26,7 @@ export const chunkedTransferService = {
         chunkSizeBytes: 1024 * 1024,
         supportsPause: true,
         supportsResume: true,
-        supportsRetry: true,
+        supportsRetry: false,
         supportsChunkAck: true,
         retryCount: 3,
         protocol: "crossbeam-chunk-v2",
@@ -38,10 +38,10 @@ export const chunkedTransferService = {
       chunkSizeBytes: 1024 * 1024,
       supportsPause: true,
       supportsResume: true,
-      supportsRetry: true,
+      supportsRetry: false,
       supportsChunkAck: true,
       retryCount: 3,
-      protocol: "crossbeam-chunk-v2",
+      protocol: "crossbeam-chunk-v3",
       transport,
     };
   },
@@ -71,6 +71,8 @@ export const chunkedTransferService = {
   },
 
   async retry(transferId: string): Promise<void> {
-    await nativeCrossBeam.resumeTransfer(transferId);
+    throw new Error(
+      `Transfer ${transferId} cannot be retried automatically; reselect the peer and start the transfer again.`,
+    );
   },
 };

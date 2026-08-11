@@ -7,6 +7,7 @@ import { GlassCard } from '@/components/GlassCard';
 import { useTheme } from '@/hooks/useTheme';
 import { gradients, FONT_SIZE, RADIUS, SPACING } from '@/theme/colors';
 import { Device } from '@/types/domain';
+import { FocusablePressable } from '@/components/FocusablePressable';
 
 type Props = {
   devices: Device[];
@@ -133,12 +134,15 @@ const DeviceRow = ({
     ]).start();
   }, [fade, tx, index]);
 
-  const capabilityChips =
-    device.platform === 'ios'
-      ? ['Apple Device', 'Easy Connect']
-      : device.platform === 'android-tv'
-        ? ['Smart TV', 'Big Screen']
-        : ['Android', 'Easy Connect'];
+  const canConnect = device.isTransferReady || device.connection === 'wifi-direct';
+  const stateLabel = device.isTransferReady
+    ? 'Ready'
+    : device.availability === 'connecting'
+      ? 'Connecting'
+      : device.connection === 'wifi-direct'
+        ? 'Connect'
+        : 'Discovery only';
+  const capabilityChips = [platformLabel[device.platform], device.connection.toUpperCase()];
 
   return (
     <Animated.View style={{ opacity: fade, transform: [{ translateX: tx }] }}>
@@ -178,23 +182,25 @@ const DeviceRow = ({
               ))}
             </View>
           </View>
-          <PulseDot active />
-          <Pressable
+          <PulseDot active={Boolean(device.isTransferReady)} />
+          <FocusablePressable
             onPress={() => onSelectDevice?.(device.id)}
+            disabled={!canConnect || device.availability === 'connecting'}
             style={[
               S.sendButton,
               {
-                backgroundColor: device.isTrusted ? colors.accent : colors.surfaceHover,
+                backgroundColor: device.isTransferReady ? colors.accent : colors.surfaceHover,
                 borderColor: colors.border,
+                opacity: canConnect ? 1 : 0.55,
               },
             ]}
             accessibilityRole="button"
           >
-            <Send size={14} color={device.isTrusted ? '#FFFFFF' : colors.textPrimary} strokeWidth={2.5} />
-            <Text style={[S.sendText, { color: device.isTrusted ? '#FFFFFF' : colors.textPrimary }]}>
-              {device.isTrusted ? 'Send' : 'Connect'}
+            <Send size={14} color={device.isTransferReady ? '#FFFFFF' : colors.textPrimary} strokeWidth={2.5} />
+            <Text style={[S.sendText, { color: device.isTransferReady ? '#FFFFFF' : colors.textPrimary }]}>
+              {stateLabel}
             </Text>
-          </Pressable>
+          </FocusablePressable>
         </View>
       </GlassCard>
     </Animated.View>
@@ -210,7 +216,7 @@ export function DiscoverScreen({
   onSelectDevice,
 }: Props) {
   const { colors } = useTheme();
-  const connections = Array.from(new Set(devices.map((device) => device.connection.toUpperCase())));
+  const readyCount = devices.filter((device) => device.isTransferReady).length;
   const trustedCount = devices.filter((device) => device.isTrusted).length;
   const radarActive = discoveryEnabled || isRefreshing;
   const statusLabel = isRefreshing ? 'Scanning' : discoveryEnabled ? 'On' : 'Off';
@@ -322,10 +328,10 @@ export function DiscoverScreen({
 
       <View style={S.statsGrid}>
         <GlassCard padding={SPACING.md} style={S.statCard}>
-          <Text style={[S.statLabel, { color: colors.textMuted }]}>CONNECTED</Text>
-          <Text style={[S.statValue, { color: colors.accentLight }]}>{connections.length || 0}</Text>
+          <Text style={[S.statLabel, { color: colors.textMuted }]}>READY</Text>
+          <Text style={[S.statValue, { color: colors.accentLight }]}>{readyCount}</Text>
           <Text style={[S.statSub, { color: colors.textMuted }]} numberOfLines={1}>
-            {connections.length > 0 ? `${connections.length} type${connections.length !== 1 ? 's' : ''}` : 'None nearby'}
+            {readyCount > 0 ? `${readyCount} can receive` : 'None connected'}
           </Text>
         </GlassCard>
         <GlassCard padding={SPACING.md} style={S.statCard}>

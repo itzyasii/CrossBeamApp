@@ -19,6 +19,7 @@ import {
   Search,
   Trash2,
   XCircle,
+  RefreshCcw,
 } from "lucide-react-native";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
@@ -38,6 +39,7 @@ import {
 
 type HistoryScreenProps = {
   transfers: TransferJob[];
+  onRetry?: (id: string) => void;
 };
 
 const statusColor = (
@@ -58,7 +60,7 @@ const statusIcon = (status: TransferJob["status"]) => {
   return Clock3;
 };
 
-export function HistoryScreen({ transfers }: HistoryScreenProps) {
+export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
   const { colors } = useTheme();
   const [storedTransfers, setStoredTransfers] = useState<TransferJob[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -181,6 +183,7 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
                 : "Others";
 
       const candidatePaths = [
+        ...(job.fileResults ?? []).flatMap((file) => file.savedUri ? [file.savedUri] : []),
         ...(job.savedFilePaths ?? []),
         ...(job.localFilePaths ?? []),
         ...(report?.savedPath && !report.savedPath.startsWith("file://")
@@ -209,6 +212,10 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
       let foundUri: string | null = null;
       for (const uri of possibleUris) {
         try {
+          if (uri.startsWith("content://")) {
+            foundUri = uri;
+            break;
+          }
           const info = await FileSystem.getInfoAsync(uri);
           if (info.exists) {
             foundUri = uri;
@@ -229,6 +236,10 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
 
       if (Platform.OS === "android") {
         try {
+          if (foundUri.startsWith("content://")) {
+            await Linking.openURL(foundUri);
+            return;
+          }
           const contentUri = await FileSystem.getContentUriAsync(foundUri);
           await Linking.openURL(contentUri);
           return;
@@ -421,7 +432,7 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
                     <Text style={[S.date, { color: colors.textMuted }]}>
                       {formatDate(job.updatedAt)}
                     </Text>
-                    {reports[job.id] && (
+                    {reports[job.id]?.verified && (
                       <View style={S.integrityRow}>
                         <Gauge
                           size={12}
@@ -450,6 +461,15 @@ export function HistoryScreen({ transfers }: HistoryScreenProps) {
                     <Text style={[S.statusText, { color }]}>{job.status}</Text>
                   </View>
                 </FocusablePressable>
+                {job.retryable && onRetry && (
+                  <FocusablePressable
+                    onPress={() => onRetry(job.id)}
+                    style={[S.retryButton, { borderColor: colors.borderStrong }]}
+                  >
+                    <RefreshCcw size={14} color={colors.accent} />
+                    <Text style={[S.retryText, { color: colors.accent }]}>Retry transfer</Text>
+                  </FocusablePressable>
+                )}
               </GlassCard>
             );
           })}
@@ -542,6 +562,18 @@ const S = StyleSheet.create({
     marginTop: 6,
   },
   integrityText: { fontSize: 10, fontWeight: "900" },
+  retryButton: {
+    alignSelf: "flex-end",
+    marginTop: SPACING.sm,
+    minHeight: 36,
+    borderWidth: 1,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+  },
+  retryText: { fontSize: FONT_SIZE.xs, fontWeight: "900" },
   statusPill: {
     borderWidth: 1,
     borderRadius: RADIUS.full,

@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import { TransferHistory, Device } from "@/types/domain";
+import { TransferHistory, Device, SelectedFile, TransferFileResult } from "@/types/domain";
 
 let db: SQLite.SQLiteDatabase | null = null;
 let initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -17,6 +17,16 @@ const parseStringArray = (value: unknown): string[] => {
 };
 
 const parseFileNames = (value: unknown): string[] => parseStringArray(value);
+
+const parseJsonArray = <T>(value: unknown): T[] => {
+  if (typeof value !== "string" || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+};
 
 export const initDatabase = async () => {
   if (db) return db;
@@ -43,7 +53,13 @@ export const initDatabase = async () => {
           errorMessage TEXT,
           mimeType TEXT,
           localFilePaths TEXT,
-          savedFilePaths TEXT
+          savedFilePaths TEXT,
+          checksum TEXT,
+          integrityVerified INTEGER NOT NULL DEFAULT 0,
+          peerId TEXT,
+          sourceFiles TEXT,
+          fileResults TEXT,
+          retryable INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS devices (
           id TEXT PRIMARY KEY NOT NULL,
@@ -59,6 +75,16 @@ export const initDatabase = async () => {
       await db.execAsync(`
         ALTER TABLE transfers ADD COLUMN savedFilePaths TEXT;
       `).catch(() => {});
+      await db.execAsync(`
+        ALTER TABLE transfers ADD COLUMN checksum TEXT;
+      `).catch(() => {});
+      await db.execAsync(`
+        ALTER TABLE transfers ADD COLUMN integrityVerified INTEGER NOT NULL DEFAULT 0;
+      `).catch(() => {});
+      await db.execAsync(`ALTER TABLE transfers ADD COLUMN peerId TEXT;`).catch(() => {});
+      await db.execAsync(`ALTER TABLE transfers ADD COLUMN sourceFiles TEXT;`).catch(() => {});
+      await db.execAsync(`ALTER TABLE transfers ADD COLUMN fileResults TEXT;`).catch(() => {});
+      await db.execAsync(`ALTER TABLE transfers ADD COLUMN retryable INTEGER NOT NULL DEFAULT 0;`).catch(() => {});
       return db;
     } catch (error) {
       console.error("[Database] Initialization failed:", error);
@@ -87,13 +113,19 @@ export const getTransferHistory = async (): Promise<TransferHistory[]> => {
       status: row.status,
       fromDeviceName: row.fromDeviceName,
       toDeviceName: row.toDeviceName,
-      encrypted: true,
+      encrypted: false,
       startedAt: row.startedAt,
       updatedAt: row.updatedAt,
       errorMessage: row.errorMessage,
       mimeType: row.mimeType,
       localFilePaths: parseStringArray(row.localFilePaths),
       savedFilePaths: parseStringArray(row.savedFilePaths),
+      checksum: row.checksum ?? undefined,
+      integrityVerified: row.integrityVerified === 1,
+      peerId: row.peerId ?? undefined,
+      sourceFiles: parseJsonArray<SelectedFile>(row.sourceFiles),
+      fileResults: parseJsonArray<TransferFileResult>(row.fileResults),
+      retryable: row.retryable === 1,
     }));
   } catch (e) {
     console.error("[Database] getTransferHistory error:", e);
@@ -110,12 +142,21 @@ export const clearTransferHistory = async () => {
   }
 };
 
+export const deleteTransferHistory = async (id: string) => {
+  try {
+    const database = await initDatabase();
+    await database.runAsync("DELETE FROM transfers WHERE id = ?", [id]);
+  } catch (e) {
+    console.error("[Database] deleteTransferHistory error:", e);
+  }
+};
+
 export const saveTransferHistory = async (transfer: TransferHistory) => {
   try {
     const database = await initDatabase();
     await database.runAsync(
-      `INSERT OR REPLACE INTO transfers (id, fileName, fileNames, sizeBytes, bytesTransferred, progress, status, fromDeviceName, toDeviceName, startedAt, updatedAt, errorMessage, mimeType, localFilePaths, savedFilePaths)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO transfers (id, fileName, fileNames, sizeBytes, bytesTransferred, progress, status, fromDeviceName, toDeviceName, startedAt, updatedAt, errorMessage, mimeType, localFilePaths, savedFilePaths, checksum, integrityVerified, peerId, sourceFiles, fileResults, retryable)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         transfer.id,
         transfer.fileName ?? null,
@@ -132,6 +173,12 @@ export const saveTransferHistory = async (transfer: TransferHistory) => {
         transfer.mimeType ?? null,
         JSON.stringify(transfer.localFilePaths ?? []),
         JSON.stringify(transfer.savedFilePaths ?? []),
+        transfer.checksum ?? null,
+        transfer.integrityVerified ? 1 : 0,
+        transfer.peerId ?? null,
+        JSON.stringify(transfer.sourceFiles ?? []),
+        JSON.stringify(transfer.fileResults ?? []),
+        transfer.retryable ? 1 : 0,
       ],
     );
   } catch (e) {
@@ -207,7 +254,7 @@ export const getAnalyticsData = async () => {
       status: row.status,
       fromDeviceName: row.fromDeviceName,
       toDeviceName: row.toDeviceName,
-      encrypted: true,
+      encrypted: false,
       startedAt: row.startedAt,
       updatedAt: row.updatedAt,
       errorMessage: row.errorMessage,

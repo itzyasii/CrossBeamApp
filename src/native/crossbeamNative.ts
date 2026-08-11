@@ -25,6 +25,12 @@ const toDevice = (peer: NativePeer): Device => ({
   id: peer.id,
   name: peer.name,
   deviceKey: peer.deviceKey,
+  availability:
+    peer.availability ?? (peer.host && peer.port ? "ready" : "discovered"),
+  isTransferReady:
+    peer.isTransferReady ?? Boolean(peer.host && peer.port && peer.port > 0),
+  statusMessage: peer.statusMessage,
+  wifiDirectAddress: peer.wifiDirectAddress,
   platform:
     peer.platform === "android-tv"
       ? "android-tv"
@@ -102,6 +108,21 @@ export const nativeCrossBeam = {
       console.warn("[Native] Reading discovered devices failed:", error);
       return [];
     }
+  },
+
+  async connectToWifiDirectPeer(peerId: string): Promise<Device> {
+    if (!CrossBeamNative?.connectToWifiDirectPeer) {
+      throw new Error("Wi-Fi Direct connection is unavailable in this build.");
+    }
+    return toDevice(await CrossBeamNative.connectToWifiDirectPeer(peerId));
+  },
+
+  async disconnectWifiDirect(): Promise<void> {
+    await CrossBeamNative?.disconnectWifiDirect?.();
+  },
+
+  async cleanupPartialTransfers(maxAgeMs: number): Promise<number> {
+    return (await CrossBeamNative?.cleanupPartialTransfers?.(maxAgeMs)) ?? 0;
   },
 
   async sendFiles(

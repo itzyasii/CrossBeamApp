@@ -15,11 +15,19 @@
   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
   <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
   <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
   <application>
     <service
         android:name="com.crossbeam.nativebridge.CrossBeamTransferService"
         android:foregroundServiceType="dataSync"
+        android:exported="false" />
+    <service
+        android:name="com.crossbeam.nativebridge.ForegroundTransferService"
+        android:foregroundServiceType="dataSync"
+        android:exported="false" />
+    <receiver
+        android:name="com.crossbeam.nativebridge.NotificationActionReceiver"
         android:exported="false" />
   </application>
 </manifest>

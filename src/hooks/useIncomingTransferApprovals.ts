@@ -18,6 +18,7 @@ export const useIncomingTransferApprovals = (knownDevices: Device[] = []) => {
   const [activeApproval, setActiveApproval] =
     useState<IncomingApprovalRequest | null>(null);
   const enableNotifications = useAppStore((state) => state.enableNotifications);
+  const autoTransfer = useAppStore((state) => state.autoTransfer);
   const respondingRef = useRef<Set<string>>(new Set());
 
   const refreshApprovals = useCallback(async () => {
@@ -114,12 +115,19 @@ export const useIncomingTransferApprovals = (knownDevices: Device[] = []) => {
         setApprovals(await platformFeatureService.getApprovals());
 
         const trustedDevices = await getTrustedDevices();
-        const isTrusted = trustedDevices.some(
-          (device) =>
-            device.id === fromDevice.id ||
-            device.name === fromDevice.name ||
-            device.isTrusted,
-        );
+        // Never trust by display name, IP address, or merely because another
+        // trusted device exists. Auto-accept is restricted to a stable device
+        // key that exactly matches a persisted record. Incoming socket peers do
+        // not currently carry an authenticated device key, so they continue to
+        // require explicit approval until secure pairing is implemented.
+        const isTrusted =
+          autoTransfer &&
+          Boolean(fromDevice.deviceKey) &&
+          trustedDevices.some(
+            (device) =>
+              device.deviceKey === fromDevice.deviceKey &&
+              device.id === fromDevice.id,
+          );
 
         if (isTrusted) {
           await respondToTransfer(approval, "accepted", { silent: true });
@@ -158,7 +166,7 @@ export const useIncomingTransferApprovals = (knownDevices: Device[] = []) => {
       removeRequestListener();
       removeNotificationListener?.();
     };
-  }, [enableNotifications, resolveDevice, respondToTransfer]);
+  }, [autoTransfer, enableNotifications, resolveDevice, respondToTransfer]);
 
   return {
     approvals,

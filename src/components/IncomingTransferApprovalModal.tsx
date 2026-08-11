@@ -146,21 +146,29 @@ export function IncomingTransferApprovalModal({
               <Text style={S.primaryBtnText}>Accept</Text>
             </FocusablePressable>
 
-            <FocusablePressable
-              onPress={onTrust}
-              style={[
-                S.secondaryBtn,
-                {
-                  backgroundColor: colors.surfaceHover,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <ShieldCheck size={16} color={colors.success} strokeWidth={2.4} />
-              <Text style={[S.secondaryBtnText, { color: colors.textPrimary }]}>
-                Always trust
-              </Text>
-            </FocusablePressable>
+            {approval.fromDevice.deviceKey && (
+              <FocusablePressable
+                onPress={onTrust}
+                style={[
+                  S.secondaryBtn,
+                  {
+                    backgroundColor: colors.surfaceHover,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <ShieldCheck
+                  size={16}
+                  color={colors.success}
+                  strokeWidth={2.4}
+                />
+                <Text
+                  style={[S.secondaryBtnText, { color: colors.textPrimary }]}
+                >
+                  Always trust
+                </Text>
+              </FocusablePressable>
+            )}
 
             <FocusablePressable
               onPress={onReject}

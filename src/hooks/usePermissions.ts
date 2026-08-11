@@ -97,7 +97,7 @@ export const usePermissions = () => {
       if (Platform.OS === "android") {
         // Android 13+ uses scoped media permissions and the document picker
         // does not require broad storage access.
-        if (!Device.platformApiLevel || Device.platformApiLevel < 30) {
+        if (!Device.platformApiLevel || Device.platformApiLevel < 29) {
           const writeStatus = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
           );
@@ -106,6 +106,7 @@ export const usePermissions = () => {
             return false;
           }
         }
+        return true;
       }
 
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -235,7 +236,7 @@ export const usePermissions = () => {
   const getMissingPermissions = async (): Promise<string[]> => {
     const missing: string[] = [];
 
-    if (!Platform.isTV && !(Platform.OS === "android" && isRunningInExpoGo())) {
+    if (Platform.OS === "ios" && !Platform.isTV) {
       const mediaPerm = await MediaLibrary.getPermissionsAsync();
       if (
         mediaPerm.status !== "granted" &&

@@ -30,7 +30,7 @@ In a world where every file transfer risks exposure, CrossBeam stands apart. Unl
 | 🚫 **No Telemetry**                | ✅        | ❌      | ❌           | ❌             |
 | 🌐 **Works Without Internet**      | ✅        | ✅      | ✅           | ❌             |
 | 🔐 **Zero-Knowledge Architecture** | ✅        | ✅      | ⚠️           | ❌             |
-| 📺 **Android TV Support**          | ✅        | ❌      | ⚠️           | ❌             |
+| 📺 **Android TV Support**          | 🚧        | ❌      | ⚠️           | ❌             |
 | 🛡️ **SHA-256 Integrity Checks**    | ✅        | ⚠️      | ⚠️           | ⚠️             |
 | 📝 **100% Open Source**            | ✅        | ❌      | ❌           | ❌             |
 | 🎉 **Forever Ad-Free**             | ✅        | ✅      | ✅           | ❌             |
@@ -58,7 +58,7 @@ In a world where every file transfer risks exposure, CrossBeam stands apart. Unl
 **Enterprise-Grade Reliability**
 
 - Byte-level progress tracking for accurate transfer estimates
-- Transfer cancellation and future resumability
+- Transfer cancellation and checksum-bound resumable checkpoints
 - Conflict resolution for duplicate filenames
 - Persistent transfer history with local storage
 
@@ -82,19 +82,20 @@ CrossBeam is in active development. We believe in radical transparency about wha
 - [x] Persistent SQLite storage for transfer history and settings
 - [x] Modular service architecture with clear separation of concerns
 - [x] Native module bridge architecture for P2P communication
-- [x] Android: DNS-SD discovery and TCP file transfer stack
+- [x] Android: DNS-SD discovery and bounded, commit-acknowledged TCP file transfer stack
 - [x] iOS: Multipeer Connectivity session management and transfer
 - [x] Comprehensive permission handling for all required capabilities
 
 ### 🚧 In Development
 
-- [ ] Android Wi-Fi Direct P2P group negotiation for direct device-to-device
-- [ ] Android foreground service with system notification integration
-- [ ] Android share target integration for sharing from any app
-- [ ] Android TV optimized layout with D-pad navigation support
+- [x] Android Wi-Fi Direct P2P group negotiation (physical-device validation pending)
+- [x] Android foreground service with system notification integration
+- [x] Android share target integration for files, media, text, and links
+- [x] Android TV receiver mode, Leanback launcher, and D-pad focus support
 - [ ] iOS system-level sharing extension and Files.app integration
 - [ ] End-to-end encryption with secure device pairing workflow
-- [ ] Chunked transfer architecture with pause/resume capabilities
+- [x] Android/TV chunked transfer with durable checkpoints and commit ACKs
+- [x] Persisted interrupted-transfer recovery with explicit user retry
 - [ ] Transfer analytics and usage insights dashboard
 
 ---

@@ -71,7 +71,7 @@ export function DevicesScreen({ onPairDevice }: Props) {
         <View style={S.headerCopy}>
           <Text style={[S.title, { color: colors.textPrimary }]}>Trusted Devices</Text>
           <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-            Devices you've connected with before — they can send and receive without extra steps.
+            Locally saved device records. Automatic acceptance requires authenticated pairing.
           </Text>
         </View>
         <Pressable onPress={onPairDevice} style={[S.pairButton, { backgroundColor: colors.accent }]} accessibilityRole="button">
@@ -88,7 +88,7 @@ export function DevicesScreen({ onPairDevice }: Props) {
             </View>
             <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>No trusted devices yet</Text>
             <Text style={[S.emptyText, { color: colors.textSecondary }]}>
-              Devices become trusted after pairing or after you approve them during transfer.
+              Authenticated device pairing is still under development. Incoming transfers require approval.
             </Text>
           </View>
         </GlassCard>

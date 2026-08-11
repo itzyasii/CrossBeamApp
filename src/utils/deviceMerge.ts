@@ -11,6 +11,15 @@ const isPoorDeviceName = (name: string): boolean => {
 const deviceIdentity = (device: Device): string =>
   device.deviceKey ?? device.id;
 
+const readinessRank = (device: Device): number =>
+  device.isTransferReady || device.availability === 'ready'
+    ? 3
+    : device.availability === 'connecting'
+      ? 2
+      : device.availability === 'discovered'
+        ? 1
+        : 0;
+
 export const mergeDiscoveredDevices = (devices: Device[]): Device[] => {
   const grouped = new Map<string, Device>();
 
@@ -30,16 +39,15 @@ export const mergeDiscoveredDevices = (devices: Device[]): Device[] => {
         ? existing.name
         : device.name || existing.name;
 
+    const preferred = readinessRank(device) >= readinessRank(existing) ? device : existing;
+    const fallback = preferred === device ? existing : device;
+
     grouped.set(key, {
-      ...existing,
-      ...device,
+      ...fallback,
+      ...preferred,
       name,
       lastSeenAt: Math.max(existing.lastSeenAt, device.lastSeenAt),
-      connection:
-        device.connection === 'local-network' ||
-        existing.connection === 'local-network'
-          ? 'local-network'
-          : device.connection,
+      isTransferReady: Boolean(existing.isTransferReady || device.isTransferReady),
     });
   });
 

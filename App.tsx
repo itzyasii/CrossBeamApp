@@ -16,6 +16,7 @@ import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as NavigationBar from "expo-navigation-bar";
 import * as SystemUI from "expo-system-ui";
+import * as DeviceInfo from "expo-device";
 
 import { HomeScreen, SettingsScreen } from "@/screens";
 
@@ -129,17 +130,18 @@ export default function App() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
   const [targetDevice, setTargetDevice] = useState<Device | null>(null);
+  const tvDiscoveryPermissionRequested = useRef(false);
   const insets = useSafeAreaInsets();
   const [tabIndex, setTabIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [discoveryEnabled, setDiscoveryEnabled] = useState(false);
+  const [discoveryEnabled, setDiscoveryEnabled] = useState(Platform.isTV);
 
   const {
     getMissingPermissions,
     getMissingDiscoveryPermissions,
     requestDiscoveryPermissions,
   } = usePermissions();
-  const { devices, isRefreshing, statusMessage, refreshDevices } =
+  const { devices, isRefreshing, statusMessage, refreshDevices, connectDevice } =
     useDeviceDiscovery(discoveryEnabled);
   const { approvals, activeApproval, handleApprovalAction } =
     useIncomingTransferApprovals(devices);
@@ -154,7 +156,17 @@ export default function App() {
     clearSelectedFiles,
     startTransfer,
     addSelectedFiles,
+    retryTransfer,
+    reportTransferError,
   } = useTransferManager(devices);
+
+  useEffect(() => {
+    if (!Platform.isTV || tvDiscoveryPermissionRequested.current) return;
+    tvDiscoveryPermissionRequested.current = true;
+    // NSD can still receive on a LAN when optional Wi-Fi Direct/BLE permissions
+    // are declined, so TV receiver mode must remain active.
+    void requestDiscoveryPermissions().finally(() => setDiscoveryEnabled(true));
+  }, [requestDiscoveryPermissions]);
 
   // Handle Back Button for TV and Android
   useEffect(() => {
@@ -205,12 +217,12 @@ export default function App() {
   // Keep screen on during active transfers (especially for TV)
   useEffect(() => {
     const hasActiveTransfer = transfers.some((t) => t.status === "in-progress");
-    if (hasActiveTransfer) {
+    if (hasActiveTransfer || (Platform.isTV && discoveryEnabled)) {
       void KeepAwake.activateKeepAwakeAsync("crossbeam-active-transfer");
     } else {
       void KeepAwake.deactivateKeepAwake("crossbeam-active-transfer");
     }
-  }, [transfers]);
+  }, [discoveryEnabled, transfers]);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -330,19 +342,32 @@ export default function App() {
   };
 
   const sendToDevice = useCallback(
-    (device: Device) => {
-      setTargetDevice(device);
-      setShowDevicePicker(false);
-      void startTransfer(device.id, device.name);
+    async (device: Device) => {
+      try {
+        const readyDevice = device.isTransferReady
+          ? device
+          : device.connection === "wifi-direct"
+            ? await connectDevice(device.id)
+            : null;
+        if (!readyDevice?.isTransferReady) {
+          throw new Error(device.statusMessage || "This discovery signal cannot carry files yet.");
+        }
+        setTargetDevice(readyDevice);
+        setShowDevicePicker(false);
+        await startTransfer(readyDevice.id, readyDevice.name);
+      } catch (error) {
+        console.warn("[App] Device connection failed:", error);
+        reportTransferError(error);
+      }
     },
-    [startTransfer],
+    [connectDevice, reportTransferError, startTransfer],
   );
 
   const handleStartTransferRequest = useCallback(
     (deviceId?: string) => {
       if (deviceId) {
         const device = devices.find((d) => d.id === deviceId);
-        if (device) sendToDevice(device);
+        if (device) void sendToDevice(device);
         return;
       }
       if (devices.length > 1) {
@@ -350,7 +375,7 @@ export default function App() {
         return;
       }
       if (devices.length === 1) {
-        sendToDevice(devices[0]);
+        void sendToDevice(devices[0]);
         return;
       }
       void startTransfer(null, "Device");
@@ -516,6 +541,7 @@ export default function App() {
                       onApprovalAction={handleApprovalAction}
                       onCreateClipboardBeam={handleCreateClipboardBeam}
                       onSaveCollection={handleSaveCollection}
+                      receiverDeviceName={DeviceInfo.deviceName || "Android TV"}
                       onStartDiscovery={handleStartDiscovery}
                       onPickFiles={pickFiles}
                       onStartTransfer={handleStartTransferRequest}
@@ -540,6 +566,7 @@ export default function App() {
                         discoveryEnabled={discoveryEnabled}
                         statusMessage={statusMessage}
                         onRefresh={handleStartDiscovery}
+                        onSelectDevice={(id) => handleStartTransferRequest(id)}
                       />
                     </React.Suspense>
                   )}
@@ -564,7 +591,7 @@ export default function App() {
                         </View>
                       }
                     >
-                      <HistoryScreen transfers={transfers} />
+                      <HistoryScreen transfers={transfers} onRetry={retryTransfer} />
                     </React.Suspense>
                   )}
                   {t.id === "settings" && <SettingsScreen />}
@@ -928,12 +955,15 @@ export default function App() {
                 </View>
                 <ScrollView style={S.modalScroll}>
                   <Text style={[S.modalText, { color: colors.textSecondary }]}>
-                    Your privacy is paramount. CrossBeam uses end-to-end
-                    peer-to-peer encryption for all transfers.
-                    {"\n\n"}• No files are stored on our servers.{"\n"}• Data
-                    stays on your local network.{"\n"}• We do not collect
-                    personal identifiers.{"\n"}• Analytics are anonymous and
-                    optional.
+                    CrossBeam currently transfers files directly over your
+                    local network without uploading them to a CrossBeam server.
+                    Transport encryption and authenticated device pairing are
+                    still under development, so only accept transfers on a
+                    network and from a sender you trust.
+                    {"\n\n"}• No CrossBeam cloud upload is used.{"\n"}• Transfer
+                    history and analytics remain on this device.{"\n"}• Incoming
+                    transfers require explicit approval unless a future,
+                    authenticated pairing matches exactly.
                   </Text>
                 </ScrollView>
               </View>

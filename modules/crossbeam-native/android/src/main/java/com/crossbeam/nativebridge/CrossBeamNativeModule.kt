@@ -2,9 +2,11 @@ package com.crossbeam.nativebridge
 
 import android.Manifest
 import android.content.Context
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.MediaStore
 import android.media.MediaScannerConnection
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
@@ -20,8 +22,10 @@ import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
@@ -92,6 +96,9 @@ class CrossBeamNativeModule : Module() {
   private var wifiP2pManager: WifiP2pManager? = null
   private var wifiP2pChannel: WifiP2pManager.Channel? = null
   private var wifiP2pReceiver: BroadcastReceiver? = null
+  private var wifiP2pConnectionLatch: CountDownLatch? = null
+  private var wifiP2pTargetPeerId: String? = null
+  @Volatile private var wifiP2pConnectionError: String? = null
   private val wifiP2pIntentFilter = IntentFilter().apply {
     addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
     addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
@@ -115,9 +122,15 @@ class CrossBeamNativeModule : Module() {
   private val incomingApprovalResults = ConcurrentHashMap<String, Boolean>()
   private val serviceType = "_crossbeam._tcp."
   private val protocolMagic = "CROSSBEAM1"
-  private val chunkedProtocolVersion = 2
+  private val chunkedProtocolVersion = 3
   private val transferChunkSize = 1024 * 1024
+  private val transferPort = 53_545
   private val DEFAULT_BUFFER_SIZE = 8192
+  private val socketConnectTimeoutMs = 10_000
+  private val socketReadTimeoutMs = 150_000
+  private val maxFileCount = 100
+  private val maxFileSize = 100L * 1024L * 1024L * 1024L
+  private val maxBatchSize = 200L * 1024L * 1024L * 1024L
 
   // BLE State
   private var bluetoothAdapter: BluetoothAdapter? = null
@@ -208,6 +221,11 @@ class CrossBeamNativeModule : Module() {
       "connection" to if (hasTransferEndpoint(transferPeer)) "local-network" else (transferPeer["connection"] ?: "ble"),
       "host" to transferPeer["host"],
       "port" to transferPeer["port"],
+      "wifiDirectAddress" to (transferPeer["wifiDirectAddress"] ?: other["wifiDirectAddress"]),
+      "availability" to if (hasTransferEndpoint(transferPeer)) "ready" else
+        (transferPeer["availability"] ?: other["availability"] ?: "discovered"),
+      "isTransferReady" to hasTransferEndpoint(transferPeer),
+      "statusMessage" to (transferPeer["statusMessage"] ?: other["statusMessage"]),
       "isTrusted" to false,
       "lastSeenAt" to max(
         (transferPeer["lastSeenAt"] as? Number)?.toLong() ?: 0L,
@@ -345,13 +363,13 @@ class CrossBeamNativeModule : Module() {
 
     AsyncFunction("getChunkProtocol") {
       mapOf(
-        "protocol" to "crossbeam-chunk-v2",
+        "protocol" to "crossbeam-chunk-v3",
         "version" to chunkedProtocolVersion,
         "chunkSizeBytes" to transferChunkSize,
         "supportsChunkAck" to true,
         "supportsPause" to true,
         "supportsResume" to true,
-        "supportsRetry" to true
+        "supportsRetry" to false
       )
     }
 
@@ -366,11 +384,13 @@ class CrossBeamNativeModule : Module() {
         nm.createNotificationChannel(chan)
       }
 
-      val acceptIntent = Intent("com.crossbeam.ACTION_INCOMING_TRANSFER").apply {
+      val acceptIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+        action = "com.crossbeam.ACTION_INCOMING_TRANSFER"
         putExtra("transferId", transferId)
         putExtra("action", "accept")
       }
-      val rejectIntent = Intent("com.crossbeam.ACTION_INCOMING_TRANSFER").apply {
+      val rejectIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+        action = "com.crossbeam.ACTION_INCOMING_TRANSFER"
         putExtra("transferId", transferId)
         putExtra("action", "reject")
       }
@@ -450,6 +470,18 @@ class CrossBeamNativeModule : Module() {
       visiblePeers()
     }
 
+    AsyncFunction("connectToWifiDirectPeer") { peerId: String ->
+      connectWifiDirectPeer(peerId)
+    }
+
+    AsyncFunction("disconnectWifiDirect") {
+      disconnectWifiDirectGroup()
+    }
+
+    AsyncFunction("cleanupPartialTransfers") { maxAgeMs: Long ->
+      cleanupPartialTransfers(maxAgeMs)
+    }
+
     AsyncFunction("respondToIncomingTransfer") { transferId: String, accepted: Boolean ->
       incomingApprovalResults[transferId] = accepted
       pendingIncomingApprovals.remove(transferId)?.countDown()
@@ -468,20 +500,25 @@ class CrossBeamNativeModule : Module() {
       @Suppress("UNCHECKED_CAST")
       val files = request["files"] as? List<Map<String, Any?>>
         ?: throw IllegalArgumentException("Missing files")
-      val peer = resolvePeer(peerId)
-        ?: throw IllegalArgumentException("Peer is not available")
-      val host = peer["host"] as? String
+      var peer = resolvePeer(peerId)
+      if (peer == null && peers[peerId]?.get("connection") == "wifi-direct") {
+        peer = connectWifiDirectPeer(peerId)
+      }
+      val transferPeer = peer ?: throw IllegalArgumentException("Peer is not transfer-ready")
+      val host = transferPeer["host"] as? String
         ?: throw IllegalArgumentException("Peer host is unavailable")
-      val port = (peer["port"] as? Number)?.toInt()
+      val port = (transferPeer["port"] as? Number)?.toInt()
         ?: throw IllegalArgumentException("Peer port is unavailable")
       val transferId = UUID.randomUUID().toString()
-      val resolvedPeerId = peer["id"] as String
+      val resolvedPeerId = transferPeer["id"] as String
       sendFilesToPeer(transferId, host, port, resolvedPeerId, files)
       mapOf("transferId" to transferId)
     }
 
     AsyncFunction("cancelTransfer") { transferId: String ->
       cancelledTransfers.add(transferId)
+      incomingApprovalResults[transferId] = false
+      pendingIncomingApprovals.remove(transferId)?.countDown()
       activeSockets.remove(transferId)?.close()
       emitTransfer(transferId, "unknown-peer", null, 0, 1, "cancelled", null)
     }
@@ -678,9 +715,18 @@ class CrossBeamNativeModule : Module() {
             if (!hasNearbyWifiPermission(context)) return
             wifiP2pManager?.requestPeers(wifiP2pChannel) { peersList ->
               val peerMapList = peersList.deviceList.map { device ->
-                mapOf(
-                  "id" to device.deviceAddress,
+                val deviceKey = "wifi-${device.deviceAddress.replace(":", "")}"
+                val peer = mapOf(
+                  "id" to canonicalPeerId(deviceKey),
+                  "deviceKey" to deviceKey,
                   "name" to device.deviceName,
+                  "platform" to inferPeerPlatform(device.deviceName),
+                  "connection" to "wifi-direct",
+                  "wifiDirectAddress" to device.deviceAddress,
+                  "availability" to "discovered",
+                  "isTransferReady" to false,
+                  "statusMessage" to "Tap Connect to create a Wi-Fi Direct link",
+                  "lastSeenAt" to System.currentTimeMillis(),
                   "status" to when (device.status) {
                     WifiP2pDevice.AVAILABLE -> "available"
                     WifiP2pDevice.INVITED -> "invited"
@@ -690,12 +736,46 @@ class CrossBeamNativeModule : Module() {
                     else -> "unknown"
                   }
                 )
+                upsertPeer(peer)
+                peer
               }
               sendEvent("onWiFiDirectPeersChanged", mapOf("peers" to peerMapList))
             }
           }
           WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-            // Handle connection change
+            wifiP2pManager?.requestConnectionInfo(wifiP2pChannel) { info ->
+              val targetId = wifiP2pTargetPeerId
+              if (info.groupFormed && targetId != null) {
+                if (info.isGroupOwner) {
+                  wifiP2pConnectionError = "This device became the Wi-Fi Direct group owner. Retry from the sending device."
+                } else {
+                  val peer = peers[targetId]
+                  if (peer != null && info.groupOwnerAddress != null) {
+                    upsertPeer(
+                      peer.toMutableMap().apply {
+                        put("host", info.groupOwnerAddress.hostAddress)
+                        put("port", transferPort)
+                        put("connection", "wifi-direct")
+                        put("availability", "ready")
+                        put("isTransferReady", true)
+                        put("statusMessage", "Connected over Wi-Fi Direct")
+                        put("lastSeenAt", System.currentTimeMillis())
+                      }
+                    )
+                  }
+                }
+                wifiP2pConnectionLatch?.countDown()
+              }
+              sendEvent(
+                "onWiFiDirectConnectionChanged",
+                mapOf(
+                  "groupFormed" to info.groupFormed,
+                  "isGroupOwner" to info.isGroupOwner,
+                  "groupOwnerHost" to info.groupOwnerAddress?.hostAddress,
+                  "error" to wifiP2pConnectionError
+                )
+              )
+            }
           }
         }
       }
@@ -739,9 +819,97 @@ class CrossBeamNativeModule : Module() {
     wifiP2pManager = null
     wifiP2pChannel = null
   }
+
+  private fun connectWifiDirectPeer(peerId: String): Map<String, Any?> {
+    val context = appContext.reactContext ?: throw IllegalStateException("Android context is unavailable")
+    if (!hasNearbyWifiPermission(context)) {
+      throw SecurityException("Nearby Wi-Fi permission is required")
+    }
+    initWifiP2p()
+    val manager = wifiP2pManager ?: throw IllegalStateException("Wi-Fi Direct is unavailable")
+    val channel = wifiP2pChannel ?: throw IllegalStateException("Wi-Fi Direct channel is unavailable")
+    val peer = peers[peerId] ?: throw IllegalArgumentException("Wi-Fi Direct peer is no longer available")
+    val address = peer["wifiDirectAddress"] as? String
+      ?: throw IllegalArgumentException("Wi-Fi Direct address is unavailable")
+
+    wifiP2pConnectionError = null
+    wifiP2pTargetPeerId = peerId
+    val latch = CountDownLatch(1)
+    wifiP2pConnectionLatch = latch
+    upsertPeer(
+      peer.toMutableMap().apply {
+        put("availability", "connecting")
+        put("isTransferReady", false)
+        put("statusMessage", "Negotiating Wi-Fi Direct connection")
+        put("lastSeenAt", System.currentTimeMillis())
+      }
+    )
+
+    val config = WifiP2pConfig().apply {
+      deviceAddress = address
+      groupOwnerIntent = 0
+    }
+    manager.connect(channel, config, object : WifiP2pManager.ActionListener {
+      override fun onSuccess() = Unit
+      override fun onFailure(reason: Int) {
+        wifiP2pConnectionError = "Wi-Fi Direct connection failed ($reason)"
+        latch.countDown()
+      }
+    })
+
+    val completed = latch.await(35, TimeUnit.SECONDS)
+    wifiP2pConnectionLatch = null
+    if (!completed) {
+      wifiP2pConnectionError = "Wi-Fi Direct connection timed out"
+    }
+    val connected = resolvePeer(peerId)
+    if (connected != null) return connected
+
+    val message = wifiP2pConnectionError ?: "Wi-Fi Direct peer did not expose a transfer endpoint"
+    upsertPeer(
+      peer.toMutableMap().apply {
+        put("availability", "unavailable")
+        put("isTransferReady", false)
+        put("statusMessage", message)
+        put("lastSeenAt", System.currentTimeMillis())
+      }
+    )
+    throw IllegalStateException(message)
+  }
+
+  private fun disconnectWifiDirectGroup() {
+    val manager = wifiP2pManager ?: return
+    val channel = wifiP2pChannel ?: return
+    manager.removeGroup(channel, object : WifiP2pManager.ActionListener {
+      override fun onSuccess() = Unit
+      override fun onFailure(reason: Int) {
+        Log.w("CrossBeamNative", "Failed to remove Wi-Fi Direct group: $reason")
+      }
+    })
+    wifiP2pTargetPeerId = null
+    wifiP2pConnectionError = null
+  }
+
+  private fun cleanupPartialTransfers(maxAgeMs: Long): Int {
+    val context = appContext.reactContext ?: return 0
+    val safeAge = max(maxAgeMs, 60_000L)
+    val cutoff = System.currentTimeMillis() - safeAge
+    val directory = File(context.filesDir, "crossbeam-partials")
+    if (!directory.isDirectory) return 0
+    var deleted = 0
+    directory.listFiles()?.forEach { file ->
+      if (file.isFile && file.name.endsWith(".crossbeam-part") && file.lastModified() < cutoff) {
+        if (file.delete()) deleted += 1
+      }
+    }
+    return deleted
+  }
   private fun startTransferServer() {
     if (serverSocket != null) return
-    val socket = ServerSocket(0)
+    val socket = ServerSocket().apply {
+      reuseAddress = true
+      bind(InetSocketAddress(transferPort))
+    }
     serverSocket = socket
     serverThread = thread(name = "CrossBeamTransferServer", isDaemon = true) {
       while (!socket.isClosed) {
@@ -871,6 +1039,9 @@ class CrossBeamNativeModule : Module() {
               "connection" to "local-network",
               "host" to host?.hostAddress,
               "port" to resolved.port,
+              "availability" to if (host != null && resolved.port > 0) "ready" else "unavailable",
+              "isTransferReady" to (host != null && resolved.port > 0),
+              "statusMessage" to if (host != null && resolved.port > 0) "Ready on local network" else "Could not resolve network endpoint",
               "isTrusted" to false,
               "lastSeenAt" to System.currentTimeMillis()
             )
@@ -938,19 +1109,35 @@ class CrossBeamNativeModule : Module() {
     activeTransferCount.incrementAndGet()
 
     thread(name = "CrossBeamOutgoingTransfer", isDaemon = true) {
-      val totalBytes = files.sumOf { (it["sizeBytes"] as? Number)?.toLong() ?: 0L }
+      var totalBytes = 0L
       var transferred = 0L
       try {
+        if (files.isEmpty() || files.size > maxFileCount) {
+          throw IllegalArgumentException("A transfer must contain between 1 and $maxFileCount files")
+        }
         val outgoingFiles = files.map { file ->
           val name = sanitizeFileName(file["name"] as? String ?: "received-file")
           val uri = Uri.parse(file["uri"] as? String ?: throw IllegalArgumentException("Missing file URI"))
-          val size = (file["sizeBytes"] as? Number)?.toLong() ?: 0L
-          val mimeType = file["mimeType"] as? String ?: "application/octet-stream"
-          val checksum = calculateSha256(context, uri)
-          OutgoingFileHeader(name, uri, mimeType, size, checksum)
+          val mimeType = (file["mimeType"] as? String)
+            ?.takeIf {
+              it.length <= 255 &&
+                Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$").matches(it)
+            }
+            ?: "application/octet-stream"
+          val (checksum, actualSize) = calculateSha256AndSize(context, uri)
+          validateOutgoingFile(name, mimeType, actualSize)
+          OutgoingFileHeader(name, uri, mimeType, actualSize, checksum)
+        }
+        totalBytes = outgoingFiles.fold(0L) { total, file ->
+          Math.addExact(total, file.size).also {
+            if (it > maxBatchSize) throw IllegalArgumentException("Transfer batch is too large")
+          }
         }
 
-        Socket(host, port).use { socket ->
+        Socket().use { socket ->
+          socket.connect(InetSocketAddress(host, port), socketConnectTimeoutMs)
+          socket.soTimeout = socketReadTimeoutMs
+          socket.tcpNoDelay = true
           activeSockets[transferId] = socket
           DataOutputStream(BufferedOutputStream(socket.getOutputStream())).use { output ->
             DataInputStream(BufferedInputStream(socket.getInputStream())).use { socketInput ->
@@ -967,32 +1154,49 @@ class CrossBeamNativeModule : Module() {
               }
               output.flush()
 
+              val accepted = socketInput.readBoolean()
+              val approvalMessage = socketInput.readUTF()
+              if (!accepted) {
+                throw TransferRejectedException(
+                  approvalMessage.ifBlank { "Transfer rejected by receiver" }
+                )
+              }
+
               outgoingFiles.forEach { file ->
                 val name = file.name
                 
                 val requestedOffset = socketInput.readLong()
                  
-                if (requestedOffset >= file.size) {
-                    transferred += file.size
-                    return@forEach
+                if (requestedOffset < 0L || requestedOffset > file.size) {
+                    throw IllegalStateException("Receiver returned an invalid checkpoint for $name")
                 }
 
-                context.contentResolver.openInputStream(file.uri)?.use { rawInput ->
-                  if (requestedOffset > 0) {
+                if (requestedOffset >= file.size) {
+                    transferred += file.size
+                } else {
+                  context.contentResolver.openInputStream(file.uri)?.use { rawInput ->
+                    if (requestedOffset > 0) {
                       var remainingToSkip = requestedOffset
                       while (remainingToSkip > 0) {
                           val skipped = rawInput.skip(remainingToSkip)
-                          if (skipped <= 0L) break
+                          if (skipped <= 0L) {
+                            if (rawInput.read() == -1) break
+                            remainingToSkip -= 1
+                            continue
+                          }
                           remainingToSkip -= skipped
                       }
+                      if (remainingToSkip != 0L) {
+                        throw IllegalStateException("Unable to seek source file to resume checkpoint")
+                      }
                       transferred += requestedOffset
-                  }
+                    }
 
-                  BufferedInputStream(rawInput).use { input ->
-                    val buffer = ByteArray(transferChunkSize)
-                    var fileOffset = requestedOffset
-                    var read = input.read(buffer)
-                    while (read >= 0) {
+                    BufferedInputStream(rawInput).use { input ->
+                      val buffer = ByteArray(transferChunkSize)
+                      var fileOffset = requestedOffset
+                      var read = input.read(buffer)
+                      while (read > 0) {
                       if (cancelledTransfers.contains(transferId)) {
                         throw TransferCancelledException()
                       }
@@ -1016,8 +1220,8 @@ class CrossBeamNativeModule : Module() {
                       if (!ack) {
                         throw IllegalStateException("Receiver rejected chunk at offset $chunkOffset for $name")
                       }
-                      if (nextOffset < chunkOffset + read) {
-                        throw IllegalStateException("Receiver checkpoint did not advance for $name")
+                      if (nextOffset != chunkOffset + read) {
+                        throw IllegalStateException("Receiver returned an invalid checkpoint for $name")
                       }
 
                       transferred += read
@@ -1025,12 +1229,13 @@ class CrossBeamNativeModule : Module() {
                       
                       // Throttle notification updates somewhat (e.g. updating UI progress)
                       if (transferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || transferred == totalBytes) {
+                          val percent = (transferred * 100 / max(totalBytes, 1L)).toInt().coerceIn(0, 100)
                           CrossBeamTransferService.updateNotification(
                               context,
                               "Sending to $peerId",
-                              "Progress: ${(transferred * 100 / max(totalBytes, 1L))}%",
-                              transferred.toInt(),
-                              totalBytes.toInt()
+                              "Progress: $percent%",
+                              percent,
+                              100
                           )
                       }
 
@@ -1044,11 +1249,44 @@ class CrossBeamNativeModule : Module() {
                         null,
                         file.mimeType
                       )
-                      read = input.read(buffer)
+                        read = input.read(buffer)
+                      }
+                      if (fileOffset != file.size) {
+                        throw IllegalStateException("Source file size changed while sending $name")
+                      }
                     }
-                  }
-                } ?: throw IllegalArgumentException("Unable to open file: $name")
+                  } ?: throw IllegalArgumentException("Unable to open file: $name")
+                }
+
+                val fileCommitted = socketInput.readBoolean()
+                val commitMessage = socketInput.readUTF()
+                if (!fileCommitted) {
+                  throw IllegalStateException(
+                    commitMessage.ifBlank { "Receiver could not commit $name" }
+                  )
+                }
+                emitTransfer(
+                  transferId,
+                  peerId,
+                  name,
+                  transferred,
+                  totalBytes,
+                  "in-progress",
+                  null,
+                  file.mimeType,
+                  null,
+                  file.checksum,
+                  true
+                )
                 output.flush()
+              }
+
+              val batchCommitted = socketInput.readBoolean()
+              val batchMessage = socketInput.readUTF()
+              if (!batchCommitted) {
+                throw IllegalStateException(
+                  batchMessage.ifBlank { "Receiver did not commit the transfer" }
+                )
               }
             }
           }
@@ -1064,10 +1302,18 @@ class CrossBeamNativeModule : Module() {
         activeSockets.remove(transferId)
         cancelledTransfers.remove(transferId)
         emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "cancelled", null)
+      } catch (error: TransferRejectedException) {
+        activeSockets.remove(transferId)
+        emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "rejected", error.message)
       } catch (error: Exception) {
         activeSockets.remove(transferId)
-        emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "failed", error.message)
+        if (cancelledTransfers.remove(transferId)) {
+          emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "cancelled", null)
+        } else {
+          emitTransfer(transferId, peerId, null, transferred, max(totalBytes, 1L), "failed", error.message)
+        }
       } finally {
+          pausedTransfers.remove(transferId)
           if (activeTransferCount.decrementAndGet() <= 0) {
               context.stopService(serviceIntent)
           }
@@ -1076,30 +1322,137 @@ class CrossBeamNativeModule : Module() {
   }
 
   private fun getStructuredOutputDir(downloadsRoot: File, mimeType: String): File {
-    val subfolder = when {
+    return File(downloadsRoot, "CrossBeam/${getMimeSubfolder(mimeType)}")
+  }
+
+  private fun getMimeSubfolder(mimeType: String): String = when {
       mimeType.startsWith("image/") -> "Images"
       mimeType.startsWith("video/") -> "Videos"
       mimeType.startsWith("audio/") -> "Audio"
       mimeType == "application/pdf" || mimeType.startsWith("text/") || 
         mimeType.contains("word") || mimeType.contains("excel") || mimeType.contains("powerpoint") -> "Documents"
       else -> "Others"
-    }
-    return File(downloadsRoot, "CrossBeam/$subfolder")
   }
 
-  private fun checkStorageSpace(outputDir: File, totalSize: Long) {
-    val statFs = android.os.StatFs(outputDir.absolutePath)
+  private fun checkStorageSpace(context: Context, totalSize: Long) {
+    val statFs = android.os.StatFs(context.filesDir.absolutePath)
     val availableBytes = statFs.availableBlocksLong * statFs.blockSizeLong
-    val requiredBytes = totalSize + (500L * 1024L * 1024L) // Safety buffer 500MB
+    val requiredBytes = try {
+      Math.addExact(Math.multiplyExact(totalSize, 2L), 100L * 1024L * 1024L)
+    } catch (_: ArithmeticException) {
+      Long.MAX_VALUE
+    }
     
     if (availableBytes < requiredBytes) {
-      throw IllegalStateException("Insufficient storage on device. Need ${requiredBytes / (1024*1024)} MB.")
+      throw IllegalStateException("Insufficient storage for a safe, atomic receive")
     }
+  }
+
+  private fun validateOutgoingFile(name: String, mimeType: String, size: Long) {
+    if (name.length > 255) throw IllegalArgumentException("File name is too long")
+    if (mimeType.length > 255) throw IllegalArgumentException("MIME type is too long")
+    if (!Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$").matches(mimeType)) {
+      throw IllegalArgumentException("Invalid MIME type")
+    }
+    if (size < 0L || size > maxFileSize) throw IllegalArgumentException("File size is not supported")
+  }
+
+  private fun validateIncomingHeader(header: IncomingFileHeader) {
+    validateOutgoingFile(header.name, header.mimeType, header.size)
+    if (!Regex("^[0-9a-f]{64}$").matches(header.checksum)) {
+      throw IllegalArgumentException("Invalid file checksum")
+    }
+  }
+
+  private fun partialFileFor(context: Context, header: IncomingFileHeader): File {
+    val directory = File(context.filesDir, "crossbeam-partials")
+    if (!directory.exists() && !directory.mkdirs()) {
+      throw IllegalStateException("Could not create partial transfer directory")
+    }
+    return File(directory, "${header.checksum.take(24)}-${sanitizeFileName(header.name).take(180)}.crossbeam-part")
+  }
+
+  private fun uniqueMediaStoreName(context: Context, relativePath: String, fileName: String): String {
+    val resolver = context.contentResolver
+    val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+    val dot = fileName.lastIndexOf('.')
+    val base = if (dot > 0) fileName.substring(0, dot) else fileName
+    val extension = if (dot > 0) fileName.substring(dot) else ""
+    var candidate = fileName
+    var index = 1
+    while (true) {
+      resolver.query(
+        collection,
+        arrayOf(MediaStore.MediaColumns._ID),
+        "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+        arrayOf(candidate, relativePath),
+        null
+      )?.use { cursor ->
+        if (!cursor.moveToFirst()) return candidate
+      } ?: return candidate
+      candidate = "$base ($index)$extension"
+      index += 1
+    }
+  }
+
+  private fun publishReceivedFile(
+    context: Context,
+    partial: File,
+    header: IncomingFileHeader
+  ): String {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/CrossBeam/${getMimeSubfolder(header.mimeType)}/"
+      val displayName = uniqueMediaStoreName(context, relativePath, header.name)
+      val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+        put(MediaStore.MediaColumns.MIME_TYPE, header.mimeType)
+        put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+        put(MediaStore.MediaColumns.IS_PENDING, 1)
+      }
+      val resolver = context.contentResolver
+      val destination = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+        ?: throw IllegalStateException("Could not create the destination file")
+      try {
+        resolver.openOutputStream(destination, "w")?.use { output ->
+          partial.inputStream().use { input -> input.copyTo(output, DEFAULT_BUFFER_SIZE) }
+        } ?: throw IllegalStateException("Could not open the destination file")
+        values.clear()
+        values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+        if (resolver.update(destination, values, null, null) <= 0) {
+          throw IllegalStateException("Could not publish the received file")
+        }
+        if (!partial.delete()) partial.deleteOnExit()
+        return destination.toString()
+      } catch (error: Exception) {
+        resolver.delete(destination, null, null)
+        throw error
+      }
+    }
+
+    val downloadsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+    val outputDir = getStructuredOutputDir(downloadsRoot, header.mimeType)
+    if (!outputDir.exists() && !outputDir.mkdirs()) {
+      throw IllegalStateException("Could not create storage directory")
+    }
+    val destination = uniqueDestination(outputDir, header.name)
+    FileOutputStream(destination).use { output ->
+      partial.inputStream().use { input -> input.copyTo(output, DEFAULT_BUFFER_SIZE) }
+      output.fd.sync()
+    }
+    if (!partial.delete()) partial.deleteOnExit()
+    MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf(header.mimeType), null)
+    return destination.absolutePath
   }
 
   private fun receiveFilesFromPeer(socket: Socket) {
-    val context = appContext.reactContext ?: return
+    val context = appContext.reactContext ?: run {
+      socket.close()
+      return
+    }
     val peerId = socket.inetAddress.hostAddress ?: "unknown-peer"
+    var currentTransferId: String? = null
+    var batchTotal = 1L
+    var batchTransferred = 0L
     
     val serviceIntent = Intent(context, CrossBeamTransferService::class.java)
     runCatching {
@@ -1111,26 +1464,37 @@ class CrossBeamNativeModule : Module() {
     }.onFailure { Log.e("CrossBeamNative", "Failed to start foreground service", it) }
     activeTransferCount.incrementAndGet()
 
-    socket.use { client ->
+    socket.use transfer@ { client ->
       try {
+        client.soTimeout = socketReadTimeoutMs
+        client.tcpNoDelay = true
         DataInputStream(BufferedInputStream(client.getInputStream())).use { input ->
           DataOutputStream(BufferedOutputStream(client.getOutputStream())).use { output ->
             if (input.readUTF() != protocolMagic) throw IllegalArgumentException("Unsupported CrossBeam protocol")
-            if (input.readInt() < chunkedProtocolVersion) throw IllegalArgumentException("Unsupported protocol version")
+            if (input.readInt() != chunkedProtocolVersion) throw IllegalArgumentException("Unsupported protocol version")
 
             val transferId = input.readUTF()
+            if (transferId.isBlank() || transferId.length > 128) {
+              throw IllegalArgumentException("Invalid transfer ID")
+            }
+            currentTransferId = transferId
+            activeSockets[transferId] = client
             val fileCount = input.readInt()
-            val downloadsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (fileCount !in 1..maxFileCount) {
+              throw IllegalArgumentException("Invalid file count")
+            }
             
             val pendingFiles = mutableListOf<IncomingFileHeader>()
-            var batchTotal = 0L
+            batchTotal = 0L
             repeat(fileCount) {
               val header = IncomingFileHeader(sanitizeFileName(input.readUTF()), input.readUTF(), input.readLong(), input.readUTF())
-              batchTotal += header.size
+              validateIncomingHeader(header)
+              batchTotal = Math.addExact(batchTotal, header.size)
+              if (batchTotal > maxBatchSize) throw IllegalArgumentException("Transfer batch is too large")
               pendingFiles.add(header)
             }
 
-            checkStorageSpace(downloadsRoot, batchTotal)
+            checkStorageSpace(context, batchTotal)
 
             emitIncomingTransferRequest(
               transferId,
@@ -1138,7 +1502,11 @@ class CrossBeamNativeModule : Module() {
               pendingFiles.map { it.name },
               batchTotal
             )
-            if (!waitForIncomingApproval(transferId)) {
+            val accepted = waitForIncomingApproval(transferId)
+            output.writeBoolean(accepted)
+            output.writeUTF(if (accepted) "" else "Transfer rejected by receiver")
+            output.flush()
+            if (!accepted) {
               emitTransfer(
                 transferId,
                 peerId,
@@ -1148,16 +1516,12 @@ class CrossBeamNativeModule : Module() {
                 "rejected",
                 "Transfer rejected by receiver"
               )
-              return@use
+              return@transfer
             }
 
-            var batchTransferred = 0L
+            batchTransferred = 0L
             pendingFiles.forEach { header ->
-              val outputDir = getStructuredOutputDir(downloadsRoot, header.mimeType)
-              if (!outputDir.exists() && !outputDir.mkdirs()) throw IllegalStateException("Could not create storage directory")
-
-              val destination = uniqueDestination(outputDir, header.name)
-              val partial = File(outputDir, "${destination.name}.crossbeam-part")
+              val partial = partialFileFor(context, header)
               val offset = if (partial.exists() && partial.isFile && partial.length() <= header.size) partial.length() else 0L
               if (offset == 0L && partial.exists()) partial.delete()
 
@@ -1170,17 +1534,34 @@ class CrossBeamNativeModule : Module() {
                   fileOutput.seek(offset)
                   var remaining = header.size - offset
                   while (remaining > 0) {
+                    if (cancelledTransfers.contains(transferId)) throw TransferCancelledException()
+                    while (pausedTransfers.contains(transferId)) {
+                      Thread.sleep(250)
+                      if (cancelledTransfers.contains(transferId)) throw TransferCancelledException()
+                    }
+
                     val chunkOffset = input.readLong()
                     val chunkLength = input.readInt()
                     val chunkChecksum = input.readUTF()
                     
                     if (chunkOffset != fileOutput.filePointer) throw IllegalStateException("Unexpected chunk offset")
+                    if (
+                      chunkLength <= 0 ||
+                      chunkLength > transferChunkSize ||
+                      chunkLength.toLong() > remaining
+                    ) {
+                      throw IllegalArgumentException("Invalid chunk length")
+                    }
+                    if (!Regex("^[0-9a-f]{64}$").matches(chunkChecksum)) {
+                      throw IllegalArgumentException("Invalid chunk checksum")
+                    }
                     
                     val chunk = ByteArray(chunkLength)
                     input.readFully(chunk)
                     if (sha256(chunk, chunkLength) != chunkChecksum) throw IllegalStateException("Chunk checksum mismatch")
 
                     fileOutput.write(chunk)
+                    fileOutput.fd.sync()
                     remaining -= chunkLength
                     batchTransferred += chunkLength
                     output.writeBoolean(true)
@@ -1188,7 +1569,8 @@ class CrossBeamNativeModule : Module() {
                     output.flush()
                     
                     if (batchTransferred % (DEFAULT_BUFFER_SIZE * 50) == 0L || batchTransferred == batchTotal) {
-                      CrossBeamTransferService.updateNotification(context, "Receiving from $peerId", "Progress: ${(batchTransferred * 100 / max(batchTotal, 1L))}%", batchTransferred.toInt(), batchTotal.toInt())
+                      val percent = (batchTransferred * 100 / max(batchTotal, 1L)).toInt().coerceIn(0, 100)
+                      CrossBeamTransferService.updateNotification(context, "Receiving from $peerId", "Progress: $percent%", percent, 100)
                     }
                     emitTransfer(transferId, peerId, header.name, batchTransferred, batchTotal, "in-progress", null, header.mimeType)
                   }
@@ -1196,14 +1578,24 @@ class CrossBeamNativeModule : Module() {
               }
 
               if (!partial.exists()) partial.createNewFile()
-              if (header.checksum.isNotBlank() && header.checksum != calculateSha256(partial)) {
+              if (partial.length() != header.size) {
+                throw IllegalStateException("Received file size mismatch")
+              }
+              if (header.checksum != calculateSha256(partial)) {
                 partial.delete()
                 throw IllegalStateException("Checksum mismatch")
               }
-              if (destination.exists()) destination.delete()
-              if (!partial.renameTo(destination)) throw IllegalStateException("Could not save received file")
-              
-              MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf(header.mimeType), null)
+              val savedUri = try {
+                publishReceivedFile(context, partial, header)
+              } catch (error: Exception) {
+                output.writeBoolean(false)
+                output.writeUTF((error.message ?: "Could not save received file").take(512))
+                output.flush()
+                throw error
+              }
+              output.writeBoolean(true)
+              output.writeUTF("")
+              output.flush()
               emitTransfer(
                 transferId,
                 peerId,
@@ -1213,15 +1605,35 @@ class CrossBeamNativeModule : Module() {
                 "in-progress",
                 null,
                 header.mimeType,
-                destination.absolutePath
+                savedUri,
+                header.checksum,
+                true
               )
             }
+            output.writeBoolean(true)
+            output.writeUTF("")
+            output.flush()
             emitTransfer(transferId, peerId, null, batchTotal, batchTotal, "completed", null)
           }
         }
+      } catch (_: TransferCancelledException) {
+        val transferId = currentTransferId ?: "unknown-transfer"
+        cancelledTransfers.remove(transferId)
+        emitTransfer(transferId, peerId, null, batchTransferred, max(batchTotal, 1L), "cancelled", null)
       } catch (error: Exception) {
-        emitTransfer(UUID.randomUUID().toString(), peerId, null, 0, 1, "failed", error.message)
+        val transferId = currentTransferId ?: "unidentified-${UUID.randomUUID()}"
+        if (cancelledTransfers.remove(transferId)) {
+          emitTransfer(transferId, peerId, null, batchTransferred, max(batchTotal, 1L), "cancelled", null)
+        } else {
+          emitTransfer(transferId, peerId, null, batchTransferred, max(batchTotal, 1L), "failed", error.message)
+        }
       } finally {
+        currentTransferId?.let {
+          activeSockets.remove(it)
+          pausedTransfers.remove(it)
+          pendingIncomingApprovals.remove(it)?.countDown()
+          incomingApprovalResults.remove(it)
+        }
         if (activeTransferCount.decrementAndGet() <= 0) context.stopService(serviceIntent)
       }
     }
@@ -1290,6 +1702,9 @@ class CrossBeamNativeModule : Module() {
           "name" to name,
           "platform" to inferPeerPlatform(name),
           "connection" to "ble",
+          "availability" to "discovered",
+          "isTransferReady" to false,
+          "statusMessage" to "Discovered over Bluetooth; waiting for a network endpoint",
           "isTrusted" to false,
           "lastSeenAt" to System.currentTimeMillis()
         )
@@ -1321,19 +1736,22 @@ class CrossBeamNativeModule : Module() {
     }
   }
 
-  private fun calculateSha256(context: Context, uri: Uri): String {
+  private fun calculateSha256AndSize(context: Context, uri: Uri): Pair<String, Long> {
     val digest = MessageDigest.getInstance("SHA-256")
+    var totalBytes = 0L
     context.contentResolver.openInputStream(uri)?.use { rawInput ->
       BufferedInputStream(rawInput).use { input ->
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
         var read = input.read(buffer)
-        while (read >= 0) {
+        while (read > 0) {
           digest.update(buffer, 0, read)
+          totalBytes = Math.addExact(totalBytes, read.toLong())
+          if (totalBytes > maxFileSize) throw IllegalArgumentException("File size is not supported")
           read = input.read(buffer)
         }
       }
     } ?: throw IllegalArgumentException("Unable to read file for checksum")
-    return digest.digest().joinToString("") { "%02x".format(it) }
+    return digest.digest().joinToString("") { "%02x".format(it) } to totalBytes
   }
 
   private fun calculateSha256(file: File): String {
@@ -1364,7 +1782,9 @@ class CrossBeamNativeModule : Module() {
     status: String,
     errorMessage: String?,
     mimeType: String? = null,
-    savedFilePath: String? = null
+    savedFilePath: String? = null,
+    checksum: String? = null,
+    integrityVerified: Boolean? = null
   ) {
     sendEvent(
       "onTransferProgress",
@@ -1377,13 +1797,18 @@ class CrossBeamNativeModule : Module() {
         "totalBytes" to totalBytes,
         "status" to status,
         "errorMessage" to errorMessage,
-        "savedFilePath" to savedFilePath
+        "savedFilePath" to savedFilePath,
+        "checksum" to checksum,
+        "integrityVerified" to integrityVerified
       )
     )
   }
 
   private fun sanitizeFileName(name: String): String {
-    val cleaned = name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
+    val cleaned = name
+      .replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "_")
+      .trim()
+      .trim('.')
     return cleaned.ifBlank { "received-file" }
   }
 
@@ -1419,4 +1844,5 @@ class CrossBeamNativeModule : Module() {
   )
 
   private class TransferCancelledException : Exception()
+  private class TransferRejectedException(message: String) : Exception(message)
 }

@@ -47,6 +47,7 @@ type Props = {
   ) => void;
   onCreateClipboardBeam?: (text: string) => void;
   onSaveCollection?: () => void;
+  receiverDeviceName?: string;
 };
 
 const DeviceIcon = ({ platform }: { platform: string }) => {
@@ -75,6 +76,7 @@ export function HomeScreen({
   discoveryEnabled = false,
   approvals = [],
   onApprovalAction,
+  receiverDeviceName = "Android TV",
 }: Props) {
   const { colors } = useTheme();
   const hasFiles = selectedFiles.length > 0;
@@ -109,7 +111,7 @@ export function HomeScreen({
                 Ready to Receive
               </Text>
               <Text style={[S.tvStatusSub, { color: colors.textSecondary }]}>
-                Visible nearby as "Living Room TV"
+                Visible nearby as "{receiverDeviceName}"
               </Text>
             </View>
           </View>
@@ -118,19 +120,17 @@ export function HomeScreen({
 
       <View style={S.actionHub}>
         <View style={S.mainButtons}>
-          <FocusablePressable
-            onPress={onPickFiles}
-            style={[
-              S.bigBtn,
-              { backgroundColor: colors.accent },
-              Platform.isTV && { flex: 1 },
-            ]}
-          >
-            <View style={S.btnIcon}>
-              <Plus size={32} color="#FFF" strokeWidth={2.5} />
-            </View>
-            <Text style={S.btnLabel}>Send Files</Text>
-          </FocusablePressable>
+          {!Platform.isTV && (
+            <FocusablePressable
+              onPress={onPickFiles}
+              style={[S.bigBtn, { backgroundColor: colors.accent }]}
+            >
+              <View style={S.btnIcon}>
+                <Plus size={32} color="#FFF" strokeWidth={2.5} />
+              </View>
+              <Text style={S.btnLabel}>Send Files</Text>
+            </FocusablePressable>
+          )}
 
           <FocusablePressable
             onPress={onOpenScanner}
@@ -153,7 +153,7 @@ export function HomeScreen({
           </FocusablePressable>
         </View>
 
-        {hasFiles && (
+        {hasFiles && !Platform.isTV && (
           <GlassCard animate style={S.selectionCard} accentBorder>
             <View style={S.selectionHeader}>
               <Text style={[S.selectionTitle, { color: colors.textPrimary }]}>
@@ -336,15 +336,19 @@ export function HomeScreen({
                     >
                       <Text style={S.approvalBtnText}>Accept</Text>
                     </FocusablePressable>
-                    <FocusablePressable
-                      onPress={() => onApprovalAction?.(approval.id, "trusted")}
-                      style={[
-                        S.approvalBtn,
-                        { backgroundColor: colors.accent },
-                      ]}
-                    >
-                      <Text style={S.approvalBtnText}>Always trust</Text>
-                    </FocusablePressable>
+                    {approval.fromDevice.deviceKey && (
+                      <FocusablePressable
+                        onPress={() =>
+                          onApprovalAction?.(approval.id, "trusted")
+                        }
+                        style={[
+                          S.approvalBtn,
+                          { backgroundColor: colors.accent },
+                        ]}
+                      >
+                        <Text style={S.approvalBtnText}>Always trust</Text>
+                      </FocusablePressable>
+                    )}
                     <FocusablePressable
                       onPress={() =>
                         onApprovalAction?.(approval.id, "rejected")
@@ -420,7 +424,13 @@ export function HomeScreen({
                   {device.name}
                 </Text>
                 <Text style={[S.deviceStatus, { color: colors.textMuted }]}>
-                  {device.isTrusted ? "Trusted" : "Nearby"}
+                  {device.isTransferReady
+                    ? "Ready"
+                    : device.availability === "connecting"
+                      ? "Connecting"
+                      : device.connection === "wifi-direct"
+                        ? "Tap to connect"
+                        : "Discovery only"}
                 </Text>
               </FocusablePressable>
             ))}

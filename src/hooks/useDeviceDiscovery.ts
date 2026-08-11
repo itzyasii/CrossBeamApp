@@ -11,9 +11,9 @@ import { Device } from "@/types/domain";
 import { mergeDiscoveredDevices } from "@/utils/deviceMerge";
 import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { haptics } from "@/services/haptics";
-import { Platform } from "react-native";
 
 const AUTO_REFRESH_MS = 12_000;
+const STALE_UNREADY_PEER_MS = 30_000;
 
 export const useDeviceDiscovery = (enabled = true) => {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -32,7 +32,7 @@ export const useDeviceDiscovery = (enabled = true) => {
       setLastRefreshAt(Date.now());
       setStatusMessage(
         result.length > 0
-          ? `Found nearby devices ready for sharing.`
+          ? `${result.length} nearby; ${result.filter((device) => device.isTransferReady).length} ready to receive.`
           : capabilities.length > 0
             ? `Scanning for nearby devices...`
             : "Device scanning is not available on this device.",
@@ -41,6 +41,30 @@ export const useDeviceDiscovery = (enabled = true) => {
       setStatusMessage(String(error));
     } finally {
       setIsRefreshing(false);
+    }
+  }, []);
+
+  const connectDevice = useCallback(async (deviceId: string) => {
+    setDevices((current) =>
+      current.map((device) =>
+        device.id === deviceId
+          ? { ...device, availability: "connecting", statusMessage: "Connecting with Wi-Fi Direct..." }
+          : device,
+      ),
+    );
+    try {
+      const connected = await nativeCrossBeam.connectToWifiDirectPeer(deviceId);
+      setDevices((current) => mergeDiscoveredDevices([connected, ...current]));
+      return connected;
+    } catch (error) {
+      setDevices((current) =>
+        current.map((device) =>
+          device.id === deviceId
+            ? { ...device, availability: "unavailable", isTransferReady: false, statusMessage: String(error) }
+            : device,
+        ),
+      );
+      throw error;
     }
   }, []);
 
@@ -65,10 +89,6 @@ export const useDeviceDiscovery = (enabled = true) => {
       })
       .finally(() => {
         if (mounted) void refreshDevices();
-        // Start foreground service on Android so discovery can continue in background
-        if (Platform.OS === "android") {
-          void nativeCrossBeam.startForegroundService().catch(() => {});
-        }
       });
 
     const removeFound = addNearbyDeviceFoundListener((device) => {
@@ -99,9 +119,6 @@ export const useDeviceDiscovery = (enabled = true) => {
       removeFound();
       removeLost();
       void stopNearbyDiscovery();
-      if (Platform.OS === "android") {
-        void nativeCrossBeam.stopForegroundService().catch(() => {});
-      }
     };
   }, [enabled, refreshDevices]);
 
@@ -109,6 +126,15 @@ export const useDeviceDiscovery = (enabled = true) => {
     if (!enabled) return;
 
     const interval = setInterval(() => {
+      const cutoff = Date.now() - STALE_UNREADY_PEER_MS;
+      setDevices((current) =>
+        current.filter(
+          (device) =>
+            device.isTransferReady ||
+            device.connection === "local-network" ||
+            device.lastSeenAt >= cutoff,
+        ),
+      );
       void refreshDevices();
     }, AUTO_REFRESH_MS);
 
@@ -121,5 +147,6 @@ export const useDeviceDiscovery = (enabled = true) => {
     lastRefreshAt,
     statusMessage,
     refreshDevices,
+    connectDevice,
   };
 };

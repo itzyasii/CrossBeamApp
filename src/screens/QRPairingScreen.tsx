@@ -132,7 +132,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
         <View style={S.tvFooter}>
           <ShieldCheck size={20} color={colors.success} />
           <Text style={[S.footerText, { color: colors.textMuted }]}>
-            SECURE_P2P_ENCRYPTED
+            LOCAL NETWORK PAIRING PREVIEW
           </Text>
         </View>
       </View>
@@ -262,7 +262,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
                 >
                   <Zap size={14} color={colors.accent} strokeWidth={3} />
                   <Text style={[S.pairingText, { color: colors.accent }]}>
-                    AUTO_PAIR_ENABLED
+                    PAIRING PREVIEW
                   </Text>
                 </View>
               </View>
@@ -276,7 +276,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
                   style={StyleSheet.absoluteFill}
                 />
                 <ShieldCheck size={64} color={colors.success} />
-                <Text style={S.successLabel}>NODE_VERIFIED</Text>
+                <Text style={S.successLabel}>CODE_SCANNED</Text>
               </View>
             )}
           </BlurView>

@@ -6,18 +6,20 @@
 | --- | --- | --- | --- |
 | Shared React Native UI | Yes | Yes | Yes, with TV focus states |
 | Local peer discovery | NSD, BLE, Wi-Fi Direct API | Multipeer Connectivity | NSD, BLE, Wi-Fi Direct API |
-| File transfer | `crossbeam-chunk-v2` socket stream | `crossbeam-chunk-v2` Multipeer stream | `crossbeam-chunk-v2` socket stream |
+| File transfer | `crossbeam-chunk-v3` same-LAN socket stream | `crossbeam-chunk-v2` Multipeer stream | `crossbeam-chunk-v3` same-LAN socket stream |
 | Integrity checks | SHA-256 file and chunk checks | SHA-256 file and chunk checks | SHA-256 file and chunk checks |
 | Secure storage | Android Keystore | Keychain | Android Keystore |
 | Share intake | Android/iOS share intent module | Android/iOS share intent module | Receive-first flow |
 | QR pairing | Scan and pair | Scan and pair | Display receiver QR |
 | Background/long transfer UX | Keep-awake during active transfer | Keep-awake during active transfer | Keep-awake and receiver status |
-| Pause/resume | Chunk checkpoint controls | Chunk checkpoint controls | Chunk checkpoint controls |
+| Pause/resume | Active transfer plus checksum-bound partial checkpoints | Chunk checkpoint controls | Active transfer plus checksum-bound partial checkpoints |
 
 ## Important Platform Notes
 
 - iOS uses an app-managed Multipeer stream for core transfers so pause/resume/retry can share the same chunk checkpoint model as Android and TV. The legacy MCSession resource delegate remains only as a compatibility fallback for older incoming resource transfers.
-- Android TV should be treated as Android plus receiver-first UX, remote focus, Leanback launcher support, and conservative background behavior.
+- Android TV has Leanback launcher/feature declarations, receiver-first UI, automatic discovery startup, and D-pad focus controls. A final localized store banner and physical-TV validation remain release gates.
+- Android/TV v3 publishes received files through scoped-storage-compatible `MediaStore.Downloads` after an app-private partial file passes its full checksum.
+- Android transport remains plaintext and unauthenticated. Do not describe a transfer as encrypted or a QR scan as verified until authenticated pairing and session encryption ship.
 - Platform-specific features such as Siri Shortcuts, Handoff, and iCloud should remain additive iOS enhancements, not required core parity.
 
 ## Implemented Feature Set
@@ -32,6 +34,8 @@
 8. Transfer collections: group multi-file transfers into named batches.
 9. Integrity report: show checksum, duration, speed, and path after completion.
 10. Privacy audit screen: explain local-only behavior and show active permissions.
+11. Android share intake: normalize single/multiple files, MIME/size metadata, text, and links.
+12. Transfer recovery: persist source descriptors and per-file results, mark process-interrupted jobs honestly, and expose explicit retry.
 
 ## UI Enhancements
 

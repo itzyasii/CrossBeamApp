@@ -49,7 +49,7 @@ const DEFAULTS: SettingsState = {
   notifications: true,
   autoTransfer: false,
   useMeteredNetworks: false,
-  requireEncryption: true,
+  requireEncryption: false,
   verifyChecksum: true,
 };
 
@@ -98,7 +98,7 @@ const SettingRow = ({
 
 export const SettingsScreen: React.FC = () => {
   const { colors, themePreference } = useTheme();
-  const { setThemePreference, biometricLockEnabled, setBiometricLock } =
+  const { setThemePreference, biometricLockEnabled, setBiometricLock, updateSettings: updateAppSetting } =
     useAppStore();
   const [settings, setSettings] = useState<SettingsState>(DEFAULTS);
   const [storageBytes, setStorageBytes] = useState(0);
@@ -119,10 +119,8 @@ export const SettingsScreen: React.FC = () => {
         autoTransfer: saved.autoTransfer ?? DEFAULTS.autoTransfer,
         useMeteredNetworks:
           saved.enableMeteredNetworks ?? DEFAULTS.useMeteredNetworks,
-        requireEncryption:
-          (saved as any).requireEncryption ?? DEFAULTS.requireEncryption,
-        verifyChecksum:
-          (saved as any).verifyChecksum ?? DEFAULTS.verifyChecksum,
+        requireEncryption: false,
+        verifyChecksum: true,
       });
       setStorageBytes(storage.used);
       setDiagnostics(report);
@@ -134,7 +132,12 @@ export const SettingsScreen: React.FC = () => {
   }, []);
 
   const updateSetting = (key: keyof SettingsState, value: boolean) => {
-    const updatedSettings = { ...settings, [key]: value };
+    const updatedSettings = {
+      ...settings,
+      [key]: value,
+      requireEncryption: false,
+      verifyChecksum: true,
+    };
     setSettings(updatedSettings);
     void StorageService.updateSettings({
       enableNotifications: updatedSettings.notifications,
@@ -143,6 +146,13 @@ export const SettingsScreen: React.FC = () => {
       requireEncryption: updatedSettings.requireEncryption,
       verifyChecksum: updatedSettings.verifyChecksum,
     } as any);
+    const runtimeKey =
+      key === "notifications"
+        ? "enableNotifications"
+        : key === "useMeteredNetworks"
+          ? "enableMeteredNetworks"
+          : key;
+    void updateAppSetting(runtimeKey, value);
   };
 
   const clearLocalData = () => {
@@ -370,8 +380,8 @@ export const SettingsScreen: React.FC = () => {
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={Smartphone}
-            title="Auto-accept trusted devices"
-            description="Skip extra steps for devices you already trust."
+            title="Auto-accept securely paired devices"
+            description="Takes effect only for an exact authenticated device key."
             value={settings.autoTransfer}
             onValueChange={(value) => updateSetting("autoTransfer", value)}
           />
@@ -404,17 +414,19 @@ export const SettingsScreen: React.FC = () => {
           <SettingRow
             icon={LockKeyhole}
             title="Secure mode"
-            description="Use extra protection for device connections."
-            value={settings.requireEncryption}
-            onValueChange={(value) => updateSetting("requireEncryption", value)}
+            description="Authenticated transport encryption is not available in this build yet."
+            value={false}
+            onValueChange={() => {}}
+            disabled
           />
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={ShieldCheck}
             title="Check transfers"
-            description="Make sure files arrive safely."
-            value={settings.verifyChecksum}
-            onValueChange={(value) => updateSetting("verifyChecksum", value)}
+            description="SHA-256 integrity verification is mandatory for every received file."
+            value
+            onValueChange={() => {}}
+            disabled
           />
         </GlassCard>
       </View>

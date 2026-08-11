@@ -1,6 +1,11 @@
   export type ConnectionType = "wifi-direct" | "hotspot" | "lan" | "local-network" | "multipeer" | "ble";
 
 export type DevicePlatform = "android" | "ios" | "android-tv";
+export type DeviceAvailability =
+  | "discovered"
+  | "connecting"
+  | "ready"
+  | "unavailable";
 
 export type Device = {
   id: string;
@@ -8,6 +13,10 @@ export type Device = {
   platform: DevicePlatform;
   connection: ConnectionType;
   deviceKey?: string;
+  availability?: DeviceAvailability;
+  isTransferReady?: boolean;
+  statusMessage?: string;
+  wifiDirectAddress?: string;
   lastSeenAt: number;
   isTrusted?: boolean;
 };
@@ -32,6 +41,17 @@ export type SelectedFile = {
   uri: string;
 };
 
+export type TransferFileResult = {
+  name: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  savedUri?: string;
+  checksum?: string;
+  integrityVerified: boolean;
+  status: "pending" | "transferring" | "completed" | "failed";
+  errorMessage?: string;
+};
+
 export type TransferJob = {
   id: string;
   // Canonical shape (multi-file support).
@@ -52,6 +72,12 @@ export type TransferJob = {
   mimeType?: string;
   localFilePaths?: string[];
   savedFilePaths?: string[];
+  checksum?: string;
+  integrityVerified?: boolean;
+  peerId?: string;
+  sourceFiles?: SelectedFile[];
+  fileResults?: TransferFileResult[];
+  retryable?: boolean;
 };
 
 export type IncomingTransferRequest = {

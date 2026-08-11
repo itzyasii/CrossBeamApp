@@ -13,6 +13,10 @@ export type NativePeer = {
   platform: NativePeerPlatform;
   connection: NativePeerConnection;
   deviceKey?: string;
+  availability?: "discovered" | "connecting" | "ready" | "unavailable";
+  isTransferReady?: boolean;
+  statusMessage?: string;
+  wifiDirectAddress?: string;
   host?: string;
   port?: number;
   isTrusted: boolean;
@@ -54,13 +58,16 @@ export type NativeTransferEvent = {
     | "paused"
     | "completed"
     | "failed"
+    | "rejected"
     | "cancelled";
   errorMessage?: string;
   savedFilePath?: string;
+  checksum?: string;
+  integrityVerified?: boolean;
 };
 
 export type NativeChunkProtocol = {
-  protocol: "crossbeam-chunk-v2";
+  protocol: "crossbeam-chunk-v2" | "crossbeam-chunk-v3";
   version: number;
   chunkSizeBytes: number;
   supportsChunkAck: boolean;
@@ -112,6 +119,9 @@ export type CrossBeamNativeModule = {
   startDiscovery(): Promise<void>;
   stopDiscovery(): Promise<void>;
   getDiscoveredPeers(): Promise<NativePeer[]>;
+  connectToWifiDirectPeer?(peerId: string): Promise<NativePeer>;
+  disconnectWifiDirect?(): Promise<void>;
+  cleanupPartialTransfers?(maxAgeMs: number): Promise<number>;
   respondToIncomingTransfer(
     transferId: string,
     accepted: boolean,

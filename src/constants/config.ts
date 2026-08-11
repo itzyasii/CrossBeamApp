@@ -29,7 +29,7 @@ export const APP_CONFIG = {
     notificationsEnabled: true,
     autoTransferEnabled: false,
     meteredNetworksEnabled: false,
-    encryptionEnabled: true,
+    encryptionEnabled: false,
     compressionEnabled: true,
   },
 } as const;
@@ -45,7 +45,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enableNotifications: true,
   autoTransfer: false,
   enableMeteredNetworks: false,
-  encryptionEnabled: true,
+  encryptionEnabled: false,
   compressionEnabled: true,
   discoveryIntervalMs: APP_CONFIG.network.discoveryIntervalMs,
 };

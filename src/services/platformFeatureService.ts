@@ -41,7 +41,8 @@ export type TransferCollection = {
 
 export type IntegrityReport = {
   transferId: string;
-  checksum: string;
+  checksum?: string;
+  verified: boolean;
   durationMs: number;
   averageBytesPerSecond: number;
   savedPath?: string;
@@ -75,15 +76,6 @@ const writeJson = async <T>(key: string, value: T): Promise<void> => {
   } catch (error) {
     console.warn(`[PlatformFeatures] Failed to store ${key}`, error);
   }
-};
-
-const syntheticChecksum = (job: TransferJob): string => {
-  const source = `${job.id}:${job.fileNames.join("|")}:${job.sizeBytes}:${job.updatedAt}`;
-  let hash = 0;
-  for (let i = 0; i < source.length; i += 1) {
-    hash = (hash * 31 + source.charCodeAt(i)) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0").repeat(8).slice(0, 64);
 };
 
 export const platformFeatureService = {
@@ -121,7 +113,12 @@ export const platformFeatureService = {
       approval.id === id ? { ...approval, status } : approval,
     );
     const approval = updated.find((item) => item.id === id);
-    if (approval && status === "trusted") {
+    if (
+      approval &&
+      status === "trusted" &&
+      approval.fromDevice.deviceKey &&
+      approval.fromDevice.id === `peer-${approval.fromDevice.deviceKey}`
+    ) {
       await saveDevice({ ...approval.fromDevice, isTrusted: true });
     }
     await writeJson(APPROVALS_KEY, updated);
@@ -187,7 +184,8 @@ export const platformFeatureService = {
     const durationMs = Math.max(1, job.updatedAt - job.startedAt);
     const report: IntegrityReport = {
       transferId: job.id,
-      checksum: syntheticChecksum(job),
+      checksum: job.integrityVerified ? job.checksum : undefined,
+      verified: job.integrityVerified === true && Boolean(job.checksum),
       durationMs,
       averageBytesPerSecond: Math.floor(job.sizeBytes / (durationMs / 1000)),
       savedPath:

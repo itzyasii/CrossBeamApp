@@ -424,13 +424,14 @@ export function HomeScreen({
                   {device.name}
                 </Text>
                 <Text style={[S.deviceStatus, { color: colors.textMuted }]}>
-                  {device.isTransferReady
-                    ? "Ready"
-                    : device.availability === "connecting"
-                      ? "Connecting"
-                      : device.connection === "wifi-direct"
-                        ? "Tap to connect"
-                        : "Discovery only"}
+                  {device.statusMessage ??
+                    (device.isTransferReady
+                      ? "Ready"
+                      : device.availability === "connecting"
+                        ? "Connecting"
+                        : device.connection === "wifi-direct"
+                          ? "Tap to connect"
+                          : "Discovery only")}
                 </Text>
               </FocusablePressable>
             ))}

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import * as Network from "expo-network";
 
 import {
   addNearbyDeviceFoundListener,
@@ -15,26 +16,83 @@ import { haptics } from "@/services/haptics";
 const AUTO_REFRESH_MS = 12_000;
 const STALE_UNREADY_PEER_MS = 30_000;
 
+const describeRoute = (
+  device: Device,
+  networkType: Network.NetworkStateType | undefined,
+): Device => {
+  if (device.availability === "connecting" || device.availability === "unavailable") return device;
+  if (device.isTransferReady && device.connection === "local-network") {
+    return { ...device, statusMessage: "Ready on the same local Wi-Fi/network" };
+  }
+  if (device.isTransferReady && device.connection === "wifi-direct") {
+    return { ...device, statusMessage: "Ready over a direct Wi-Fi link" };
+  }
+  if (device.connection === "wifi-direct" || device.wifiDirectAddress) {
+    return { ...device, statusMessage: "Nearby over Wi-Fi Direct; tap Connect" };
+  }
+  if (device.connection === "ble") {
+    return {
+      ...device,
+      statusMessage:
+        networkType === Network.NetworkStateType.WIFI
+          ? "Nearby via Bluetooth; no same-network endpoint found yet"
+          : "Nearby via Bluetooth; turn on Wi-Fi for a direct transfer",
+    };
+  }
+  return device;
+};
+
+const scanningMessage = (
+  networkType: Network.NetworkStateType | undefined,
+  deviceCount: number,
+  readyCount: number,
+): string => {
+  if (deviceCount > 0) return `${deviceCount} nearby; ${readyCount} ready to receive.`;
+  if (networkType === Network.NetworkStateType.WIFI) {
+    return "Scanning the local Wi-Fi network, Wi-Fi Direct, and Bluetooth.";
+  }
+  if (networkType === Network.NetworkStateType.CELLULAR) {
+    return "Carrier data is active. CrossBeam uses Bluetooth and Wi-Fi Direct locally, never the internet.";
+  }
+  if (networkType === Network.NetworkStateType.NONE) {
+    return "No network route. Turn on Wi-Fi and Bluetooth to discover nearby devices.";
+  }
+  return "Scanning local and direct nearby routes...";
+};
+
 export const useDeviceDiscovery = (enabled = true) => {
   const [devices, setDevices] = useState<Device[]>([]);
+  const devicesRef = useRef<Device[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
+  const networkTypeRef = useRef<Network.NetworkStateType | undefined>(undefined);
   const [statusMessage, setStatusMessage] = useState(
     "Scanning is paused. Tap to find nearby devices.",
   );
 
+  useEffect(() => {
+    devicesRef.current = devices;
+  }, [devices]);
+
   const refreshDevices = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const result = mergeDiscoveredDevices(await discoverNearbyDevices());
+      const currentNetwork = await Network.getNetworkStateAsync().catch(() => ({ type: networkTypeRef.current }));
+      const routeType = currentNetwork.type ?? networkTypeRef.current;
+      networkTypeRef.current = routeType;
+      const result = mergeDiscoveredDevices(await discoverNearbyDevices()).map((device) =>
+        describeRoute(device, routeType),
+      );
       const capabilities = await nativeCrossBeam.getCapabilities();
       setDevices(result);
       setLastRefreshAt(Date.now());
       setStatusMessage(
-        result.length > 0
-          ? `${result.length} nearby; ${result.filter((device) => device.isTransferReady).length} ready to receive.`
-          : capabilities.length > 0
-            ? `Scanning for nearby devices...`
+        capabilities.length > 0
+          ? scanningMessage(
+              routeType,
+              result.length,
+              result.filter((device) => device.isTransferReady).length,
+            )
             : "Device scanning is not available on this device.",
       );
     } catch (error) {
@@ -43,6 +101,28 @@ export const useDeviceDiscovery = (enabled = true) => {
       setIsRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    void Network.getNetworkStateAsync().then((state) => {
+      networkTypeRef.current = state.type;
+    }).catch(() => {});
+    const subscription = Network.addNetworkStateListener((state) => {
+      networkTypeRef.current = state.type;
+      const current = devicesRef.current;
+      const updated = current.map((device) => describeRoute(device, state.type));
+      setDevices(updated);
+      if (enabled) {
+        setStatusMessage(
+          scanningMessage(
+            state.type,
+            updated.length,
+            updated.filter((device) => device.isTransferReady).length,
+          ),
+        );
+      }
+    });
+    return () => subscription.remove();
+  }, [enabled]);
 
   const connectDevice = useCallback(async (deviceId: string) => {
     setDevices((current) =>
@@ -93,7 +173,9 @@ export const useDeviceDiscovery = (enabled = true) => {
 
     const removeFound = addNearbyDeviceFoundListener((device) => {
       setDevices((current) => {
-        const merged = mergeDiscoveredDevices([device, ...current]);
+        const merged = mergeDiscoveredDevices([device, ...current]).map((item) =>
+          describeRoute(item, networkTypeRef.current),
+        );
         const alreadyFound = current.some(
           (item) =>
             item.id === device.id ||

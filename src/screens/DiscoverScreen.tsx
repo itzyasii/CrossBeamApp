@@ -142,7 +142,17 @@ const DeviceRow = ({
       : device.connection === 'wifi-direct'
         ? 'Connect'
         : 'Discovery only';
-  const capabilityChips = [platformLabel[device.platform], device.connection.toUpperCase()];
+  const routeLabel: Record<string, string> = {
+    'local-network': 'Same network',
+    lan: 'Same network',
+    'wifi-direct': 'Wi-Fi Direct',
+    hotspot: 'Direct hotspot',
+    ble: 'Bluetooth discovery',
+    multipeer: 'Multipeer',
+  };
+  const capabilityChips = Array.from(
+    new Set(device.availableConnections ?? [device.connection]),
+  ).map((connection) => routeLabel[connection] ?? connection);
 
   return (
     <Animated.View style={{ opacity: fade, transform: [{ translateX: tx }] }}>
@@ -163,6 +173,9 @@ const DeviceRow = ({
             </View>
             <Text style={[S.deviceMeta, { color: colors.textSecondary }]} numberOfLines={1}>
               {platformLabel[device.platform]}
+            </Text>
+            <Text style={[S.routeStatus, { color: colors.textMuted }]} numberOfLines={2}>
+              {device.statusMessage ?? stateLabel}
             </Text>
             <View style={S.capabilityRow}>
               {capabilityChips.map((chip) => (
@@ -395,6 +408,7 @@ const S = StyleSheet.create({
   nameLine: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   deviceName: { fontSize: FONT_SIZE.base, fontWeight: '800', flexShrink: 1 },
   deviceMeta: { fontSize: FONT_SIZE.xs, marginTop: 3, fontWeight: '700' },
+  routeStatus: { fontSize: 10, lineHeight: 14, marginTop: 3, fontWeight: '600' },
   capabilityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
   capabilityChip: {
     overflow: 'hidden',

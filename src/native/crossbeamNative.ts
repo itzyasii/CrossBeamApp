@@ -31,6 +31,7 @@ const toDevice = (peer: NativePeer): Device => ({
     peer.isTransferReady ?? Boolean(peer.host && peer.port && peer.port > 0),
   statusMessage: peer.statusMessage,
   wifiDirectAddress: peer.wifiDirectAddress,
+  availableConnections: peer.availableConnections,
   platform:
     peer.platform === "android-tv"
       ? "android-tv"

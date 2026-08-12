@@ -17,6 +17,7 @@ export type NativePeer = {
   isTransferReady?: boolean;
   statusMessage?: string;
   wifiDirectAddress?: string;
+  availableConnections?: NativePeerConnection[];
   host?: string;
   port?: number;
   isTrusted: boolean;

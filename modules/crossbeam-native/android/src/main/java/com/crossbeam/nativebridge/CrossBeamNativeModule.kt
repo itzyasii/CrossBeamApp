@@ -202,23 +202,56 @@ class CrossBeamNativeModule : Module() {
     return !host.isNullOrBlank() && port != null && port.toInt() > 0
   }
 
-  private fun mergePeerMaps(a: Map<String, Any?>, b: Map<String, Any?>): Map<String, Any?> {
-    val transferPeer = when {
-      hasTransferEndpoint(b) -> b
-      hasTransferEndpoint(a) -> a
-      else -> a
+  private fun isWifiDirectKey(deviceKey: String): Boolean = deviceKey.startsWith("wifi-")
+
+  private fun normalizedPeerName(name: String?): String? {
+    if (isPoorPeerName(name) || name == "Nearby Device") return null
+    return name!!.trim().lowercase().replace(Regex("\\s+"), " ")
+  }
+
+  private fun routeRank(peer: Map<String, Any?>): Int {
+    val endpointBonus = if (hasTransferEndpoint(peer)) 10 else 0
+    return endpointBonus + when (peer["connection"] as? String) {
+      "local-network" -> 4
+      "wifi-direct" -> 3
+      "multipeer" -> 2
+      else -> 1
     }
+  }
+
+  private fun peerConnections(peer: Map<String, Any?>): Set<String> {
+    val advertised = (peer["availableConnections"] as? List<*>)
+      ?.mapNotNull { it as? String }
+      ?.toSet()
+      ?: emptySet()
+    val connection = peer["connection"] as? String
+    return if (connection != null) advertised + connection else advertised
+  }
+
+  private fun mergePeerMaps(a: Map<String, Any?>, b: Map<String, Any?>): Map<String, Any?> {
+    val transferPeer = if (routeRank(b) > routeRank(a)) b else a
     val other = if (transferPeer == b) a else b
-    val deviceKey = (transferPeer["deviceKey"] as? String)
+    val deviceKey = listOfNotNull(a["deviceKey"] as? String, b["deviceKey"] as? String)
+      .firstOrNull { !isWifiDirectKey(it) }
+      ?: (transferPeer["deviceKey"] as? String)
       ?: (other["deviceKey"] as? String)
       ?: transferPeer["id"] as String
+    val connections = (peerConnections(a) + peerConnections(b)).sortedByDescending {
+      when (it) {
+        "local-network" -> 4
+        "wifi-direct" -> 3
+        "multipeer" -> 2
+        else -> 1
+      }
+    }
 
     return mapOf(
       "id" to canonicalPeerId(deviceKey),
       "deviceKey" to deviceKey,
       "name" to bestPeerName(transferPeer["name"] as? String, other["name"] as? String),
       "platform" to (transferPeer["platform"] ?: other["platform"] ?: "android"),
-      "connection" to if (hasTransferEndpoint(transferPeer)) "local-network" else (transferPeer["connection"] ?: "ble"),
+      "connection" to (transferPeer["connection"] ?: "ble"),
+      "availableConnections" to connections,
       "host" to transferPeer["host"],
       "port" to transferPeer["port"],
       "wifiDirectAddress" to (transferPeer["wifiDirectAddress"] ?: other["wifiDirectAddress"]),
@@ -244,18 +277,53 @@ class CrossBeamNativeModule : Module() {
   }
 
   private fun upsertPeer(incoming: Map<String, Any?>): Map<String, Any?> {
-    val deviceKey = incoming["deviceKey"] as? String ?: incoming["id"] as String
+    val rawDeviceKey = incoming["deviceKey"] as? String ?: incoming["id"] as String
+    val incomingName = normalizedPeerName(incoming["name"] as? String)
+    val correlated = if (incomingName != null) {
+      val candidates = peers.values
+        .filter { normalizedPeerName(it["name"] as? String) == incomingName }
+        .distinctBy { it["deviceKey"] as? String ?: it["id"] as String }
+      if (isWifiDirectKey(rawDeviceKey)) {
+        candidates.filter { !isWifiDirectKey(it["deviceKey"] as? String ?: "wifi-") }
+          .singleOrNull()
+      } else {
+        candidates.filter { isWifiDirectKey(it["deviceKey"] as? String ?: "") }
+          .singleOrNull()
+      }
+    } else {
+      null
+    }
+    val correlatedKey = correlated?.get("deviceKey") as? String
+    val deviceKey = when {
+      !isWifiDirectKey(rawDeviceKey) -> rawDeviceKey
+      correlatedKey != null && !isWifiDirectKey(correlatedKey) -> correlatedKey
+      else -> rawDeviceKey
+    }
     val normalized = incoming.toMutableMap().apply {
       put("deviceKey", deviceKey)
       put("id", canonicalPeerId(deviceKey))
+      put("availableConnections", peerConnections(incoming).toList())
     }
 
     val existing = findPeerByDeviceKey(deviceKey)
+      ?: correlated
       ?: peers[normalized["id"] as String]
       ?: peers[incoming["id"] as String]
 
     val merged = if (existing != null) mergePeerMaps(normalized, existing) else normalized
+    val correlatedId = correlated?.get("id") as? String
+    val obsoleteIds = peers.entries
+      .filter { (_, peer) ->
+        normalizedPeerName(peer["name"] as? String) == incomingName &&
+          (peer["deviceKey"] == rawDeviceKey || peer["id"] == incoming["id"] || peer["id"] == correlatedId)
+      }
+      .map { it.key }
     removePeersExcept(merged["id"] as String, deviceKey)
+    obsoleteIds.forEach { obsoleteId ->
+      if (obsoleteId != merged["id"] && peers.remove(obsoleteId) != null) {
+        sendEvent("onPeerLost", mapOf("id" to obsoleteId))
+      }
+    }
     peers[merged["id"] as String] = merged
     sendEvent("onPeerFound", merged)
     return merged
@@ -711,11 +779,41 @@ class CrossBeamNativeModule : Module() {
     wifiP2pReceiver = object : BroadcastReceiver() {
       override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
+          WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
+            val enabled = intent.getIntExtra(
+              WifiP2pManager.EXTRA_WIFI_STATE,
+              WifiP2pManager.WIFI_P2P_STATE_DISABLED
+            ) == WifiP2pManager.WIFI_P2P_STATE_ENABLED
+            if (!enabled) {
+              peers.values
+                .filter { it["connection"] == "wifi-direct" && !hasTransferEndpoint(it) }
+                .forEach { peer ->
+                  upsertPeer(peer.toMutableMap().apply {
+                    put("availability", "unavailable")
+                    put("isTransferReady", false)
+                    put("statusMessage", "Turn on Wi-Fi to use Wi-Fi Direct")
+                    put("lastSeenAt", System.currentTimeMillis())
+                  })
+                }
+            }
+          }
           WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
             if (!hasNearbyWifiPermission(context)) return
             wifiP2pManager?.requestPeers(wifiP2pChannel) { peersList ->
               val peerMapList = peersList.deviceList.map { device ->
                 val deviceKey = "wifi-${device.deviceAddress.replace(":", "")}"
+                val availability = when (device.status) {
+                  WifiP2pDevice.INVITED, WifiP2pDevice.CONNECTED -> "connecting"
+                  WifiP2pDevice.FAILED, WifiP2pDevice.UNAVAILABLE -> "unavailable"
+                  else -> "discovered"
+                }
+                val statusMessage = when (device.status) {
+                  WifiP2pDevice.INVITED -> "Wi-Fi Direct invitation sent"
+                  WifiP2pDevice.CONNECTED -> "Establishing direct transfer route"
+                  WifiP2pDevice.FAILED -> "Wi-Fi Direct connection failed; refresh to retry"
+                  WifiP2pDevice.UNAVAILABLE -> "Wi-Fi Direct peer is currently unavailable"
+                  else -> "Nearby over Wi-Fi Direct; tap Connect"
+                }
                 val peer = mapOf(
                   "id" to canonicalPeerId(deviceKey),
                   "deviceKey" to deviceKey,
@@ -723,9 +821,9 @@ class CrossBeamNativeModule : Module() {
                   "platform" to inferPeerPlatform(device.deviceName),
                   "connection" to "wifi-direct",
                   "wifiDirectAddress" to device.deviceAddress,
-                  "availability" to "discovered",
+                  "availability" to availability,
                   "isTransferReady" to false,
-                  "statusMessage" to "Tap Connect to create a Wi-Fi Direct link",
+                  "statusMessage" to statusMessage,
                   "lastSeenAt" to System.currentTimeMillis(),
                   "status" to when (device.status) {
                     WifiP2pDevice.AVAILABLE -> "available"
@@ -1057,8 +1155,36 @@ class CrossBeamNativeModule : Module() {
         } else {
           peers.entries.firstOrNull { it.value["name"] == serviceInfo.serviceName }?.key
         }
-        if (lostId != null && peers.remove(lostId) != null) {
-          sendEvent("onPeerLost", mapOf("id" to lostId))
+        if (lostId != null) {
+          val peer = peers[lostId]
+          val routes = peer?.let { peerConnections(it) } ?: emptySet()
+          val fallbackConnection = when {
+            peer?.get("wifiDirectAddress") != null && routes.contains("wifi-direct") -> "wifi-direct"
+            routes.contains("ble") -> "ble"
+            else -> null
+          }
+          if (peer != null && fallbackConnection != null) {
+            val downgraded = peer.toMutableMap().apply {
+              remove("host")
+              remove("port")
+              put("connection", fallbackConnection)
+              put("availableConnections", routes - "local-network")
+              put("availability", "discovered")
+              put("isTransferReady", false)
+              put(
+                "statusMessage",
+                if (fallbackConnection == "wifi-direct")
+                  "Local network route was lost; tap Connect for Wi-Fi Direct"
+                else
+                  "Local network route was lost; nearby over Bluetooth"
+              )
+              put("lastSeenAt", System.currentTimeMillis())
+            }
+            peers[lostId] = downgraded
+            sendEvent("onPeerFound", downgraded)
+          } else if (peers.remove(lostId) != null) {
+            sendEvent("onPeerLost", mapOf("id" to lostId))
+          }
         }
       }
     }

@@ -17,6 +17,7 @@ export type Device = {
   isTransferReady?: boolean;
   statusMessage?: string;
   wifiDirectAddress?: string;
+  availableConnections?: ConnectionType[];
   lastSeenAt: number;
   isTrusted?: boolean;
 };

@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0F"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.crossbeam.app",
@@ -20,7 +22,9 @@
         "webcredentials:crossbeam.app"
       ],
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.crossbeam.app"],
+        "com.apple.security.application-groups": [
+          "group.com.crossbeam.app"
+        ],
         "com.apple.developer.icloud-container-identifiers": [
           "iCloud.com.crossbeam.app"
         ],
@@ -35,7 +39,9 @@
         "NSCameraUsageDescription": "CrossBeam uses the camera to scan QR codes for device pairing.",
         "NSFaceIDUsageDescription": "CrossBeam uses FaceID to secure your transfers and privacy.",
         "NSLocalNetworkUsageDescription": "CrossBeam uses the local network to discover and connect to nearby devices for private file sharing.",
-        "NSBonjourServices": ["_crossbeam._tcp"],
+        "NSBonjourServices": [
+          "_crossbeam._tcp"
+        ],
         "NSPhotoLibraryUsageDescription": "CrossBeam lets you choose photos and videos to share with nearby devices.",
         "NSDocumentsFolderUsageDescription": "CrossBeam lets you choose documents to share with nearby devices.",
         "NSBluetoothAlwaysUsageDescription": "CrossBeam uses Bluetooth to discover nearby devices for file sharing.",
@@ -47,7 +53,10 @@
             "NSUbiquitousContainerSupportsFolderLevelEncryption": true
           }
         },
-        "LSApplicationQueriesSchemes": ["files", "sharemenow"]
+        "LSApplicationQueriesSchemes": [
+          "files",
+          "sharemenow"
+        ]
       }
     },
     "android": {
@@ -80,6 +89,15 @@
     },
     "plugins": [
       "./plugins/withAndroidTv",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A0A0F",
+          "image": "./assets/splash/native-splash-mark.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ],
       "expo-sqlite",
       [
         "expo-camera",
@@ -109,7 +127,8 @@
             "NSExtensionActivationSupportsFileWithMaxCount": 10
           }
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "scheme": "crossbeamapp",
     "extra": {

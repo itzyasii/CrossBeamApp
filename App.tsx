@@ -114,7 +114,9 @@ import { useIncomingTransferApprovals } from "@/hooks/useIncomingTransferApprova
 
 export default function App() {
   const { colors, isDark } = useTheme();
-  const DRAWER_BACKGROUND = colors.backgroundElevated;
+  // Keep the drawer visually tied to the main canvas. The elevated light token is
+  // intentionally cream-colored for the bottom navigation and other accents.
+  const DRAWER_BACKGROUND = colors.background;
   const DRAWER_TEXT_PRIMARY = colors.textPrimary;
   const DRAWER_TEXT_SECONDARY = colors.textSecondary;
   const DRAWER_TEXT_MUTED = colors.textMuted;
@@ -604,21 +606,23 @@ export default function App() {
             pointerEvents="box-none"
             style={[S.tabBarWrap, { paddingBottom: Math.max(insets.bottom, 10) }]}
           >
-            <BlurView
-              intensity={isDark ? 34 : 55}
-              tint={isDark ? "dark" : "light"}
-              style={[
-                S.tabBar,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(5,43,58,0.88)"
-                    : "rgba(253,252,220,0.9)",
-                  borderColor: isDark
-                    ? "rgba(128,206,215,0.22)"
-                    : "rgba(0,126,167,0.14)",
-                },
-              ]}
-            >
+            <View style={S.tabBar}>
+              <BlurView
+                intensity={isDark ? 34 : 55}
+                tint={isDark ? "dark" : "light"}
+                pointerEvents="none"
+                style={[
+                  S.tabBarBackground,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(5,43,58,0.88)"
+                      : "rgba(253,252,220,0.9)",
+                    borderColor: isDark
+                      ? "rgba(128,206,215,0.22)"
+                      : "rgba(0,126,167,0.14)",
+                  },
+                ]}
+              />
               {BOTTOM_TABS.map((id) => {
                 if (id === "home") return <View key={id} style={S.centerGap} />;
 
@@ -689,7 +693,7 @@ export default function App() {
                   },
                 ]}
               />
-            </BlurView>
+            </View>
           </View>
 
           {isLocked && (
@@ -1130,13 +1134,18 @@ const S = StyleSheet.create({
     height: 66,
     alignItems: "center",
     borderRadius: 27,
-    borderWidth: 1,
     overflow: "visible",
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.22,
     shadowRadius: 18,
     elevation: 16,
+  },
+  tabBarBackground: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 27,
+    borderWidth: 1,
+    overflow: "hidden",
   },
   tabItem: {
     flex: 1,

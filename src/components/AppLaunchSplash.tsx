@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import { Asset } from "expo-asset";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -14,13 +15,19 @@ import splashParticles from "../../assets/splash/splash-particles.png";
 import splashWordmark from "../../assets/splash/splash-wordmark.png";
 
 interface Props {
+  shouldStart: boolean;
+  onReady: () => void;
   onFinish: () => void;
 }
 
 const BACKGROUND = "#0A0A0F";
+const SPLASH_ASSETS = [splashGlow, splashMark, splashParticles, splashWordmark];
 
-export const AppLaunchSplash = ({ onFinish }: Props) => {
+export const AppLaunchSplash = ({ shouldStart, onReady, onFinish }: Props) => {
   const { width, height } = useWindowDimensions();
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [hasLayout, setHasLayout] = useState(false);
+  const readyNotified = useRef(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const markOpacity = useRef(new Animated.Value(0)).current;
   const markScale = useRef(new Animated.Value(0.82)).current;
@@ -33,6 +40,36 @@ export const AppLaunchSplash = ({ onFinish }: Props) => {
   const finished = useRef(false);
 
   useEffect(() => {
+    let mounted = true;
+
+    void Promise.all(
+      SPLASH_ASSETS.map((source) =>
+        Asset.fromModule(source as number).downloadAsync(),
+      ),
+    )
+      .catch((error) => {
+        // The bundled images can still render from their module references. Do
+        // not leave the native splash stuck if an individual cache load fails.
+        console.warn("[Splash] Unable to preload launch assets:", error);
+      })
+      .finally(() => {
+        if (mounted) setAssetsLoaded(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!assetsLoaded || !hasLayout || readyNotified.current) return;
+    readyNotified.current = true;
+    onReady();
+  }, [assetsLoaded, hasLayout, onReady]);
+
+  useEffect(() => {
+    if (!shouldStart) return;
+
     let animation: Animated.CompositeAnimation | undefined;
 
     const finish = () => {
@@ -156,6 +193,7 @@ export const AppLaunchSplash = ({ onFinish }: Props) => {
     overlayOpacity,
     particlesOpacity,
     particlesProgress,
+    shouldStart,
     wordmarkOffset,
     wordmarkOpacity,
   ]);
@@ -180,6 +218,7 @@ export const AppLaunchSplash = ({ onFinish }: Props) => {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       pointerEvents="auto"
+      onLayout={() => setHasLayout(true)}
       style={[S.overlay, { opacity: overlayOpacity }]}
     >
       <View style={S.brand}>

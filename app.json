@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CrossBeamApp",
+    "name": "CrossBeam",
     "slug": "crossbeam-app",
     "version": "0.1.0",
     "orientation": "default",
@@ -119,7 +119,14 @@
         "expo-share-intent",
         {
           "customScheme": "crossbeamapp",
+          "androidIntentFilters": [
+            "*/*"
+          ],
+          "androidMultiIntentFilters": [
+            "*/*"
+          ],
           "iosActivationRules": {
+            "NSExtensionActivationSupportsText": true,
             "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
             "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
             "NSExtensionActivationSupportsImageWithMaxCount": 10,

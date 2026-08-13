@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Alert,
   Dimensions,
   FlatList,
   Platform,
@@ -137,6 +138,13 @@ export default function App() {
   const [tabIndex, setTabIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [discoveryEnabled, setDiscoveryEnabled] = useState(Platform.isTV);
+  const exitPromptVisible = useRef(false);
+  const pagerRef = useRef<FlatList>(null);
+
+  const goToTab = useCallback((idx: number) => {
+    setTabIndex(idx);
+    pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+  }, []);
 
   const {
     getMissingPermissions,
@@ -197,7 +205,37 @@ export default function App() {
         closeDrawer();
         return true;
       }
-      return false;
+      if (Platform.OS !== "android" || exitPromptVisible.current) return true;
+
+      exitPromptVisible.current = true;
+      Alert.alert(
+        "Exit CrossBeam?",
+        "Are you sure you want to close the app?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => {
+              exitPromptVisible.current = false;
+            },
+          },
+          {
+            text: "Exit",
+            style: "destructive",
+            onPress: () => {
+              exitPromptVisible.current = false;
+              BackHandler.exitApp();
+            },
+          },
+        ],
+        {
+          cancelable: true,
+          onDismiss: () => {
+            exitPromptVisible.current = false;
+          },
+        },
+      );
+      return true;
     };
 
     const backHandler = BackHandler.addEventListener(
@@ -276,12 +314,6 @@ export default function App() {
 
   useEffect(() => {
     void notificationService.requestPermissions();
-  }, []);
-
-  const pagerRef = useRef<FlatList>(null);
-  const goToTab = useCallback((idx: number) => {
-    setTabIndex(idx);
-    pagerRef.current?.scrollToIndex({ index: idx, animated: true });
   }, []);
 
   const drawerX = useRef(new Animated.Value(-DRAWER_W)).current;

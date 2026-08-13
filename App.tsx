@@ -72,7 +72,7 @@ import {
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const DRAWER_W = 300;
-const TAB_BAR_H = 76;
+const TAB_BAR_H = 98;
 
 type Tab = "home" | "discover" | "devices" | "history" | "settings";
 type TabConfig = { id: Tab; icon: any; label: string; desc: string };
@@ -95,6 +95,14 @@ const TABS: TabConfig[] = [
   },
 ];
 
+const BOTTOM_TABS: Tab[] = [
+  "discover",
+  "devices",
+  "home",
+  "history",
+  "settings",
+];
+
 import { Modal, Linking, BackHandler } from "react-native";
 import { FocusablePressable } from "@/components/FocusablePressable";
 import * as KeepAwake from "expo-keep-awake";
@@ -106,22 +114,14 @@ import { useIncomingTransferApprovals } from "@/hooks/useIncomingTransferApprova
 
 export default function App() {
   const { colors, isDark } = useTheme();
-  const DRAWER_BACKGROUND = isDark ? colors.backgroundElevated : "#1b263b";
-  const DRAWER_TEXT_PRIMARY = isDark ? colors.textPrimary : "#FFFFFF";
-  const DRAWER_TEXT_SECONDARY = isDark
-    ? colors.textSecondary
-    : "rgba(255,255,255,0.75)";
-  const DRAWER_TEXT_MUTED = isDark
-    ? colors.textMuted
-    : "rgba(255,255,255,0.65)";
-  const DRAWER_SURFACE = isDark ? colors.surface : "rgba(255,255,255,0.08)";
-  const DRAWER_SURFACE_HOVER = isDark
-    ? colors.surfaceHover
-    : "rgba(255,255,255,0.08)";
-  const DRAWER_BORDER = isDark ? colors.border : "rgba(255,255,255,0.12)";
-  const DRAWER_BORDER_STRONG = isDark
-    ? colors.borderStrong
-    : "rgba(255,255,255,0.16)";
+  const DRAWER_BACKGROUND = colors.backgroundElevated;
+  const DRAWER_TEXT_PRIMARY = colors.textPrimary;
+  const DRAWER_TEXT_SECONDARY = colors.textSecondary;
+  const DRAWER_TEXT_MUTED = colors.textMuted;
+  const DRAWER_SURFACE = colors.surface;
+  const DRAWER_SURFACE_HOVER = colors.surfaceHover;
+  const DRAWER_BORDER = colors.border;
+  const DRAWER_BORDER_STRONG = colors.borderStrong;
   const { biometricLockEnabled, setThemePreference } = useAppStore();
   const { authenticate } = useBiometrics();
   const [isLocked, setIsLocked] = useState(false);
@@ -600,43 +600,97 @@ export default function App() {
           />
 
           {/* ── Bottom Nav ── */}
-          <BlurView
-            intensity={20}
-            tint="dark"
-            style={[
-              S.tabBarWrap,
-              { paddingBottom: insets.bottom, backgroundColor: "#1b263b" },
-            ]}
+          <View
+            pointerEvents="box-none"
+            style={[S.tabBarWrap, { paddingBottom: Math.max(insets.bottom, 10) }]}
           >
-            <View style={S.tabBar}>
-              {TABS.map((t, i) => {
-                const isActive = tabIndex === i;
+            <BlurView
+              intensity={isDark ? 34 : 55}
+              tint={isDark ? "dark" : "light"}
+              style={[
+                S.tabBar,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(5,43,58,0.88)"
+                    : "rgba(253,252,220,0.9)",
+                  borderColor: isDark
+                    ? "rgba(128,206,215,0.22)"
+                    : "rgba(0,126,167,0.14)",
+                },
+              ]}
+            >
+              {BOTTOM_TABS.map((id) => {
+                if (id === "home") return <View key={id} style={S.centerGap} />;
+
+                const tabIndexForItem = TABS.findIndex((tab) => tab.id === id);
+                const tab = TABS[tabIndexForItem];
+                const isActive = tabIndex === tabIndexForItem;
+                const Icon = tab.icon;
+
                 return (
                   <FocusablePressable
-                    key={t.id}
-                    onPress={() => goToTab(i)}
+                    key={id}
+                    accessibilityRole="tab"
+                    accessibilityLabel={tab.label}
+                    accessibilityState={{ selected: isActive }}
+                    onPress={() => {
+                      void haptics.light();
+                      goToTab(tabIndexForItem);
+                    }}
                     style={S.tabItem}
+                    focusedStyle={S.tabItemFocused}
                   >
-                    <t.icon
-                      size={20}
-                      color={isActive ? colors.accent : colors.textMuted}
-                      strokeWidth={isActive ? 2.5 : 2}
+                    <Icon
+                      size={22}
+                      color={isActive ? colors.accentLight : colors.textMuted}
+                      strokeWidth={isActive ? 2.5 : 1.8}
                     />
-                    <Text
+                    <View
                       style={[
-                        S.tabLabel,
+                        S.tabIndicator,
                         {
-                          color: isActive ? colors.accent : colors.textMuted,
+                          backgroundColor: isActive
+                            ? colors.accentLight
+                            : "transparent",
                         },
                       ]}
-                    >
-                      {t.label}
-                    </Text>
+                    />
                   </FocusablePressable>
                 );
               })}
-            </View>
-          </BlurView>
+
+              <FocusablePressable
+                accessibilityRole="tab"
+                accessibilityLabel="Home"
+                accessibilityState={{ selected: tabIndex === 0 }}
+                onPress={() => {
+                  void haptics.medium();
+                  goToTab(0);
+                }}
+                style={[
+                  S.centerTab,
+                  {
+                    backgroundColor: colors.accent,
+                    borderColor: colors.background,
+                    shadowColor: colors.accentLight,
+                  },
+                ]}
+                focusedStyle={S.centerTabFocused}
+              >
+                <Home size={27} color="#FFFFFF" strokeWidth={2.1} />
+              </FocusablePressable>
+              <View
+                pointerEvents="none"
+                style={[
+                  S.centerIndicator,
+                  {
+                    backgroundColor:
+                      tabIndex === 0 ? colors.accentLight : "transparent",
+                  },
+                ]}
+              />
+            </BlurView>
+          </View>
 
           {isLocked && (
             <View
@@ -1064,19 +1118,63 @@ const S = StyleSheet.create({
   tabBarWrap: {
     position: "absolute",
     bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopWidth: 0.5,
-    borderTopColor: "rgba(255,255,255,0.05)",
+    left: SPACING.lg,
+    right: SPACING.lg,
+    zIndex: 50,
+    alignItems: "center",
   },
   tabBar: {
+    width: "100%",
+    maxWidth: 560,
     flexDirection: "row",
-    height: TAB_BAR_H,
+    height: 66,
     alignItems: "center",
-    justifyContent: "space-around",
+    borderRadius: 27,
+    borderWidth: 1,
+    overflow: "visible",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 16,
   },
-  tabItem: { alignItems: "center", gap: 4 },
-  tabLabel: { fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  tabItem: {
+    flex: 1,
+    height: 58,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 20,
+  },
+  tabItemFocused: { borderWidth: 1 },
+  tabIndicator: { width: 5, height: 5, borderRadius: 3 },
+  centerGap: { flex: 1.08 },
+  centerTab: {
+    position: "absolute",
+    top: -25,
+    left: "50%",
+    width: 68,
+    height: 68,
+    marginLeft: -34,
+    borderRadius: 34,
+    borderWidth: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.34,
+    shadowRadius: 12,
+    elevation: 18,
+  },
+  centerTabFocused: { borderWidth: 7 },
+  centerIndicator: {
+    position: "absolute",
+    bottom: 7,
+    left: "50%",
+    width: 5,
+    height: 5,
+    marginLeft: -2.5,
+    borderRadius: 3,
+  },
 
   lockScreen: {
     ...StyleSheet.absoluteFillObject,

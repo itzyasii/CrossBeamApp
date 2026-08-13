@@ -1,6 +1,10 @@
 import React, { useEffect } from "react";
 import { Animated, Image, View } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
+import headerMarkDark from "../../assets/logo/header-mark-dark.png";
+import headerMarkLight from "../../assets/logo/header-mark-light.png";
+import drawerWordmarkDark from "../../assets/logo/drawer-wordmark-dark.png";
+import drawerWordmarkLight from "../../assets/logo/drawer-wordmark-light.png";
 
 interface Props {
   size?: number;
@@ -9,9 +13,7 @@ interface Props {
 
 export const CrossBeamLogo = ({ size = 100, animate = true }: Props) => {
   const { isDark } = useTheme();
-  const source = isDark
-    ? require("../../assets/logo_dark_mode.png")
-    : require("../../assets/logo_light_mode.png");
+  const source = isDark ? headerMarkDark : headerMarkLight;
   const pulse = React.useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -59,15 +61,21 @@ interface WordmarkProps {
 
 export const CrossBeamWordmark = ({ width = 220 }: WordmarkProps) => {
   const { isDark } = useTheme();
-  const source = isDark
-    ? require("../../assets/logo_main_dark.png")
-    : require("../../assets/logo_main.png");
+  const source = isDark ? drawerWordmarkDark : drawerWordmarkLight;
+  const imageHeight = isDark ? width * (2 / 3) : width / 3;
+  const imageOffset = isDark ? -width * 0.23 : -width * 0.065;
 
   return (
-    <Image
-      source={source}
-      style={{ width, height: width / 3 }}
-      resizeMode="contain"
-    />
+    <View style={{ width, height: width * 0.2, overflow: "hidden" }}>
+      <Image
+        source={source}
+        style={{
+          width,
+          height: imageHeight,
+          transform: [{ translateY: imageOffset }],
+        }}
+        resizeMode="contain"
+      />
+    </View>
   );
 };

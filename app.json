@@ -7,7 +7,7 @@
     "icon": "./assets/AppIcon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/logo_main.png",
+      "image": "./assets/splash/native-splash-mark.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0F"
     },

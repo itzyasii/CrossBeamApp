@@ -66,10 +66,10 @@ export function IncomingTransferApprovalModal({
             </View>
             <View style={S.headerCopy}>
               <Text style={[S.title, { color: colors.textPrimary }]}>
-                Incoming Transfer
+                Files for you
               </Text>
               <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-                A nearby device wants to send files
+                Check the sender before accepting
               </Text>
             </View>
             <Pressable onPress={onReject} style={S.closeBtn} hitSlop={8}>
@@ -133,7 +133,7 @@ export function IncomingTransferApprovalModal({
               ]}
             >
               <Text style={[S.warningText, { color: colors.warning }]}>
-                Low storage — this transfer may fail if you accept.
+                You may not have enough space for these files.
               </Text>
             </View>
           )}
@@ -165,7 +165,7 @@ export function IncomingTransferApprovalModal({
                 <Text
                   style={[S.secondaryBtnText, { color: colors.textPrimary }]}
                 >
-                  Always trust
+                  Trust this device
                 </Text>
               </FocusablePressable>
             )}
@@ -182,7 +182,7 @@ export function IncomingTransferApprovalModal({
             >
               <XCircle size={16} color={colors.error} strokeWidth={2.4} />
               <Text style={[S.secondaryBtnText, { color: colors.error }]}>
-                Reject
+                Decline
               </Text>
             </FocusablePressable>
           </View>

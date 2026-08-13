@@ -5,11 +5,9 @@ import {
   History,
   Laptop,
   Plus,
-  Radio,
   RefreshCcw,
   Send,
   Settings,
-  Shield,
   Smartphone,
   Tv,
   X,
@@ -21,8 +19,14 @@ import { useTheme } from "@/hooks/useTheme";
 import { formatSize } from "@/services/transferService";
 import { RADIUS, SPACING } from "@/theme/colors";
 import { Device, SelectedFile, TransferJob } from "@/types/domain";
-import { getRuntimePlatformLabel } from "@/utils/platform";
 import { IncomingApprovalRequest } from "@/services/platformFeatureService";
+
+const approvalStatusLabel: Record<IncomingApprovalRequest["status"], string> = {
+  pending: "Waiting",
+  accepted: "Accepted",
+  rejected: "Declined",
+  trusted: "Saved",
+};
 
 type Props = {
   devices: Device[];
@@ -37,7 +41,6 @@ type Props = {
   onClearFiles: () => void;
   transferStatus?: string | null;
   isSending?: boolean;
-  statusMessage?: string;
   isRefreshing?: boolean;
   discoveryEnabled?: boolean;
   approvals?: IncomingApprovalRequest[];
@@ -71,7 +74,6 @@ export function HomeScreen({
   onOpenScanner,
   onGoToTab,
   onClearFiles,
-  statusMessage,
   isRefreshing,
   discoveryEnabled = false,
   approvals = [],
@@ -87,12 +89,6 @@ export function HomeScreen({
     (total, file) => total + file.sizeBytes,
     0,
   );
-  const discoveryActionLabel = isRefreshing
-    ? "Finding devices"
-    : discoveryEnabled
-      ? "Refresh"
-      : "Find devices";
-
   return (
     <ScrollView
       style={S.container}
@@ -108,10 +104,10 @@ export function HomeScreen({
             </View>
             <View style={S.tvStatusCopy}>
               <Text style={[S.tvStatusTitle, { color: colors.textPrimary }]}>
-                Ready to Receive
+                Ready for files
               </Text>
               <Text style={[S.tvStatusSub, { color: colors.textSecondary }]}>
-                Visible nearby as "{receiverDeviceName}"
+                Other devices can find “{receiverDeviceName}”
               </Text>
             </View>
           </View>
@@ -165,7 +161,7 @@ export function HomeScreen({
               </FocusablePressable>
             </View>
             <Text style={[S.selectionSub, { color: colors.textSecondary }]}>
-              Total size: {formatSize(totalSelectedBytes)}
+              {formatSize(totalSelectedBytes)} total
             </Text>
             <FocusablePressable
               onPress={() => onStartTransfer()}
@@ -200,82 +196,10 @@ export function HomeScreen({
         )}
       </View>
 
-      <GlassCard style={S.platformCard}>
-        <View style={S.platformHeader}>
-          <View
-            style={[
-              S.platformIcon,
-              { backgroundColor: colors.accentHighlight },
-            ]}
-          >
-            <Radio size={20} color={colors.accent} strokeWidth={2.4} />
-          </View>
-          <View style={S.platformCopy}>
-            <Text style={[S.platformTitle, { color: colors.textPrimary }]}>
-              This device
-            </Text>
-            <Text style={[S.platformSub, { color: colors.textSecondary }]}>
-              Your {getRuntimePlatformLabel()}
-            </Text>
-            <Text
-              style={[S.platformSub, { color: colors.textSecondary }]}
-              numberOfLines={2}
-            >
-              {statusMessage || "Ready to send and receive files."}
-            </Text>
-          </View>
-        </View>
-
-        <View style={S.discoveryActions}>
-          <FocusablePressable
-            onPress={onStartDiscovery}
-            style={[
-              S.discoveryPrimary,
-              {
-                backgroundColor: discoveryEnabled
-                  ? colors.surfaceHover
-                  : colors.accent,
-                borderColor: discoveryEnabled
-                  ? colors.borderStrong
-                  : colors.accent,
-              },
-            ]}
-          >
-            <RefreshCcw
-              size={17}
-              color={discoveryEnabled ? colors.textPrimary : "#FFFFFF"}
-              strokeWidth={2.4}
-            />
-            <Text
-              style={[
-                S.discoveryPrimaryText,
-                { color: discoveryEnabled ? colors.textPrimary : "#FFFFFF" },
-              ]}
-            >
-              {discoveryActionLabel}
-            </Text>
-          </FocusablePressable>
-          <FocusablePressable
-            onPress={() => onGoToTab("discover")}
-            style={[S.discoverySecondary, { borderColor: colors.borderStrong }]}
-          >
-            <Radio size={16} color={colors.accentLight} strokeWidth={2.3} />
-            <Text
-              style={[
-                S.discoverySecondaryText,
-                { color: colors.textSecondary },
-              ]}
-            >
-              Find devices
-            </Text>
-          </FocusablePressable>
-        </View>
-      </GlassCard>
-
       {approvals.length > 0 && (
         <View style={S.section}>
           <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
-            Waiting for your approval
+            Files waiting for you
           </Text>
           {approvals.map((approval) => {
             const pending = approval.status === "pending";
@@ -310,8 +234,8 @@ export function HomeScreen({
                       ]}
                     >
                       {approval.storageOk === false
-                        ? "Storage check: Not enough free space"
-                        : "Storage check: Space looks OK"}
+                        ? "Not enough free space"
+                        : "Enough space available"}
                     </Text>
                   </View>
                   <Text
@@ -320,7 +244,7 @@ export function HomeScreen({
                       { color: pending ? colors.warning : colors.success },
                     ]}
                   >
-                    {approval.status}
+                    {approvalStatusLabel[approval.status]}
                   </Text>
                 </View>
                 {pending && (
@@ -346,7 +270,7 @@ export function HomeScreen({
                           { backgroundColor: colors.accent },
                         ]}
                       >
-                        <Text style={S.approvalBtnText}>Always trust</Text>
+                        <Text style={S.approvalBtnText}>Trust this device</Text>
                       </FocusablePressable>
                     )}
                     <FocusablePressable
@@ -368,7 +292,7 @@ export function HomeScreen({
       <View style={S.section}>
         <View style={S.sectionHeader}>
           <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
-            Nearby Devices
+            Nearby devices
           </Text>
           <FocusablePressable onPress={onStartDiscovery}>
             <Text style={[S.actionLink, { color: colors.accent }]}>
@@ -376,7 +300,7 @@ export function HomeScreen({
                 ? "Refreshing"
                 : discoveryEnabled
                   ? "Refresh"
-                  : "Start Scanning"}
+                  : "Find devices"}
             </Text>
           </FocusablePressable>
         </View>
@@ -386,8 +310,8 @@ export function HomeScreen({
             <View style={S.emptyContent}>
               <Text style={[S.emptyText, { color: colors.textSecondary }]}>
                 {discoveryEnabled
-                  ? "Finding nearby devices..."
-                  : "Finding devices is paused."}
+                  ? "No devices found yet."
+                  : "Find a device to start sharing."}
               </Text>
               {!discoveryEnabled && (
                 <FocusablePressable
@@ -442,7 +366,7 @@ export function HomeScreen({
       {activeTransfers.length > 0 && (
         <View style={S.section}>
           <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
-            Active Transfers
+            Sending now
           </Text>
           {activeTransfers.map((job) => (
             <GlassCard key={job.id} style={S.jobCard}>
@@ -498,14 +422,6 @@ export function HomeScreen({
           </Text>
         </FocusablePressable>
 
-        <View style={S.linkItem}>
-          <View style={[S.linkIcon, { backgroundColor: colors.successMuted }]}>
-            <Shield size={20} color={colors.success} />
-          </View>
-          <Text style={[S.linkLabel, { color: colors.textSecondary }]}>
-            Secure
-          </Text>
-        </View>
       </View>
     </ScrollView>
   );

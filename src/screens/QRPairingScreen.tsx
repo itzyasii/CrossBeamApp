@@ -94,11 +94,10 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
         <View style={S.tvLayout}>
           <View style={S.tvContent}>
             <Text style={[S.tvTitle, { color: colors.textPrimary }]}>
-              Connect Mobile Device
+              Share with this TV
             </Text>
             <Text style={[S.tvSub, { color: colors.textSecondary }]}>
-              Open CrossBeam on your phone and scan this code to start sharing
-              files instantly.
+              Open CrossBeam on your phone and scan this code.
             </Text>
 
             <View style={S.tvStatusRow}>
@@ -106,7 +105,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
                 style={[S.statusDot, { backgroundColor: colors.success }]}
               />
               <Text style={[S.statusText, { color: colors.textMuted }]}>
-                TV_NODE_ACTIVE
+                Ready to scan
               </Text>
             </View>
           </View>
@@ -132,7 +131,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
         <View style={S.tvFooter}>
           <ShieldCheck size={20} color={colors.success} />
           <Text style={[S.footerText, { color: colors.textMuted }]}>
-            LOCAL NETWORK PAIRING PREVIEW
+            This feature is in early access
           </Text>
         </View>
       </View>
@@ -151,17 +150,17 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
     return (
       <View style={[S.container, S.centered, { backgroundColor: colors.background }]}>
         <Text style={[S.permissionTitle, { color: colors.textPrimary }]}>
-          Camera unavailable
+          Camera access needed
         </Text>
         <Text style={[S.permissionText, { color: colors.textSecondary }]}>
-          Camera access is required to scan a pairing code.
+          Allow camera access to scan a device code.
         </Text>
         <Pressable
           onPress={onBack}
           style={[S.permissionButton, { borderColor: colors.borderStrong }]}
         >
           <Text style={[S.permissionButtonText, { color: colors.textPrimary }]}>
-            CLOSE
+            Go back
           </Text>
         </Pressable>
       </View>
@@ -192,7 +191,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
               <Pressable onPress={onBack} style={S.closeBtn}>
                 <X color="#FFF" size={28} />
               </Pressable>
-              <Text style={S.scannerTitle}>SCAN_NODE</Text>
+              <Text style={S.scannerTitle}>Scan a device</Text>
               <View style={{ width: 28 }} />
             </View>
 
@@ -253,7 +252,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
               </View>
 
               <View style={S.scannerHint}>
-                <Text style={S.hintText}>ALIGN QR CODE WITHIN FRAME</Text>
+                <Text style={S.hintText}>Place the code inside the frame</Text>
                 <View
                   style={[
                     S.pairingBadge,
@@ -262,7 +261,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
                 >
                   <Zap size={14} color={colors.accent} strokeWidth={3} />
                   <Text style={[S.pairingText, { color: colors.accent }]}>
-                    PAIRING PREVIEW
+                    Early access
                   </Text>
                 </View>
               </View>
@@ -276,7 +275,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
                   style={StyleSheet.absoluteFill}
                 />
                 <ShieldCheck size={64} color={colors.success} />
-                <Text style={S.successLabel}>CODE_SCANNED</Text>
+                <Text style={S.successLabel}>Code found</Text>
               </View>
             )}
           </BlurView>

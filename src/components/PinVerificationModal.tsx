@@ -68,7 +68,7 @@ export const PinVerificationModal = ({ visible, onConfirm, onCancel, expectedPin
           }
         ]}>
           <View style={S.header}>
-            <Text style={[S.title, { color: colors.textPrimary }]}>NODE_AUTH</Text>
+            <Text style={[S.title, { color: colors.textPrimary }]}>Enter PIN</Text>
             <Pressable onPress={onCancel} style={S.closeBtn}>
               <X size={20} color={colors.textSecondary} />
             </Pressable>
@@ -79,7 +79,7 @@ export const PinVerificationModal = ({ visible, onConfirm, onCancel, expectedPin
           </View>
 
           <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-            ENTER SECURITY PIN TO AUTHORIZE
+            Enter your 4-digit PIN to continue
           </Text>
 
           <View style={S.pinContainer}>
@@ -114,7 +114,7 @@ export const PinVerificationModal = ({ visible, onConfirm, onCancel, expectedPin
 
           <View style={S.footer}>
             <ShieldCheck size={14} color={colors.textMuted} />
-            <Text style={[S.footerText, { color: colors.textMuted }]}>E2EE_ENFORCED</Text>
+            <Text style={[S.footerText, { color: colors.textMuted }]}>PIN required</Text>
           </View>
         </Animated.View>
       </View>

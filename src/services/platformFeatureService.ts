@@ -244,13 +244,13 @@ export const platformFeatureService = {
     const blockedPermissions: string[] = [];
 
     if (Platform.OS === "android" && !capabilities.includes("wifi-direct-api-available")) {
-      blockedPermissions.push("Wi-Fi Direct unavailable on this OS/runtime");
+      blockedPermissions.push("Direct nearby connections aren't available on this device.");
     }
     if (!nativeAvailable) {
-      blockedPermissions.push("Native CrossBeam bridge unavailable");
+      blockedPermissions.push("Nearby sharing isn't ready. Reinstall or update the app.");
     }
     if (network.type !== Network.NetworkStateType.WIFI) {
-      blockedPermissions.push("Wi-Fi is not the active network");
+      blockedPermissions.push("Turn on Wi-Fi for the best nearby sharing experience.");
     }
 
     return {

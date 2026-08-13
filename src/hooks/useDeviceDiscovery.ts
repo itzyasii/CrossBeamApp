@@ -12,6 +12,7 @@ import { Device } from "@/types/domain";
 import { mergeDiscoveredDevices } from "@/utils/deviceMerge";
 import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { haptics } from "@/services/haptics";
+import { friendlyErrorMessage } from "@/utils/userMessage";
 
 const AUTO_REFRESH_MS = 12_000;
 const STALE_UNREADY_PEER_MS = 30_000;
@@ -20,23 +21,28 @@ const describeRoute = (
   device: Device,
   networkType: Network.NetworkStateType | undefined,
 ): Device => {
-  if (device.availability === "connecting" || device.availability === "unavailable") return device;
+  if (device.availability === "connecting") {
+    return { ...device, statusMessage: "Connecting…" };
+  }
+  if (device.availability === "unavailable") {
+    return { ...device, statusMessage: "Not available right now" };
+  }
   if (device.isTransferReady && device.connection === "local-network") {
-    return { ...device, statusMessage: "Ready on the same local Wi-Fi/network" };
+    return { ...device, statusMessage: "Ready to share" };
   }
   if (device.isTransferReady && device.connection === "wifi-direct") {
-    return { ...device, statusMessage: "Ready over a direct Wi-Fi link" };
+    return { ...device, statusMessage: "Ready to share" };
   }
   if (device.connection === "wifi-direct" || device.wifiDirectAddress) {
-    return { ...device, statusMessage: "Nearby over Wi-Fi Direct; tap Connect" };
+    return { ...device, statusMessage: "Nearby — tap Connect" };
   }
   if (device.connection === "ble") {
     return {
       ...device,
       statusMessage:
         networkType === Network.NetworkStateType.WIFI
-          ? "Nearby via Bluetooth; no same-network endpoint found yet"
-          : "Nearby via Bluetooth; turn on Wi-Fi for a direct transfer",
+          ? "Nearby, but not ready yet"
+          : "Nearby — turn on Wi-Fi to connect",
     };
   }
   return device;
@@ -47,17 +53,17 @@ const scanningMessage = (
   deviceCount: number,
   readyCount: number,
 ): string => {
-  if (deviceCount > 0) return `${deviceCount} nearby; ${readyCount} ready to receive.`;
+  if (deviceCount > 0) return `${deviceCount} found · ${readyCount} ready`;
   if (networkType === Network.NetworkStateType.WIFI) {
-    return "Scanning the local Wi-Fi network, Wi-Fi Direct, and Bluetooth.";
+    return "Looking for nearby devices…";
   }
   if (networkType === Network.NetworkStateType.CELLULAR) {
-    return "Carrier data is active. CrossBeam uses Bluetooth and Wi-Fi Direct locally, never the internet.";
+    return "Turn on Wi-Fi to find and share with nearby devices.";
   }
   if (networkType === Network.NetworkStateType.NONE) {
-    return "No network route. Turn on Wi-Fi and Bluetooth to discover nearby devices.";
+    return "Turn on Wi-Fi and Bluetooth to find nearby devices.";
   }
-  return "Scanning local and direct nearby routes...";
+  return "Looking for nearby devices…";
 };
 
 export const useDeviceDiscovery = (enabled = true) => {
@@ -67,7 +73,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
   const networkTypeRef = useRef<Network.NetworkStateType | undefined>(undefined);
   const [statusMessage, setStatusMessage] = useState(
-    "Scanning is paused. Tap to find nearby devices.",
+    "Tap Find devices when you're ready.",
   );
 
   useEffect(() => {
@@ -93,10 +99,10 @@ export const useDeviceDiscovery = (enabled = true) => {
               result.length,
               result.filter((device) => device.isTransferReady).length,
             )
-            : "Device scanning is not available on this device.",
+            : "Nearby sharing isn't available on this device.",
       );
     } catch (error) {
-      setStatusMessage(String(error));
+      setStatusMessage(friendlyErrorMessage(error));
     } finally {
       setIsRefreshing(false);
     }
@@ -128,7 +134,7 @@ export const useDeviceDiscovery = (enabled = true) => {
     setDevices((current) =>
       current.map((device) =>
         device.id === deviceId
-          ? { ...device, availability: "connecting", statusMessage: "Connecting with Wi-Fi Direct..." }
+          ? { ...device, availability: "connecting", statusMessage: "Connecting…" }
           : device,
       ),
     );
@@ -140,7 +146,7 @@ export const useDeviceDiscovery = (enabled = true) => {
       setDevices((current) =>
         current.map((device) =>
           device.id === deviceId
-            ? { ...device, availability: "unavailable", isTransferReady: false, statusMessage: String(error) }
+            ? { ...device, availability: "unavailable", isTransferReady: false, statusMessage: friendlyErrorMessage(error) }
             : device,
         ),
       );
@@ -151,7 +157,7 @@ export const useDeviceDiscovery = (enabled = true) => {
   useEffect(() => {
     if (!enabled) {
       setDevices([]);
-      setStatusMessage("Scanning is paused. Tap to find nearby devices.");
+      setStatusMessage("Tap Find devices when you're ready.");
       return;
     }
 
@@ -159,12 +165,12 @@ export const useDeviceDiscovery = (enabled = true) => {
     void startNearbyDiscovery()
       .then(() => {
         if (mounted) {
-          setStatusMessage("Scanning for nearby devices...");
+          setStatusMessage("Looking for nearby devices…");
         }
       })
       .catch((error) => {
         if (mounted) {
-          setStatusMessage(String(error));
+          setStatusMessage(friendlyErrorMessage(error));
         }
       })
       .finally(() => {

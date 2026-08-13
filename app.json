@@ -79,6 +79,7 @@
       ]
     },
     "plugins": [
+      "./plugins/withAndroidTv",
       "expo-sqlite",
       [
         "expo-camera",

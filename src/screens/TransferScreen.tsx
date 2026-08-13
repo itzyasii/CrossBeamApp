@@ -16,6 +16,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { gradients, FONT_SIZE, RADIUS, SPACING } from "@/theme/colors";
 import { formatSize } from "@/services/transferService";
 import { SelectedFile, TransferJob } from "@/types/domain";
+import { transferRouteLabel, transferStatusLabel } from "@/utils/transferCopy";
 
 type Props = {
   transfers: TransferJob[];
@@ -98,7 +99,7 @@ export function TransferScreen({
     <View style={S.container}>
       <GlassCard animate>
         <Text style={[S.sectionTitle, { color: colors.textPrimary }]}>
-          Select files to send
+          Choose what to send
         </Text>
 
         {!hasFiles && (
@@ -120,7 +121,7 @@ export function TransferScreen({
               Choose Files
             </Text>
             <Text style={[S.dropzoneSub, { color: colors.textSecondary }]}>
-              Tap to browse documents, photos, videos and more.
+              Photos, videos, documents, and more.
             </Text>
           </Pressable>
         )}
@@ -213,7 +214,7 @@ export function TransferScreen({
             <AlertTriangle size={22} color={colors.error} strokeWidth={2.4} />
             <View style={{ flex: 1 }}>
               <Text style={[S.errorTitle, { color: colors.error }]}>
-                Transfer blocked
+                Couldn't send
               </Text>
               <Text style={[S.errorMsg, { color: colors.textSecondary }]}>
                 {transferError}
@@ -226,7 +227,7 @@ export function TransferScreen({
                   <Text
                     style={[S.recoveryText, { color: colors.textSecondary }]}
                   >
-                    Retry discovery
+                    Find devices again
                   </Text>
                 </Pressable>
                 <Pressable
@@ -236,7 +237,7 @@ export function TransferScreen({
                   <Text
                     style={[S.recoveryText, { color: colors.textSecondary }]}
                   >
-                    Reselect files
+                    Choose files again
                   </Text>
                 </Pressable>
                 <Pressable
@@ -258,7 +259,7 @@ export function TransferScreen({
       {transfers.length > 0 && (
         <>
           <Text style={[S.listHeader, { color: colors.textMuted }]}>
-            ACTIVE TRANSFERS
+            RECENT SHARING
           </Text>
           {transfers.map((job) => {
             const color = STATUS_COLOR[job.status] ?? colors.accent;
@@ -287,8 +288,7 @@ export function TransferScreen({
                       {job.fileNames.join(", ")}
                     </Text>
                     <Text style={[S.jobRoute, { color: colors.textSecondary }]}>
-                      {job.fromDeviceName} to {job.toDeviceName} -{" "}
-                      {formatSize(job.sizeBytes)}
+                      {transferRouteLabel(job)} · {formatSize(job.sizeBytes)}
                     </Text>
                   </View>
                   <View
@@ -300,7 +300,9 @@ export function TransferScreen({
                       },
                     ]}
                   >
-                    <Text style={[S.statusText, { color }]}>{job.status}</Text>
+                    <Text style={[S.statusText, { color }]}>
+                      {transferStatusLabel(job.status)}
+                    </Text>
                   </View>
                 </View>
 
@@ -329,6 +331,9 @@ export function TransferScreen({
                   </Text>
                 )}
 
+                {(job.status === "queued" ||
+                  job.status === "in-progress" ||
+                  job.status === "paused") && (
                 <View style={S.jobActions}>
                   <Pressable
                     onPress={() => onPauseResume(job.id)}
@@ -355,29 +360,13 @@ export function TransferScreen({
                     </Text>
                   </Pressable>
                 </View>
+                )}
               </GlassCard>
             );
           })}
         </>
       )}
 
-      <View style={S.transferRadar}>
-        {[192, 144, 96].map((size) => (
-          <View
-            key={size}
-            style={[
-              S.transferRing,
-              { width: size, height: size, borderRadius: size / 2 },
-            ]}
-          />
-        ))}
-        <View style={[S.transferCore, { backgroundColor: colors.accent }]}>
-          <Radio size={22} color="#FFFFFF" strokeWidth={2.4} />
-        </View>
-        <Text style={[S.radarCaption, { color: colors.textMuted }]}>
-          SCANNING LOCAL BEAM RANGE...
-        </Text>
-      </View>
     </View>
   );
 }

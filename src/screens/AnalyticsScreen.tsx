@@ -20,6 +20,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { useTheme } from "@/hooks/useTheme";
 import { getAnalyticsData } from "@/store/database";
 import { formatBytes, formatDate } from "@/utils/helpers";
+import { transferRouteLabel, transferStatusLabel } from "@/utils/transferCopy";
 import { gradients, FONT_SIZE, RADIUS, SPACING } from "@/theme/colors";
 import { TransferJob } from "@/types/domain";
 
@@ -136,14 +137,14 @@ export function AnalyticsScreen() {
       }
     >
       <Text style={[S.pageTitle, { color: colors.textPrimary }]}>
-        Analytics
+        Your activity
       </Text>
 
       <GlassCard animate accentBorder>
         <View style={S.heroMetric}>
           <View>
             <Text style={[S.heroLabel, { color: colors.accentLight }]}>
-              NETWORK THROUGHPUT
+              TOTAL SHARED
             </Text>
             <View style={S.heroValueRow}>
               <Text style={[S.heroValue, { color: colors.accentLight }]}>
@@ -170,7 +171,7 @@ export function AnalyticsScreen() {
 
       <View style={S.grid}>
         <MetricCard
-          label="Data Moved"
+          label="Data Shared"
           value={formatBytes(data.totalBytes)}
           icon={HardDrive}
           color="#007EA7"
@@ -228,7 +229,7 @@ export function AnalyticsScreen() {
               {data.totalJobs}
             </Text>
             <Text style={[S.summaryLabel, { color: colors.textSecondary }]}>
-              Total Jobs
+              Attempts
             </Text>
           </View>
           <View style={[S.vertDivider, { backgroundColor: colors.border }]} />
@@ -256,10 +257,10 @@ export function AnalyticsScreen() {
         <View style={S.chartHeader}>
           <View>
             <Text style={[S.chartTitle, { color: colors.textPrimary }]}>
-              Weekly Activity
+              This week
             </Text>
             <Text style={[S.chartSub, { color: colors.textMuted }]}>
-              7-DAY LOCAL TRANSMISSION
+              Daily sharing
             </Text>
           </View>
           <Text style={[S.chartLegend, { color: colors.textSecondary }]}>
@@ -309,13 +310,13 @@ export function AnalyticsScreen() {
 
       <View style={S.logSection}>
         <Text style={[S.logHeader, { color: colors.textMuted }]}>
-          ACTIVITY PULSE
+          RECENT ACTIVITY
         </Text>
         <GlassCard padding={0}>
           {data.recentTransfers.length === 0 ? (
             <View style={S.emptyLog}>
               <Text style={[S.logRoute, { color: colors.textMuted }]}>
-                No transfer activity recorded yet.
+                Your recent sharing will appear here.
               </Text>
             </View>
           ) : null}
@@ -352,8 +353,7 @@ export function AnalyticsScreen() {
                   style={[S.logRoute, { color: colors.textMuted }]}
                   numberOfLines={1}
                 >
-                  {transfer.fromDeviceName} to {transfer.toDeviceName} -{" "}
-                  {formatDate(transfer.updatedAt)}
+                  {transferRouteLabel(transfer)} · {formatDate(transfer.updatedAt)}
                 </Text>
               </View>
               <View style={S.logAmount}>
@@ -371,7 +371,7 @@ export function AnalyticsScreen() {
                     },
                   ]}
                 >
-                  {transfer.status.toUpperCase()}
+                  {transferStatusLabel(transfer.status)}
                 </Text>
               </View>
             </View>
@@ -381,13 +381,13 @@ export function AnalyticsScreen() {
 
       <View style={S.logSection}>
         <Text style={[S.logHeader, { color: colors.textMuted }]}>
-          TOP DEVICES
+          MOST USED DEVICES
         </Text>
         <GlassCard padding={0}>
           {data.topDevices.length === 0 ? (
             <View style={S.emptyLog}>
               <Text style={[S.logRoute, { color: colors.textMuted }]}>
-                Completed transfers will identify top peers here.
+                Devices you share with most will appear here.
               </Text>
             </View>
           ) : null}
@@ -419,7 +419,7 @@ export function AnalyticsScreen() {
                   {device.name}
                 </Text>
                 <Text style={[S.logRoute, { color: colors.textMuted }]}>
-                  Completed transfer volume
+                  Total shared
                 </Text>
               </View>
               <Text style={[S.logBytes, { color: colors.accentLight }]}>

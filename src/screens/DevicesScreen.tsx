@@ -48,7 +48,7 @@ export function DevicesScreen({ onPairDevice }: Props) {
   }, [loadData]);
 
   const confirmRemove = (device: Device) => {
-    Alert.alert('Remove trusted device?', `${device.name} will need approval before future transfers.`, [
+    Alert.alert('Remove this device?', `You'll be asked before accepting files from ${device.name} again.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -69,14 +69,14 @@ export function DevicesScreen({ onPairDevice }: Props) {
     >
       <View style={S.header}>
         <View style={S.headerCopy}>
-          <Text style={[S.title, { color: colors.textPrimary }]}>Trusted Devices</Text>
+          <Text style={[S.title, { color: colors.textPrimary }]}>Saved devices</Text>
           <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-            Locally saved device records. Automatic acceptance requires authenticated pairing.
+            Devices you've chosen to remember.
           </Text>
         </View>
         <Pressable onPress={onPairDevice} style={[S.pairButton, { backgroundColor: colors.accent }]} accessibilityRole="button">
           <PlusCircle size={18} color="#FFFFFF" strokeWidth={2.4} />
-          <Text style={S.pairText}>Pair</Text>
+          <Text style={S.pairText}>Add</Text>
         </Pressable>
       </View>
 
@@ -86,9 +86,9 @@ export function DevicesScreen({ onPairDevice }: Props) {
             <View style={[S.emptyIcon, { backgroundColor: colors.accentHighlight }]}>
               <ShieldCheck size={34} color={colors.accentLight} strokeWidth={2.2} />
             </View>
-            <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>No trusted devices yet</Text>
+            <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>No saved devices yet</Text>
             <Text style={[S.emptyText, { color: colors.textSecondary }]}>
-              Authenticated device pairing is still under development. Incoming transfers require approval.
+              Devices you choose to trust will appear here. You'll still approve new senders.
             </Text>
           </View>
         </GlassCard>
@@ -100,7 +100,7 @@ export function DevicesScreen({ onPairDevice }: Props) {
                 <DeviceIcon platform={device.platform} />
                 <View style={[S.trustedBadge, { backgroundColor: colors.successMuted, borderColor: `${colors.success}55` }]}>
                   <ShieldCheck size={13} color={colors.success} strokeWidth={2.6} />
-                  <Text style={[S.trustedText, { color: colors.success }]}>Trusted</Text>
+                  <Text style={[S.trustedText, { color: colors.success }]}>Saved</Text>
                 </View>
               </View>
 
@@ -114,7 +114,7 @@ export function DevicesScreen({ onPairDevice }: Props) {
 
               <View style={[S.cardFooter, { borderTopColor: colors.border }]}>
                 <View>
-                  <Text style={[S.footerLabel, { color: colors.textMuted }]}>LAST SEEN</Text>
+                  <Text style={[S.footerLabel, { color: colors.textMuted }]}>LAST USED</Text>
                   <Text style={[S.footerValue, { color: colors.textPrimary }]}>{formatDate(device.lastSeenAt)}</Text>
                 </View>
                 <Pressable

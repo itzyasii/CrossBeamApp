@@ -141,19 +141,7 @@ const DeviceRow = ({
       ? 'Connecting'
       : device.connection === 'wifi-direct'
         ? 'Connect'
-        : 'Discovery only';
-  const routeLabel: Record<string, string> = {
-    'local-network': 'Same network',
-    lan: 'Same network',
-    'wifi-direct': 'Wi-Fi Direct',
-    hotspot: 'Direct hotspot',
-    ble: 'Bluetooth discovery',
-    multipeer: 'Multipeer',
-  };
-  const capabilityChips = Array.from(
-    new Set(device.availableConnections ?? [device.connection]),
-  ).map((connection) => routeLabel[connection] ?? connection);
-
+        : 'Not ready';
   return (
     <Animated.View style={{ opacity: fade, transform: [{ translateX: tx }] }}>
       <GlassCard padding={SPACING.md}>
@@ -167,7 +155,7 @@ const DeviceRow = ({
               {device.isTrusted && (
                 <View style={[S.trusted, { backgroundColor: colors.successMuted, borderColor: `${colors.success}55` }]}>
                   <ShieldCheck size={12} color={colors.success} strokeWidth={2.5} />
-                  <Text style={[S.trustedText, { color: colors.success }]}>TRUSTED</Text>
+                  <Text style={[S.trustedText, { color: colors.success }]}>SAVED</Text>
                 </View>
               )}
             </View>
@@ -177,23 +165,6 @@ const DeviceRow = ({
             <Text style={[S.routeStatus, { color: colors.textMuted }]} numberOfLines={2}>
               {device.statusMessage ?? stateLabel}
             </Text>
-            <View style={S.capabilityRow}>
-              {capabilityChips.map((chip) => (
-                <Text
-                  key={chip}
-                  style={[
-                    S.capabilityChip,
-                    {
-                      color: colors.textMuted,
-                      backgroundColor: colors.surfaceHover,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  {chip}
-                </Text>
-              ))}
-            </View>
           </View>
           <PulseDot active={Boolean(device.isTransferReady)} />
           <FocusablePressable
@@ -229,66 +200,19 @@ export function DiscoverScreen({
   onSelectDevice,
 }: Props) {
   const { colors } = useTheme();
-  const readyCount = devices.filter((device) => device.isTransferReady).length;
-  const trustedCount = devices.filter((device) => device.isTrusted).length;
   const radarActive = discoveryEnabled || isRefreshing;
-  const statusLabel = isRefreshing ? 'Scanning' : discoveryEnabled ? 'On' : 'Off';
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={S.scroll}>
       <GlassCard animate style={S.scanCard}>
         <View style={S.scanBody}>
-          <View
-            style={[
-              S.statusPill,
-              {
-                backgroundColor: isRefreshing
-                  ? colors.warningMuted
-                  : discoveryEnabled
-                    ? colors.successMuted
-                    : colors.surfaceHover,
-                borderColor: isRefreshing
-                  ? `${colors.warning}55`
-                  : discoveryEnabled
-                    ? `${colors.success}55`
-                    : colors.border,
-              },
-            ]}
-          >
-            <View
-              style={[
-                S.statusDot,
-                {
-                  backgroundColor: isRefreshing
-                    ? colors.warning
-                    : discoveryEnabled
-                      ? colors.success
-                      : colors.textMuted,
-                },
-              ]}
-            />
-            <Text
-              style={[
-                S.statusText,
-                {
-                  color: isRefreshing
-                    ? colors.warning
-                    : discoveryEnabled
-                      ? colors.success
-                      : colors.textMuted,
-                },
-              ]}
-            >
-              {statusLabel}
-            </Text>
-          </View>
           <RadarSweep active={radarActive} />
           <Text style={[S.scanTitle, { color: colors.textPrimary }]}>
             {isRefreshing
-              ? 'Scanning for nearby devices...'
+              ? 'Looking nearby…'
               : discoveryEnabled
-                ? 'Find Nearby Devices'
-                : 'Scanning Paused'}
+                ? 'Nearby devices'
+                : 'Find a device'}
           </Text>
           <Text style={[S.scanSub, { color: colors.textSecondary }]}>{statusMessage}</Text>
           <Pressable onPress={onRefresh} accessibilityRole="button">
@@ -296,10 +220,10 @@ export function DiscoverScreen({
               <RefreshCcw size={16} color="#FFFFFF" strokeWidth={2.5} />
               <Text style={S.scanBtnText}>
                 {isRefreshing
-                  ? 'Scanning...'
+                  ? 'Looking…'
                   : discoveryEnabled
-                    ? 'Refresh'
-                    : 'Start Scanning'}
+                    ? 'Look again'
+                    : 'Find devices'}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -311,18 +235,18 @@ export function DiscoverScreen({
           <View style={S.empty}>
             <Wifi size={42} color={colors.accentLight} strokeWidth={2.1} />
             <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>
-              {discoveryEnabled ? 'No devices nearby' : 'Scanning Paused'}
+              {discoveryEnabled ? 'No devices found' : 'Ready when you are'}
             </Text>
             <Text style={[S.emptySub, { color: colors.textSecondary }]}>
               {discoveryEnabled
-                ? 'Check that your devices are nearby and have scanning turned on.'
-                : 'Tap below to find phones, tablets and TVs around you.'}
+                ? 'Keep both devices nearby, unlocked, and open in CrossBeam.'
+                : 'Find phones, tablets, and TVs near you.'}
             </Text>
             {!discoveryEnabled && (
               <Pressable onPress={onRefresh} accessibilityRole="button">
                 <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={S.emptyBtn}>
                   <RefreshCcw size={14} color="#FFFFFF" strokeWidth={2.5} />
-                  <Text style={S.emptyBtnText}>Start Scanning</Text>
+                  <Text style={S.emptyBtnText}>Find devices</Text>
                 </LinearGradient>
               </Pressable>
             )}
@@ -331,7 +255,7 @@ export function DiscoverScreen({
       ) : (
         <View style={S.list}>
           <Text style={[S.listHeader, { color: colors.textMuted }]}>
-            NEARBY — {devices.length} DEVICE{devices.length !== 1 ? 'S' : ''}
+            FOUND · {devices.length}
           </Text>
           {devices.map((device, index) => (
             <DeviceRow key={device.id} device={device} index={index} onSelectDevice={onSelectDevice} />
@@ -339,20 +263,6 @@ export function DiscoverScreen({
         </View>
       )}
 
-      <View style={S.statsGrid}>
-        <GlassCard padding={SPACING.md} style={S.statCard}>
-          <Text style={[S.statLabel, { color: colors.textMuted }]}>READY</Text>
-          <Text style={[S.statValue, { color: colors.accentLight }]}>{readyCount}</Text>
-          <Text style={[S.statSub, { color: colors.textMuted }]} numberOfLines={1}>
-            {readyCount > 0 ? `${readyCount} can receive` : 'None connected'}
-          </Text>
-        </GlassCard>
-        <GlassCard padding={SPACING.md} style={S.statCard}>
-          <Text style={[S.statLabel, { color: colors.textMuted }]}>TRUSTED</Text>
-          <Text style={[S.statValue, { color: colors.success }]}>{trustedCount}</Text>
-          <Text style={[S.statSub, { color: colors.textMuted }]}>{devices.length} nearby</Text>
-        </GlassCard>
-      </View>
     </ScrollView>
   );
 }

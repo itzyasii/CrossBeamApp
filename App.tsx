@@ -79,8 +79,8 @@ type TabConfig = { id: Tab; icon: any; label: string; desc: string };
 
 const TABS: TabConfig[] = [
   { id: "home", icon: Home, label: "HOME", desc: "Send and receive" },
-  { id: "discover", icon: Radar, label: "RADAR", desc: "Find nearby peers" },
-  { id: "devices", icon: Users, label: "TRUST", desc: "Trusted devices" },
+  { id: "discover", icon: Radar, label: "FIND", desc: "Nearby devices" },
+  { id: "devices", icon: Users, label: "SAVED", desc: "Remembered devices" },
   {
     id: "history",
     icon: HistoryIcon,
@@ -350,7 +350,7 @@ export default function App() {
             ? await connectDevice(device.id)
             : null;
         if (!readyDevice?.isTransferReady) {
-          throw new Error(device.statusMessage || "This discovery signal cannot carry files yet.");
+          throw new Error(device.statusMessage || "This device isn't ready to receive files yet.");
         }
         setTargetDevice(readyDevice);
         setShowDevicePicker(false);
@@ -534,7 +534,6 @@ export default function App() {
                       transferStatus={transferStatus}
                       isSending={isSending}
                       selectedFiles={selectedFiles}
-                      statusMessage={statusMessage}
                       isRefreshing={isRefreshing}
                       discoveryEnabled={discoveryEnabled}
                       approvals={approvals}
@@ -645,7 +644,7 @@ export default function App() {
             >
               <Fingerprint size={64} color={colors.accent} strokeWidth={1} />
               <Text style={[S.lockTitle, { color: colors.textPrimary }]}>
-                LOCKED
+                CrossBeam is locked
               </Text>
               <Pressable
                 style={[S.unlockBtn, { borderColor: colors.borderStrong }]}
@@ -654,7 +653,7 @@ export default function App() {
                 }}
               >
                 <Text style={[S.unlockText, { color: colors.textSecondary }]}>
-                  UNLOCK APP
+                  Unlock
                 </Text>
               </Pressable>
             </View>
@@ -672,7 +671,7 @@ export default function App() {
                 <View style={S.modalHeader}>
                   <Smartphone size={24} color={colors.accent} />
                   <Text style={[S.modalTitle, { color: colors.textPrimary }]}>
-                    Choose Device
+                    Choose a device
                   </Text>
                   <Pressable
                     onPress={() => setShowDevicePicker(false)}
@@ -713,7 +712,7 @@ export default function App() {
                             { color: colors.textSecondary },
                           ]}
                         >
-                          {device.platform} - {device.connection}
+                          {device.statusMessage ?? (device.isTransferReady ? "Ready to share" : "Nearby")}
                         </Text>
                       </View>
                       <ChevronRight size={18} color={colors.accent} />
@@ -780,7 +779,7 @@ export default function App() {
                       },
                     ]}
                   >
-                    {discoveryEnabled ? "SCANNING" : "SCANNING OFF"}
+                    {discoveryEnabled ? "FINDING DEVICES" : "NOT LOOKING"}
                   </Text>
                 </View>
               </View>
@@ -862,7 +861,7 @@ export default function App() {
               {/* Quick Stats */}
               <View style={S.drawerSection}>
                 <Text style={[S.sectionLabel, { color: DRAWER_TEXT_MUTED }]}>
-                  ACTIVITY
+                  AT A GLANCE
                 </Text>
                 <View style={S.statsRow}>
                   <View
@@ -873,7 +872,7 @@ export default function App() {
                       {devices.length}
                     </Text>
                     <Text style={[S.statLabel, { color: DRAWER_TEXT_MUTED }]}>
-                      DEVICES
+                      NEARBY
                     </Text>
                   </View>
                   <View
@@ -887,7 +886,7 @@ export default function App() {
                       }
                     </Text>
                     <Text style={[S.statLabel, { color: DRAWER_TEXT_MUTED }]}>
-                      TRANSFERS
+                      SENDING
                     </Text>
                   </View>
                 </View>
@@ -955,15 +954,12 @@ export default function App() {
                 </View>
                 <ScrollView style={S.modalScroll}>
                   <Text style={[S.modalText, { color: colors.textSecondary }]}>
-                    CrossBeam currently transfers files directly over your
-                    local network without uploading them to a CrossBeam server.
-                    Transport encryption and authenticated device pairing are
-                    still under development, so only accept transfers on a
-                    network and from a sender you trust.
-                    {"\n\n"}• No CrossBeam cloud upload is used.{"\n"}• Transfer
-                    history and analytics remain on this device.{"\n"}• Incoming
-                    transfers require explicit approval unless a future,
-                    authenticated pairing matches exactly.
+                    CrossBeam sends files straight to a nearby device. Your
+                    files aren't uploaded to CrossBeam.
+                    {"\n\n"}• Your sharing history stays on this device.{"\n"}• You
+                    choose whether to accept each new sender.{"\n"}• Encrypted
+                    connections are still being developed, so share only with
+                    people you trust.
                   </Text>
                 </ScrollView>
               </View>
@@ -994,10 +990,10 @@ export default function App() {
                 <ScrollView style={S.modalScroll}>
                   <Text style={[S.modalText, { color: colors.textSecondary }]}>
                     By using CrossBeam, you agree to:{"\n\n"}
-                    1. Use the service for legal file sharing only.{"\n"}
-                    2. Not attempt to reverse engineer the protocol.{"\n"}
-                    3. Acknowledge that transfers depend on local network
-                    quality.
+                    1. Share only files you have the right to share.{"\n"}
+                    2. Respect other people and their devices.{"\n"}
+                    3. Understand that speed and availability depend on the
+                    connection between your devices.
                   </Text>
                 </ScrollView>
               </View>

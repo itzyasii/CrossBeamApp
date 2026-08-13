@@ -35,7 +35,6 @@ import {
   platformFeatureService,
 } from "@/services/platformFeatureService";
 import { formatBytes } from "@/utils/helpers";
-import { chunkedTransferService } from "@/services/chunkedTransferService";
 
 type SettingsState = {
   notifications: boolean;
@@ -105,7 +104,6 @@ export const SettingsScreen: React.FC = () => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticsReport | null>(
     null,
   );
-  const chunkPlan = chunkedTransferService.getPlan();
 
   useEffect(() => {
     let mounted = true;
@@ -158,8 +156,8 @@ export const SettingsScreen: React.FC = () => {
   const clearLocalData = () => {
     void haptics.warning();
     Alert.alert(
-      "Clear local data?",
-      "This removes cached preferences and transfer history from this device.",
+      "Clear app data?",
+      "This removes your settings and sharing history. Your files won't be deleted.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -190,7 +188,7 @@ export const SettingsScreen: React.FC = () => {
       <View style={S.header}>
         <Text style={[S.title, { color: colors.textPrimary }]}>Settings</Text>
         <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-          Choose the settings you want.
+          Make CrossBeam work your way.
         </Text>
       </View>
 
@@ -206,7 +204,7 @@ export const SettingsScreen: React.FC = () => {
               This Device
             </Text>
             <Text style={[S.nodeMeta, { color: colors.textSecondary }]}>
-              Transfers are direct and private
+              Files stay between your devices
             </Text>
           </View>
           <View
@@ -219,7 +217,7 @@ export const SettingsScreen: React.FC = () => {
             ]}
           >
             <Text style={[S.statusText, { color: colors.success }]}>
-              SECURE
+              LOCAL
             </Text>
           </View>
         </View>
@@ -234,30 +232,29 @@ export const SettingsScreen: React.FC = () => {
             <View style={S.diagnosticsGrid}>
               {[
                 {
-                  label: "Platform",
-                  value: diagnostics.platform,
+                  label: "Device",
+                  value:
+                    diagnostics.platform === "android-tv"
+                      ? "Android TV"
+                      : diagnostics.platform === "android"
+                        ? "Android phone"
+                        : diagnostics.platform === "ios"
+                          ? "iPhone or iPad"
+                          : "This device",
                 },
                 {
-                  label: "Native bridge",
+                  label: "Nearby sharing",
                   value: diagnostics.nativeAvailable
-                    ? "Available"
-                    : "Unavailable",
+                    ? "Ready"
+                    : "Not available",
                 },
                 {
                   label: "Wi-Fi",
                   value: diagnostics.isWifiConnected ? "Connected" : "Inactive",
                 },
                 {
-                  label: "Free space",
+                  label: "Space available",
                   value: formatBytes(diagnostics.freeDiskBytes),
-                },
-                {
-                  label: "Chunk size",
-                  value: formatBytes(chunkPlan.chunkSizeBytes),
-                },
-                {
-                  label: "Transport",
-                  value: chunkPlan.transport,
                 },
               ].map((item) => (
                 <View key={item.label} style={S.diagnosticItem}>
@@ -372,24 +369,25 @@ export const SettingsScreen: React.FC = () => {
         <GlassCard padding={0}>
           <SettingRow
             icon={Bell}
-            title="Transfer notifications"
-            description="Get a simple alert when files are incoming or sent."
+            title="Sharing alerts"
+            description="Let me know when files arrive or finish sending."
             value={settings.notifications}
             onValueChange={(value) => updateSetting("notifications", value)}
           />
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={Smartphone}
-            title="Auto-accept securely paired devices"
-            description="Takes effect only for an exact authenticated device key."
-            value={settings.autoTransfer}
-            onValueChange={(value) => updateSetting("autoTransfer", value)}
+            title="Accept from saved devices"
+            description="Coming later with verified device connections."
+            value={false}
+            onValueChange={() => {}}
+            disabled
           />
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={Wifi}
-            title="Use metered networks"
-            description="Allow transfers over cellular or limited Wi-Fi."
+            title="Use limited networks"
+            description="Allow sharing when Android marks the connection as limited."
             value={settings.useMeteredNetworks}
             onValueChange={(value) =>
               updateSetting("useMeteredNetworks", value)
@@ -413,8 +411,8 @@ export const SettingsScreen: React.FC = () => {
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={LockKeyhole}
-            title="Secure mode"
-            description="Authenticated transport encryption is not available in this build yet."
+            title="Encrypted sharing"
+            description="Coming in a future update. For now, share only with people you trust."
             value={false}
             onValueChange={() => {}}
             disabled
@@ -422,8 +420,8 @@ export const SettingsScreen: React.FC = () => {
           <View style={[S.divider, { backgroundColor: colors.border }]} />
           <SettingRow
             icon={ShieldCheck}
-            title="Check transfers"
-            description="SHA-256 integrity verification is mandatory for every received file."
+            title="Check received files"
+            description="CrossBeam checks every file for damage. This is always on."
             value
             onValueChange={() => {}}
             disabled
@@ -433,14 +431,14 @@ export const SettingsScreen: React.FC = () => {
 
       <View style={S.section}>
         <Text style={[S.sectionLabel, { color: colors.textMuted }]}>
-          KEEP IT PRIVATE
+          YOUR PRIVACY
         </Text>
         <GlassCard padding={0}>
           {[
-            "Files move directly between nearby devices without a cloud relay.",
-            "Discovery happens locally on your network.",
-            "Trusted device settings stay on this device only.",
-            "Transfer history and settings stay private here.",
+            "Your files aren't uploaded to CrossBeam.",
+            "Only nearby devices can appear.",
+            "Saved devices stay on this device.",
+            "Your sharing history stays here.",
           ].map((line) => (
             <View key={line} style={S.auditRow}>
               <View
@@ -463,13 +461,13 @@ export const SettingsScreen: React.FC = () => {
           </View>
           <View style={S.settingCopy}>
             <Text style={[S.settingTitle, { color: colors.textPrimary }]}>
-              Local cache
+              App data
             </Text>
             <Text
               style={[S.settingDescription, { color: colors.textSecondary }]}
             >
-              Approx. {Math.max(1, Math.ceil(storageBytes / 1024))} KB stored on
-              this device.
+              About {Math.max(1, Math.ceil(storageBytes / 1024))} KB used for
+              settings and history.
             </Text>
           </View>
           <FocusablePressable
@@ -484,7 +482,7 @@ export const SettingsScreen: React.FC = () => {
       </GlassCard>
 
       <Text style={[S.footer, { color: colors.textMuted }]}>
-        CrossBeam · Private · Local · Fast
+        CrossBeam · Simple nearby sharing
       </Text>
     </ScrollView>
   );

@@ -31,6 +31,7 @@ import { clearTransferHistory, getTransferHistory } from "@/store/database";
 import { TransferJob } from "@/types/domain";
 import { formatBytes, formatDate } from "@/utils/helpers";
 import { FONT_SIZE, RADIUS, SPACING } from "@/theme/colors";
+import { transferRouteLabel, transferStatusLabel } from "@/utils/transferCopy";
 import {
   IntegrityReport,
   platformFeatureService,
@@ -228,8 +229,8 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
 
       if (!foundUri) {
         Alert.alert(
-          "File Unavailable",
-          `The file "${fileName}" could not be located on disk. It may have been moved or deleted.`,
+          "File not found",
+          `“${fileName}” may have been moved or deleted.`,
         );
         return;
       }
@@ -257,7 +258,7 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
       }
     } catch (err) {
       console.warn(err);
-      Alert.alert("Error", "Could not open the file.");
+      Alert.alert("Couldn't open file", "Try opening it from your Files app.");
     }
   };
 
@@ -276,10 +277,10 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
       <View style={S.header}>
         <View style={S.headerCopy}>
           <Text style={[S.title, { color: colors.textPrimary }]}>
-            Transfer History
+          Sharing history
           </Text>
           <Text style={[S.subtitle, { color: colors.textSecondary }]}>
-            Completed, paused, failed, and rejected jobs.
+            Files you've sent and received.
           </Text>
         </View>
         {mergedTransfers.length > 0 && (
@@ -345,7 +346,7 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
       {collections.length > 0 && (
         <View style={S.collectionStrip}>
           <Text style={[S.listHeader, { color: colors.textMuted }]}>
-            TRANSFER COLLECTIONS
+            SAVED GROUPS
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {collections.map((collection) => (
@@ -388,7 +389,7 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
               No history yet
             </Text>
             <Text style={[S.emptyText, { color: colors.textSecondary }]}>
-              Shared files will appear here after the first transfer starts.
+              Files you send or receive will appear here.
             </Text>
           </View>
         </GlassCard>
@@ -397,7 +398,7 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
           {filteredTransfers.length === 0 ? (
             <GlassCard>
               <Text style={[S.emptyText, { color: colors.textSecondary }]}>
-                No matching transfer records.
+                Nothing matches your search.
               </Text>
             </GlassCard>
           ) : null}
@@ -426,8 +427,7 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
                       style={[S.route, { color: colors.textSecondary }]}
                       numberOfLines={1}
                     >
-                      {job.fromDeviceName} to {job.toDeviceName} -{" "}
-                      {formatBytes(job.sizeBytes)}
+                      {transferRouteLabel(job)} · {formatBytes(job.sizeBytes)}
                     </Text>
                     <Text style={[S.date, { color: colors.textMuted }]}>
                       {formatDate(job.updatedAt)}
@@ -443,7 +443,7 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
                           style={[S.integrityText, { color: colors.success }]}
                           numberOfLines={1}
                         >
-                          Verified Integrity •{" "}
+                          File checked •{" "}
                           {formatBytes(reports[job.id].averageBytesPerSecond)}/s
                         </Text>
                       </View>
@@ -458,7 +458,9 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
                       },
                     ]}
                   >
-                    <Text style={[S.statusText, { color }]}>{job.status}</Text>
+                    <Text style={[S.statusText, { color }]}>
+                      {transferStatusLabel(job.status)}
+                    </Text>
                   </View>
                 </FocusablePressable>
                 {job.retryable && onRetry && (
@@ -467,7 +469,7 @@ export function HistoryScreen({ transfers, onRetry }: HistoryScreenProps) {
                     style={[S.retryButton, { borderColor: colors.borderStrong }]}
                   >
                     <RefreshCcw size={14} color={colors.accent} />
-                    <Text style={[S.retryText, { color: colors.accent }]}>Retry transfer</Text>
+                    <Text style={[S.retryText, { color: colors.accent }]}>Try again</Text>
                   </FocusablePressable>
                 )}
               </GlassCard>

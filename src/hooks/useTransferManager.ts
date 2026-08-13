@@ -12,6 +12,7 @@ import {
 } from "@/store/database";
 import { chunkedTransferService } from "@/services/chunkedTransferService";
 import { useAppStore } from "@/store";
+import { friendlyErrorMessage } from "@/utils/userMessage";
 
 export const useTransferManager = (knownDevices: Device[] = []) => {
   const [transfers, setTransfers] = useState<TransferJob[]>([]);
@@ -19,6 +20,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   const [transferError, setTransferError] = useState<string | null>(null);
   const [transferStatus, setTransferStatus] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const isSendingRef = useRef(false);
   const enableMeteredNetworks = useAppStore((state) => state.enableMeteredNetworks);
   const knownDevicesRef = useRef(knownDevices);
   useEffect(() => {
@@ -34,7 +36,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
               ...job,
               status: "failed" as const,
               retryable: Boolean(job.peerId && job.sourceFiles?.length),
-              errorMessage: "Transfer was interrupted when the app stopped. Retry to send it again.",
+              errorMessage: "This stopped when CrossBeam closed. Tap Retry to send it again.",
               updatedAt: Date.now(),
             }
           : job,
@@ -116,7 +118,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
           encrypted: false,
           startedAt: Date.now(),
           updatedAt: Date.now(),
-          errorMessage: event.errorMessage,
+          errorMessage: event.errorMessage ? friendlyErrorMessage(event.errorMessage) : undefined,
           checksum: event.checksum,
           integrityVerified: event.integrityVerified === true,
           peerId: event.peerId,
@@ -139,7 +141,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
                 : event.status === "failed" || event.status === "rejected" || event.status === "cancelled"
                   ? "failed"
                   : "transferring",
-            errorMessage: event.errorMessage,
+            errorMessage: event.errorMessage ? friendlyErrorMessage(event.errorMessage) : undefined,
           };
           if (index >= 0) next[index] = result;
           else next.push(result);
@@ -167,7 +169,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
                   ]
                 : existing.savedFilePaths,
               updatedAt: Date.now(),
-              errorMessage: event.errorMessage,
+              errorMessage: event.errorMessage ? friendlyErrorMessage(event.errorMessage) : undefined,
               checksum: event.checksum ?? existing.checksum,
               integrityVerified:
                 event.integrityVerified ?? existing.integrityVerified,
@@ -208,7 +210,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
 
     if (Platform.isTV) {
       setTransferError(
-        "File picking is not available on TV. Send files from a phone or computer.",
+        "Choose files on your phone, then send them to this TV.",
       );
       return;
     }
@@ -220,7 +222,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
         copyToCacheDirectory: true,
       });
     } catch (error) {
-      setTransferError(String(error));
+      setTransferError(friendlyErrorMessage(error));
       return;
     }
 
@@ -256,66 +258,148 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     files: SelectedFile[],
     targetDeviceId: string,
     targetDeviceName: string,
+    retryJob?: TransferJob,
   ) => {
-    if (isSending) {
-      setTransferError("Preparing your transfer. Please wait a moment.");
+    if (isSendingRef.current) {
+      setTransferError("Getting your files ready. Please wait a moment.");
       return;
     }
 
-    const target = knownDevices.find((device) => device.id === targetDeviceId);
-    if (target && target.connection !== "wifi-direct" && !enableMeteredNetworks) {
-      const network = await Network.getNetworkStateAsync();
-      if (network.type !== Network.NetworkStateType.WIFI) {
-        setTransferError("Sending over a metered or non-Wi-Fi network is disabled in Settings.");
-        return;
-      }
-    }
-
-    const inProgressLabel =
-      files.length > 1
-        ? `Sending ${files.length} files to ${targetDeviceName}`
-        : `Sending ${files[0]?.name || "file"} to ${targetDeviceName}`;
-
-    setTransferError(null);
-    setTransferStatus(inProgressLabel);
+    isSendingRef.current = true;
     setIsSending(true);
+    setTransferError(null);
 
-    const now = Date.now();
-    const sourcePaths = files.map((file) => file.uri);
-    const baseJob: TransferJob = {
-      id: `${now}-pending`,
-      fileNames: files.map((file) => file.name),
-      fileName: files[0]?.name,
-      sizeBytes: files.reduce((sum, file) => sum + file.sizeBytes, 0),
-      progress: 0,
-      bytesTransferred: 0,
-      totalBytes: files.reduce((sum, file) => sum + file.sizeBytes, 0),
-      status: "queued",
-      fromDeviceName: "This Device",
-      toDeviceName: targetDeviceName,
-      encrypted: false,
-      startedAt: now,
-      updatedAt: now,
-      localFilePaths: sourcePaths,
-      mimeType: files[0]?.mimeType,
-      peerId: targetDeviceId,
-      sourceFiles: files,
-      fileResults: files.map((file) => ({
-        name: file.name,
-        mimeType: file.mimeType,
-        sizeBytes: file.sizeBytes,
-        integrityVerified: false,
-        status: "pending",
-      })),
-      retryable: true,
+    const updateRetryFailure = async (message: string) => {
+      setTransferError(message);
+      setTransferStatus(null);
+      if (!retryJob) return;
+
+      const failedJob: TransferJob = {
+        ...retryJob,
+        status: "blocked",
+        retryable: true,
+        errorMessage: message,
+        updatedAt: Date.now(),
+      };
+      setTransfers((current) =>
+        current.map((job) => (job.id === retryJob.id ? failedJob : job)),
+      );
+      await saveTransferHistory(failedJob);
     };
 
-    setTransfers((current) => [baseJob, ...current]);
-    await saveTransferHistory(baseJob);
-
+    let activeJob: TransferJob | undefined;
     try {
+      const storedIdentity = targetDeviceId.startsWith("peer-")
+        ? targetDeviceId.slice(5)
+        : targetDeviceId;
+      let target = knownDevicesRef.current.find((device) => {
+        const deviceIdentity = device.deviceKey ?? device.id;
+        const normalizedIdentity = deviceIdentity.startsWith("peer-")
+          ? deviceIdentity.slice(5)
+          : deviceIdentity;
+        return (
+          device.id === targetDeviceId ||
+          device.deviceKey === targetDeviceId ||
+          device.id === storedIdentity ||
+          device.deviceKey === storedIdentity ||
+          normalizedIdentity === storedIdentity
+        );
+      });
+
+      if (!target || target.availability === "unavailable") {
+        await updateRetryFailure(
+          `${targetDeviceName} isn't nearby right now. Open CrossBeam on that device, then find it and try again.`,
+        );
+        return;
+      }
+
+      let resolvedTargetId = target.id;
+      if (!target.isTransferReady) {
+        const canReconnectDirectly =
+          target.connection === "wifi-direct" ||
+          Boolean(target.wifiDirectAddress) ||
+          target.availableConnections?.includes("wifi-direct");
+
+        if (!canReconnectDirectly) {
+          await updateRetryFailure(
+            `${targetDeviceName} is nearby but isn't ready yet. Keep CrossBeam open on both devices, then try again.`,
+          );
+          return;
+        }
+
+        setTransferStatus(`Connecting to ${targetDeviceName}…`);
+        try {
+          const connected = await nativeCrossBeam.connectToWifiDirectPeer(target.id);
+          if (!connected.isTransferReady) {
+            throw new Error("DEVICE_NOT_READY");
+          }
+          target = connected;
+          resolvedTargetId = connected.id;
+        } catch {
+          await updateRetryFailure(
+            `Couldn't reconnect to ${targetDeviceName}. Keep both devices nearby, make sure Wi-Fi is on, then try again.`,
+          );
+          return;
+        }
+      }
+
+      if (target.connection !== "wifi-direct" && !enableMeteredNetworks) {
+        const network = await Network.getNetworkStateAsync();
+        if (network.type !== Network.NetworkStateType.WIFI) {
+          await updateRetryFailure(
+            "This network is limited. Allow limited networks in Settings, or connect to Wi-Fi.",
+          );
+          return;
+        }
+      }
+
+      const inProgressLabel =
+        files.length > 1
+          ? `Sending ${files.length} files to ${targetDeviceName}`
+          : `Sending ${files[0]?.name || "file"} to ${targetDeviceName}`;
+
+      setTransferStatus(inProgressLabel);
+
+      const now = Date.now();
+      const sourcePaths = files.map((file) => file.uri);
+      const baseJob: TransferJob = {
+        id: retryJob?.id ?? `${now}-pending`,
+        fileNames: files.map((file) => file.name),
+        fileName: files[0]?.name,
+        sizeBytes: files.reduce((sum, file) => sum + file.sizeBytes, 0),
+        progress: 0,
+        bytesTransferred: 0,
+        totalBytes: files.reduce((sum, file) => sum + file.sizeBytes, 0),
+        status: "queued",
+        fromDeviceName: "This Device",
+        toDeviceName: targetDeviceName,
+        encrypted: false,
+        startedAt: now,
+        updatedAt: now,
+        localFilePaths: sourcePaths,
+        mimeType: files[0]?.mimeType,
+        peerId: resolvedTargetId,
+        sourceFiles: files,
+        fileResults: files.map((file) => ({
+          name: file.name,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          integrityVerified: false,
+          status: "pending",
+        })),
+        retryable: true,
+      };
+      activeJob = baseJob;
+
+      setTransfers((current) =>
+        retryJob
+          ? current.map((job) => (job.id === retryJob.id ? baseJob : job))
+          : [baseJob, ...current],
+      );
+      await saveTransferHistory(baseJob);
+
       const result = await nativeCrossBeam.sendFiles({
-        peerId: targetDeviceId,
+        peerId: resolvedTargetId,
         files: files.map((file) => ({
           id: file.id,
           name: file.name,
@@ -349,29 +433,32 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
       });
       setTransferError(null);
     } catch (error) {
-      const message = String(error);
+      const message = friendlyErrorMessage(error);
       setTransferError(message);
       setTransferStatus(null);
-      const failedJob: TransferJob = {
-        ...baseJob,
-        status: "blocked",
-        encrypted: false,
-        retryable: true,
-        updatedAt: Date.now(),
-        errorMessage: message,
-      };
-      setTransfers((current) =>
-        current.map((job) => (job.id === baseJob.id ? failedJob : job)),
-      );
-      await saveTransferHistory(failedJob);
+      const currentJob = activeJob ?? retryJob;
+      if (currentJob) {
+        const failedJob: TransferJob = {
+          ...currentJob,
+          status: "blocked",
+          retryable: true,
+          updatedAt: Date.now(),
+          errorMessage: message,
+        };
+        setTransfers((current) =>
+          current.map((job) => (job.id === currentJob.id ? failedJob : job)),
+        );
+        await saveTransferHistory(failedJob);
+      }
     } finally {
+      isSendingRef.current = false;
       setIsSending(false);
     }
   };
 
   const reportTransferError = (error: unknown) => {
     setTransferStatus(null);
-    setTransferError(error instanceof Error ? error.message : String(error));
+    setTransferError(friendlyErrorMessage(error));
   };
 
   const startTransfer = async (
@@ -379,11 +466,11 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
     targetDeviceName: string,
   ) => {
     if (selectedFiles.length === 0) {
-      setTransferError("Select one or more files before starting a transfer.");
+      setTransferError("Choose at least one file first.");
       return;
     }
     if (!targetDeviceId) {
-      setTransferError("Select a discovered peer before starting a transfer.");
+      setTransferError("Choose a nearby device first.");
       return;
     }
     await sendFileSet(selectedFiles, targetDeviceId, targetDeviceName);
@@ -392,10 +479,10 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
   const retryTransfer = async (id: string) => {
     const job = transfers.find((transfer) => transfer.id === id);
     if (!job?.peerId || !job.sourceFiles?.length) {
-      setTransferError("This transfer has no reusable source files. Select the files again.");
+      setTransferError("These files are no longer available. Choose them again.");
       return;
     }
-    await sendFileSet(job.sourceFiles, job.peerId, job.toDeviceName);
+    await sendFileSet(job.sourceFiles, job.peerId, job.toDeviceName, job);
   };
 
   const togglePause = async (id: string) => {
@@ -409,7 +496,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
         await chunkedTransferService.pause(id);
       }
     } catch (error) {
-      setTransferError(String(error));
+      setTransferError(friendlyErrorMessage(error));
     }
   };
 
@@ -426,7 +513,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
       );
       if (cancelled) await saveTransferHistory(cancelled);
     } catch (error) {
-      setTransferError(String(error));
+      setTransferError(friendlyErrorMessage(error));
     }
   };
 

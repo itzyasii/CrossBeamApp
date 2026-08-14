@@ -79,9 +79,9 @@ type Tab = "home" | "discover" | "devices" | "history" | "settings";
 type TabConfig = { id: Tab; icon: any; label: string; desc: string };
 
 const TABS: TabConfig[] = [
-  { id: "home", icon: Home, label: "HOME", desc: "Send and receive" },
   { id: "discover", icon: Radar, label: "FIND", desc: "Nearby devices" },
   { id: "devices", icon: Users, label: "SAVED", desc: "Remembered devices" },
+  { id: "home", icon: Home, label: "HOME", desc: "Send and receive" },
   {
     id: "history",
     icon: HistoryIcon,
@@ -135,7 +135,9 @@ export default function App() {
   const [targetDevice, setTargetDevice] = useState<Device | null>(null);
   const tvDiscoveryPermissionRequested = useRef(false);
   const insets = useSafeAreaInsets();
-  const [tabIndex, setTabIndex] = useState(0);
+  const [tabIndex, setTabIndex] = useState(() =>
+    TABS.findIndex((tab) => tab.id === "home"),
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [discoveryEnabled, setDiscoveryEnabled] = useState(Platform.isTV);
   const exitPromptVisible = useRef(false);
@@ -357,13 +359,13 @@ export default function App() {
     if (sharedFiles.length > 0) {
       addSelectedFiles(sharedFiles);
       setSharedFiles([]);
-      goToTab(0); // Go to Home
+      goToTab(TABS.findIndex((tab) => tab.id === "home"));
     }
   }, [sharedFiles, addSelectedFiles, setSharedFiles, goToTab]);
 
   const handleDiscoveryPress = () => {
     void haptics.medium();
-    goToTab(1);
+    goToTab(TABS.findIndex((tab) => tab.id === "discover"));
   };
 
   const handleSupportPress = () => {
@@ -698,10 +700,13 @@ export default function App() {
               <FocusablePressable
                 accessibilityRole="tab"
                 accessibilityLabel="Home"
-                accessibilityState={{ selected: tabIndex === 0 }}
+                accessibilityState={{
+                  selected:
+                    tabIndex === TABS.findIndex((tab) => tab.id === "home"),
+                }}
                 onPress={() => {
                   void haptics.medium();
-                  goToTab(0);
+                  goToTab(TABS.findIndex((tab) => tab.id === "home"));
                 }}
                 style={[
                   S.centerTab,
@@ -721,7 +726,9 @@ export default function App() {
                   S.centerIndicator,
                   {
                     backgroundColor:
-                      tabIndex === 0 ? colors.accentLight : "transparent",
+                      tabIndex === TABS.findIndex((tab) => tab.id === "home")
+                        ? colors.accentLight
+                        : "transparent",
                   },
                 ]}
               />

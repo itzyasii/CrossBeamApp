@@ -54,7 +54,6 @@ import {
   Radar,
   Activity,
   ShieldCheck,
-  HelpCircle,
   ChevronRight,
   Wifi,
   FileText,
@@ -96,6 +95,8 @@ const TABS: TabConfig[] = [
   },
 ];
 
+const HOME_TAB_INDEX = TABS.findIndex((tab) => tab.id === "home");
+
 const BOTTOM_TABS: Tab[] = [
   "discover",
   "devices",
@@ -104,7 +105,7 @@ const BOTTOM_TABS: Tab[] = [
   "settings",
 ];
 
-import { Modal, Linking, BackHandler } from "react-native";
+import { Modal, BackHandler } from "react-native";
 import { FocusablePressable } from "@/components/FocusablePressable";
 import * as KeepAwake from "expo-keep-awake";
 import { platformFeatureService } from "@/services/platformFeatureService";
@@ -135,17 +136,26 @@ export default function App() {
   const [targetDevice, setTargetDevice] = useState<Device | null>(null);
   const tvDiscoveryPermissionRequested = useRef(false);
   const insets = useSafeAreaInsets();
-  const [tabIndex, setTabIndex] = useState(() =>
-    TABS.findIndex((tab) => tab.id === "home"),
-  );
+  const [tabIndex, setTabIndex] = useState(HOME_TAB_INDEX);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [discoveryEnabled, setDiscoveryEnabled] = useState(Platform.isTV);
   const exitPromptVisible = useRef(false);
   const pagerRef = useRef<FlatList>(null);
+  const positionedInitialTab = useRef(false);
 
   const goToTab = useCallback((idx: number) => {
     setTabIndex(idx);
     pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+  }, []);
+
+  const positionInitialTab = useCallback(() => {
+    if (positionedInitialTab.current) return;
+    positionedInitialTab.current = true;
+    setTabIndex(HOME_TAB_INDEX);
+    pagerRef.current?.scrollToIndex({
+      index: HOME_TAB_INDEX,
+      animated: false,
+    });
   }, []);
 
   const {
@@ -153,8 +163,13 @@ export default function App() {
     getMissingDiscoveryPermissions,
     requestDiscoveryPermissions,
   } = usePermissions();
-  const { devices, isRefreshing, statusMessage, refreshDevices, connectDevice } =
-    useDeviceDiscovery(discoveryEnabled);
+  const {
+    devices,
+    isRefreshing,
+    statusMessage,
+    refreshDevices,
+    connectDevice,
+  } = useDeviceDiscovery(discoveryEnabled);
   const { approvals, activeApproval, handleApprovalAction } =
     useIncomingTransferApprovals(devices);
   const { sharedFiles, setSharedFiles } = useShareIntent();
@@ -359,22 +374,13 @@ export default function App() {
     if (sharedFiles.length > 0) {
       addSelectedFiles(sharedFiles);
       setSharedFiles([]);
-      goToTab(TABS.findIndex((tab) => tab.id === "home"));
+      goToTab(HOME_TAB_INDEX);
     }
   }, [sharedFiles, addSelectedFiles, setSharedFiles, goToTab]);
 
   const handleDiscoveryPress = () => {
     void haptics.medium();
     goToTab(TABS.findIndex((tab) => tab.id === "discover"));
-  };
-
-  const handleSupportPress = () => {
-    void haptics.light();
-    void Linking.openURL(
-      "mailto:yasirpechuho1@gmail.com?subject=CrossBeam Support Request",
-    ).catch((error) => {
-      console.warn("[App] Unable to open support email:", error);
-    });
   };
 
   const sendToDevice = useCallback(
@@ -386,7 +392,10 @@ export default function App() {
             ? await connectDevice(device.id)
             : null;
         if (!readyDevice?.isTransferReady) {
-          throw new Error(device.statusMessage || "This device isn't ready to receive files yet.");
+          throw new Error(
+            device.statusMessage ||
+              "This device isn't ready to receive files yet.",
+          );
         }
         setTargetDevice(readyDevice);
         setShowDevicePicker(false);
@@ -552,6 +561,13 @@ export default function App() {
             keyExtractor={(t) => t.id}
             horizontal
             pagingEnabled
+            initialScrollIndex={HOME_TAB_INDEX}
+            getItemLayout={(_, index) => ({
+              length: SCREEN_W,
+              offset: SCREEN_W * index,
+              index,
+            })}
+            onLayout={positionInitialTab}
             scrollEnabled={!isLocked}
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={(e) =>
@@ -632,7 +648,10 @@ export default function App() {
                         </View>
                       }
                     >
-                      <HistoryScreen transfers={transfers} onRetry={retryTransfer} />
+                      <HistoryScreen
+                        transfers={transfers}
+                        onRetry={retryTransfer}
+                      />
                     </React.Suspense>
                   )}
                   {t.id === "settings" && <SettingsScreen />}
@@ -644,7 +663,10 @@ export default function App() {
           {/* ── Bottom Nav ── */}
           <View
             pointerEvents="box-none"
-            style={[S.tabBarWrap, { paddingBottom: Math.max(insets.bottom, 10) }]}
+            style={[
+              S.tabBarWrap,
+              { paddingBottom: Math.max(insets.bottom, 10) },
+            ]}
           >
             <View style={S.tabBar}>
               <BlurView
@@ -707,12 +729,11 @@ export default function App() {
                 accessibilityRole="tab"
                 accessibilityLabel="Home"
                 accessibilityState={{
-                  selected:
-                    tabIndex === TABS.findIndex((tab) => tab.id === "home"),
+                  selected: tabIndex === HOME_TAB_INDEX,
                 }}
                 onPress={() => {
                   void haptics.medium();
-                  goToTab(TABS.findIndex((tab) => tab.id === "home"));
+                  goToTab(HOME_TAB_INDEX);
                 }}
                 style={[
                   S.centerTab,
@@ -732,7 +753,7 @@ export default function App() {
                   S.centerIndicator,
                   {
                     backgroundColor:
-                      tabIndex === TABS.findIndex((tab) => tab.id === "home")
+                      tabIndex === HOME_TAB_INDEX
                         ? colors.accentLight
                         : "transparent",
                   },
@@ -815,7 +836,10 @@ export default function App() {
                             { color: colors.textSecondary },
                           ]}
                         >
-                          {device.statusMessage ?? (device.isTransferReady ? "Ready to share" : "Nearby")}
+                          {device.statusMessage ??
+                            (device.isTransferReady
+                              ? "Ready to share"
+                              : "Nearby")}
                         </Text>
                       </View>
                       <ChevronRight size={18} color={colors.accent} />
@@ -1059,10 +1083,10 @@ export default function App() {
                   <Text style={[S.modalText, { color: colors.textSecondary }]}>
                     CrossBeam sends files straight to a nearby device. Your
                     files aren't uploaded to CrossBeam.
-                    {"\n\n"}• Your sharing history stays on this device.{"\n"}• You
-                    choose whether to accept each new sender.{"\n"}• Encrypted
-                    connections are still being developed, so share only with
-                    people you trust.
+                    {"\n\n"}• Your sharing history stays on this device.{"\n"}•
+                    You choose whether to accept each new sender.{"\n"}•
+                    Encrypted connections are still being developed, so share
+                    only with people you trust.
                   </Text>
                 </ScrollView>
               </View>

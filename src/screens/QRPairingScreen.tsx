@@ -25,10 +25,15 @@ import { Device } from "@/types/domain";
 import qrCenterBadge from "../../assets/QR/crossbeam-qr-center-badge.png";
 import qrCornerFrame from "../../assets/QR/crossbeam-qr-corner-frame.png";
 
-// A pale brand surface preserves the QR quiet zone and camera contrast without
-// falling back to a generic white card.
-const QR_LIGHT_SURFACE = "#DDF9FC";
-const QR_DARK_MODULE = "#031C26";
+// Keep the decorative treatment outside the QR data area. A high-contrast
+// surface, four-module quiet zone, and small protected logo make the branded
+// code reliable for phone cameras at TV viewing distance.
+const QR_LIGHT_SURFACE = "#F2FDFF";
+const QR_DARK_MODULE = "#02070A";
+const QR_ACCENT_MODULE = "#08788C";
+const QR_CODE_SIZE = 400;
+const QR_QUIET_ZONE = 32;
+const QR_LOGO_SIZE = 58;
 
 export const QRPairingScreen = ({
   onBack,
@@ -151,17 +156,22 @@ export const QRPairingScreen = ({
               {qrData ? (
                 <QRCode
                   value={qrData}
-                  size={400}
+                  size={QR_CODE_SIZE}
                   color={QR_DARK_MODULE}
                   backgroundColor={QR_LIGHT_SURFACE}
-                  quietZone={26}
+                  quietZone={QR_QUIET_ZONE}
+                  enableLinearGradient
+                  linearGradient={[QR_DARK_MODULE, QR_ACCENT_MODULE]}
+                  gradientDirection={["0", "0", "1", "1"]}
+                  logo={qrCenterBadge}
+                  logoSize={QR_LOGO_SIZE}
+                  logoMargin={8}
+                  logoBorderRadius={QR_LOGO_SIZE / 2}
+                  logoBackgroundColor={QR_LIGHT_SURFACE}
                   ecl="H"
                 />
               ) : (
                 <ActivityIndicator size="large" color={colors.accent} />
-              )}
-              {qrData && (
-                <Image source={qrCenterBadge} style={S.qrLogoBadge} resizeMode="contain" />
               )}
             </View>
             <View style={S.qrGlow} />
@@ -411,15 +421,6 @@ const S = StyleSheet.create({
     width: 560,
     height: 560,
     zIndex: 2,
-  },
-  qrLogoBadge: {
-    position: "absolute",
-    width: 68,
-    height: 68,
-    alignSelf: "center",
-    top: "50%",
-    marginTop: -34,
-    zIndex: 3,
   },
   tvFooter: {
     flexDirection: "row",

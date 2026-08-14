@@ -1,4 +1,8 @@
-const { withAndroidManifest } = require("expo/config-plugins");
+const {
+  AndroidConfig,
+  withAndroidManifest,
+  withAndroidStyles,
+} = require("expo/config-plugins");
 
 const REMOVE_PERMISSIONS = new Set([
   "android.permission.SYSTEM_ALERT_WINDOW",
@@ -25,8 +29,8 @@ const intentFilterKey = (filter) =>
       ),
   });
 
-const withAndroidReleaseConfig = (config) =>
-  withAndroidManifest(config, (manifestConfig) => {
+const withAndroidReleaseConfig = (config) => {
+  config = withAndroidManifest(config, (manifestConfig) => {
     const manifest = manifestConfig.modResults.manifest;
     const permissions = manifest["uses-permission"] ?? [];
 
@@ -79,5 +83,23 @@ const withAndroidReleaseConfig = (config) =>
 
     return manifestConfig;
   });
+
+  return withAndroidStyles(config, (stylesConfig) => {
+    stylesConfig.modResults = AndroidConfig.Styles.assignStylesValue(
+      stylesConfig.modResults,
+      {
+        add: true,
+        name: "android:windowSplashScreenBehavior",
+        value: "icon_preferred",
+        targetApi: "33",
+        parent: {
+          name: "Theme.App.SplashScreen",
+          parent: "Theme.SplashScreen",
+        },
+      },
+    );
+    return stylesConfig;
+  });
+};
 
 module.exports = withAndroidReleaseConfig;

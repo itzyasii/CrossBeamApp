@@ -27,6 +27,8 @@
     "validate": "npm run typecheck && npm run lint && npm test && npm run doctor",
     "android:lint": "node scripts/run-gradle.js :app:lintRelease",
     "android:bundle": "node scripts/run-gradle.js :app:bundleRelease",
+    "android:apk": "node scripts/build-android-apk.js",
+    "android:apk:all": "node scripts/build-android-apk.js --all",
     "clean": "npx expo-modules-core clean",
     "reset": "npx expo start --clear && watchman watch-del-all",
     "doctor": "npx expo-doctor",

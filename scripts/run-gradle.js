@@ -6,11 +6,15 @@ const wrapper = path.join(
   androidDirectory,
   process.platform === "win32" ? "gradlew.bat" : "gradlew",
 );
-const command = process.platform === "win32" ? "gradlew.bat" : wrapper;
-const result = spawnSync(command, process.argv.slice(2), {
+const isWindows = process.platform === "win32";
+const command = isWindows ? "gradlew.bat" : "bash";
+const args = isWindows
+  ? process.argv.slice(2)
+  : [wrapper, ...process.argv.slice(2)];
+const result = spawnSync(command, args, {
   cwd: androidDirectory,
   env: { ...process.env, NODE_ENV: process.env.NODE_ENV || "production" },
-  shell: process.platform === "win32",
+  shell: isWindows,
   stdio: "inherit",
 });
 

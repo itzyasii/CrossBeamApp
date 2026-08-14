@@ -1,0 +1,11 @@
+{
+  "scheme": "crossbeam-pair",
+  "version": 1,
+  "id": "smoke-tv-qr-001",
+  "deviceKey": "smoke-tv-qr-001",
+  "name": "CrossBeam QR Smoke Test TV",
+  "platform": "android-tv",
+  "host": "192.168.56.1",
+  "port": 53545,
+  "expiresAt": 4102444800000
+}

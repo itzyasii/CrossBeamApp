@@ -5,6 +5,7 @@ import {
   CrossBeamNativeEvents,
   NativeChunkProtocol,
   NativePeer,
+  NativePairingPayload,
   NativeTransferRequest,
   NativeTransferEvent,
   NativeIncomingTransferRequest,
@@ -14,6 +15,7 @@ export {
   CrossBeamNative,
   CrossBeamNativeEvents,
   NativePeer,
+  NativePairingPayload,
   NativeTransferRequest,
   NativeTransferEvent,
   NativeChunkProtocol,
@@ -109,6 +111,25 @@ export const nativeCrossBeam = {
       console.warn("[Native] Reading discovered devices failed:", error);
       return [];
     }
+  },
+
+  async getPairingPayload(): Promise<NativePairingPayload | null> {
+    if (!CrossBeamNative?.getPairingPayload || !this.isRuntimeSupported()) {
+      return null;
+    }
+    try {
+      return await CrossBeamNative.getPairingPayload();
+    } catch (error) {
+      console.warn("[Native] Pairing payload unavailable:", error);
+      return null;
+    }
+  },
+
+  async addQrPeer(payload: NativePairingPayload): Promise<Device> {
+    if (!CrossBeamNative?.addQrPeer) {
+      throw new Error("QR pairing is unavailable in this build.");
+    }
+    return toDevice(await CrossBeamNative.addQrPeer(payload));
   },
 
   async connectToWifiDirectPeer(peerId: string): Promise<Device> {

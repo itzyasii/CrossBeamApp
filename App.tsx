@@ -536,7 +536,13 @@ export default function App() {
                 </View>
               }
             >
-              <QRPairingScreen onBack={() => setShowQrPairing(false)} />
+              <QRPairingScreen
+                onBack={() => setShowQrPairing(false)}
+                onPaired={() => {
+                  void handleStartDiscovery();
+                  goToTab(TABS.findIndex((tab) => tab.id === "discover"));
+                }}
+              />
             </React.Suspense>
           )}
 

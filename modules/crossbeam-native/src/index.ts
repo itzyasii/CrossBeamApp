@@ -24,6 +24,18 @@ export type NativePeer = {
   lastSeenAt: number;
 };
 
+export type NativePairingPayload = {
+  scheme: "crossbeam-pair";
+  version: 1;
+  id: string;
+  deviceKey: string;
+  name: string;
+  platform: NativePeerPlatform;
+  host: string;
+  port: number;
+  expiresAt: number;
+};
+
 export type NativeSelectedFile = {
   id: string;
   name: string;
@@ -120,6 +132,8 @@ export type CrossBeamNativeModule = {
   startDiscovery(): Promise<void>;
   stopDiscovery(): Promise<void>;
   getDiscoveredPeers(): Promise<NativePeer[]>;
+  getPairingPayload?(): Promise<NativePairingPayload>;
+  addQrPeer?(payload: NativePairingPayload): Promise<NativePeer>;
   connectToWifiDirectPeer?(peerId: string): Promise<NativePeer>;
   disconnectWifiDirect?(): Promise<void>;
   cleanupPartialTransfers?(maxAgeMs: number): Promise<number>;

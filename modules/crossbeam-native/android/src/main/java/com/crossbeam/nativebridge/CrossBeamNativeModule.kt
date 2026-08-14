@@ -26,6 +26,7 @@ import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
@@ -538,6 +539,53 @@ class CrossBeamNativeModule : Module() {
       visiblePeers()
     }
 
+    AsyncFunction("getPairingPayload") {
+      val context = appContext() ?: throw IllegalStateException("App context is unavailable")
+      startTransferServer()
+      val host = localIpv4Address()
+        ?: throw IllegalStateException("Connect this TV to Wi-Fi before creating a pairing code")
+      mapOf(
+        "scheme" to "crossbeam-pair",
+        "version" to 1,
+        "id" to getOrCreateDeviceKey(context),
+        "deviceKey" to getOrCreateDeviceKey(context),
+        "name" to getFriendlyDeviceName(context),
+        "platform" to localPlatform(context),
+        "host" to host,
+        "port" to (serverSocket?.localPort ?: transferPort),
+        "expiresAt" to (System.currentTimeMillis() + 10 * 60 * 1000)
+      )
+    }
+
+    AsyncFunction("addQrPeer") { payload: Map<String, Any?> ->
+      val id = payload["id"] as? String ?: throw IllegalArgumentException("Pairing code is missing a device ID")
+      val host = payload["host"] as? String ?: throw IllegalArgumentException("Pairing code is missing an endpoint")
+      val port = (payload["port"] as? Number)?.toInt() ?: throw IllegalArgumentException("Pairing code has an invalid endpoint")
+      val expiresAt = (payload["expiresAt"] as? Number)?.toLong() ?: 0L
+      if (expiresAt < System.currentTimeMillis()) throw IllegalArgumentException("This pairing code has expired")
+      if (port !in 1..65535 || InetAddress.getByName(host).isLoopbackAddress) {
+        throw IllegalArgumentException("Pairing code has an invalid endpoint")
+      }
+      val context = appContext() ?: throw IllegalStateException("App context is unavailable")
+      val peer = mapOf<String, Any?>(
+        "id" to id,
+        "deviceKey" to ((payload["deviceKey"] as? String) ?: id),
+        "name" to ((payload["name"] as? String) ?: "CrossBeam device"),
+        "platform" to ((payload["platform"] as? String) ?: "android"),
+        "connection" to "local-network",
+        "host" to host,
+        "port" to port,
+        "availability" to "ready",
+        "isTransferReady" to true,
+        "statusMessage" to "Connected with QR code",
+        "isTrusted" to false,
+        "lastSeenAt" to System.currentTimeMillis()
+      )
+      peers[id] = peer
+      sendEvent("onPeerFound", peer)
+      peer
+    }
+
     AsyncFunction("connectToWifiDirectPeer") { peerId: String ->
       connectWifiDirectPeer(peerId)
     }
@@ -1023,6 +1071,24 @@ class CrossBeamNativeModule : Module() {
         }
       }
     }
+  }
+
+  private fun localIpv4Address(): String? = try {
+    val interfaces = NetworkInterface.getNetworkInterfaces()
+    while (interfaces.hasMoreElements()) {
+      val networkInterface = interfaces.nextElement()
+      if (!networkInterface.isUp || networkInterface.isLoopback) continue
+      val addresses = networkInterface.inetAddresses
+      while (addresses.hasMoreElements()) {
+        val address = addresses.nextElement()
+        if (!address.isLoopbackAddress && address.hostAddress?.contains(":") == false) {
+          return address.hostAddress
+        }
+      }
+    }
+    null
+  } catch (_: Exception) {
+    null
   }
 
   private fun stopTransferServer() {

@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Animated,
+  Image,
 } from "react-native";
 import {
   Gesture,
@@ -19,13 +20,28 @@ import { X, ShieldCheck, Zap } from "lucide-react-native";
 import { BlurView } from "expo-blur";
 import { useTheme } from "@/hooks/useTheme";
 import { haptics } from "@/services/haptics";
-import * as ExpoDevice from "expo-device";
+import { nativeCrossBeam } from "@/native/crossbeamNative";
+import { Device } from "@/types/domain";
+import qrCenterBadge from "../../assets/QR/crossbeam-qr-center-badge.png";
+import qrCornerFrame from "../../assets/QR/crossbeam-qr-corner-frame.png";
 
-export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
+// A pale brand surface preserves the QR quiet zone and camera contrast without
+// falling back to a generic white card.
+const QR_LIGHT_SURFACE = "#DDF9FC";
+const QR_DARK_MODULE = "#031C26";
+
+export const QRPairingScreen = ({
+  onBack,
+  onPaired,
+}: {
+  onBack: () => void;
+  onPaired?: (device: Device) => void;
+}) => {
   const { colors } = useTheme();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [qrData, setQrData] = useState<string | null>(null);
+  const [pairingError, setPairingError] = useState<string | null>(null);
 
   const scanAnim = useRef(new Animated.Value(0)).current;
   const viewfinderAnim = useRef(new Animated.Value(0)).current;
@@ -67,37 +83,51 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
 
     if (Platform.isTV) {
       void (async () => {
-        const info = {
-          id:
-            "node-" +
-            (ExpoDevice.osInternalBuildId ||
-              Math.random().toString(36).substr(2, 6)),
-          name: ExpoDevice.deviceName || "Living Room TV",
-          platform: "android-tv",
-          v: 1,
-        };
-        setQrData(JSON.stringify(info));
+        const payload = await nativeCrossBeam.getPairingPayload();
+        if (!payload) {
+          setPairingError("Connect this TV to Wi-Fi to create a pairing code.");
+          return;
+        }
+        setQrData(JSON.stringify(payload));
       })();
     }
   }, []);
 
-  const handleBarCodeScanned = ({ data: _data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (scanned) return;
-    setScanned(true);
-    void haptics.success();
-    setTimeout(() => onBack(), 1200);
+    try {
+      const payload = JSON.parse(data);
+      if (
+        payload?.scheme !== "crossbeam-pair" ||
+        payload?.version !== 1 ||
+        typeof payload.host !== "string" ||
+        typeof payload.port !== "number"
+      ) {
+        throw new Error("This is not a CrossBeam pairing code.");
+      }
+      const device = await nativeCrossBeam.addQrPeer(payload);
+      setScanned(true);
+      void haptics.success();
+      onPaired?.(device);
+      setTimeout(onBack, 1200);
+    } catch (error) {
+      void haptics.error();
+      setPairingError(
+        error instanceof Error ? error.message : "Could not pair with this device.",
+      );
+    }
   };
 
   if (Platform.isTV) {
     return (
-      <View style={[S.container, { backgroundColor: colors.background }]}>
+      <View style={[S.container, S.tvScreen]}>
         <View style={S.tvLayout}>
           <View style={S.tvContent}>
             <Text style={[S.tvTitle, { color: colors.textPrimary }]}>
-              Share with this TV
+              PAIR WITH THIS TV
             </Text>
             <Text style={[S.tvSub, { color: colors.textSecondary }]}>
-              Open CrossBeam on your phone and scan this code.
+              Scan with CrossBeam to connect instantly.
             </Text>
 
             <View style={S.tvStatusRow}>
@@ -111,17 +141,27 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
           </View>
 
           <View style={S.tvQrWrapper}>
-            <View style={S.qrContainer}>
+            <View style={S.qrHalo} />
+            <Image
+              source={qrCornerFrame}
+              style={S.tvCornerFrame}
+              resizeMode="contain"
+            />
+            <View style={[S.qrContainer, { backgroundColor: QR_LIGHT_SURFACE }]}>
               {qrData ? (
                 <QRCode
                   value={qrData}
-                  size={320}
-                  color="#000"
-                  backgroundColor="#FFF"
-                  quietZone={20}
+                  size={400}
+                  color={QR_DARK_MODULE}
+                  backgroundColor={QR_LIGHT_SURFACE}
+                  quietZone={26}
+                  ecl="H"
                 />
               ) : (
                 <ActivityIndicator size="large" color={colors.accent} />
+              )}
+              {qrData && (
+                <Image source={qrCenterBadge} style={S.qrLogoBadge} resizeMode="contain" />
               )}
             </View>
             <View style={S.qrGlow} />
@@ -131,7 +171,7 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
         <View style={S.tvFooter}>
           <ShieldCheck size={20} color={colors.success} />
           <Text style={[S.footerText, { color: colors.textMuted }]}>
-            This feature is in early access
+            {pairingError ?? "Secure local pairing · code expires in 10 minutes"}
           </Text>
         </View>
       </View>
@@ -275,7 +315,12 @@ export const QRPairingScreen = ({ onBack }: { onBack: () => void }) => {
                   style={StyleSheet.absoluteFill}
                 />
                 <ShieldCheck size={64} color={colors.success} />
-                <Text style={S.successLabel}>Code found</Text>
+                <Text style={S.successLabel}>TV CONNECTED</Text>
+              </View>
+            )}
+            {pairingError && !scanned && (
+              <View style={S.scanError}>
+                <Text style={S.scanErrorText}>{pairingError}</Text>
               </View>
             )}
           </BlurView>
@@ -310,43 +355,73 @@ const S = StyleSheet.create({
   permissionButtonText: { fontSize: 12, fontWeight: "900", letterSpacing: 1 },
 
   // TV Styles
+  tvScreen: { backgroundColor: "#080E12" },
   tvLayout: {
     flex: 1,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 100,
-    padding: 80,
+    justifyContent: "space-evenly",
+    paddingHorizontal: 48,
+    paddingVertical: 40,
   },
-  tvContent: { flex: 1, gap: 24 },
-  tvTitle: { fontSize: 48, fontWeight: "900", letterSpacing: -1 },
-  tvSub: { fontSize: 22, lineHeight: 32, opacity: 0.8 },
-  tvStatusRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  tvContent: { alignItems: "center", gap: 12 },
+  tvTitle: { fontSize: 34, fontWeight: "900", letterSpacing: 3 },
+  tvSub: { fontSize: 18, lineHeight: 26, opacity: 0.8, textAlign: "center" },
+  tvStatusRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 14, fontWeight: "800", letterSpacing: 2 },
   tvQrWrapper: {
-    width: 400,
-    height: 400,
+    width: 560,
+    height: 560,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#02070A",
+    borderRadius: 34,
+    borderWidth: 1,
+    borderColor: "rgba(57, 217, 238, 0.18)",
+    shadowOpacity: 0.9,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 16,
   },
   qrContainer: {
-    padding: 20,
-    backgroundColor: "#FFF",
-    borderRadius: 24,
+    padding: 14,
+    borderRadius: 8,
     zIndex: 1,
+    position: "relative",
+    borderWidth: 1,
+    borderColor: "rgba(112, 232, 244, 0.56)",
   },
+  qrHalo: {
+    position: "absolute",
+    width: 488,
+    height: 488,
+    backgroundColor: "rgba(34, 211, 238, 0.07)",
+    borderRadius: 244,
+  } as any,
   qrGlow: {
     position: "absolute",
-    width: 320,
-    height: 320,
-    backgroundColor: "rgba(99, 102, 241, 0.2)",
-    borderRadius: 160,
+    width: 470,
+    height: 470,
+    borderWidth: 1,
+    borderColor: "rgba(34, 211, 238, 0.22)",
+    borderRadius: 235,
   } as any,
-  tvFooter: {
+  tvCornerFrame: {
     position: "absolute",
-    bottom: 60,
-    left: 80,
+    width: 560,
+    height: 560,
+    zIndex: 2,
+  },
+  qrLogoBadge: {
+    position: "absolute",
+    width: 68,
+    height: 68,
+    alignSelf: "center",
+    top: "50%",
+    marginTop: -34,
+    zIndex: 3,
+  },
+  tvFooter: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -461,4 +536,6 @@ const S = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 4,
   },
+  scanError: { position: "absolute", bottom: 72, left: 24, right: 24, alignItems: "center" },
+  scanErrorText: { color: "#fff", textAlign: "center", fontSize: 13, fontWeight: "700" },
 });

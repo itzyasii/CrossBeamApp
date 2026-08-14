@@ -24,6 +24,7 @@ import { nativeCrossBeam } from "@/native/crossbeamNative";
 import { Device } from "@/types/domain";
 import qrCenterBadge from "../../assets/QR/crossbeam-qr-center-badge.png";
 import qrCornerFrame from "../../assets/QR/crossbeam-qr-corner-frame.png";
+import { parsePairingPayload } from "@/utils/pairing";
 
 // Keep the decorative treatment outside the QR data area. A high-contrast
 // surface, four-module quiet zone, and small protected logo make the branded
@@ -101,15 +102,7 @@ export const QRPairingScreen = ({
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (scanned) return;
     try {
-      const payload = JSON.parse(data);
-      if (
-        payload?.scheme !== "crossbeam-pair" ||
-        payload?.version !== 1 ||
-        typeof payload.host !== "string" ||
-        typeof payload.port !== "number"
-      ) {
-        throw new Error("This is not a CrossBeam pairing code.");
-      }
+      const payload = parsePairingPayload(data);
       const device = await nativeCrossBeam.addQrPeer(payload);
       setScanned(true);
       void haptics.success();

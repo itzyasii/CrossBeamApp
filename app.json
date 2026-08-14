@@ -2,7 +2,7 @@
   "expo": {
     "name": "CrossBeam",
     "slug": "crossbeam-app",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/AppIcon.png",
     "userInterfaceStyle": "automatic",
@@ -61,6 +61,13 @@
     },
     "android": {
       "package": "com.crossbeam.app",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/AppIcon.png",
         "backgroundColor": "#0A0A0F"
@@ -88,6 +95,7 @@
       ]
     },
     "plugins": [
+      "./plugins/withAndroidReleaseConfig",
       "./plugins/withAndroidTv",
       [
         "expo-splash-screen",
@@ -135,7 +143,8 @@
           }
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-sharing"
     ],
     "scheme": "crossbeamapp",
     "extra": {

@@ -1,0 +1,1 @@
+Initial CrossBeam release with local file sharing, Android share-sheet support, QR pairing, resumable transfers, transfer approvals, and Android TV receiver mode.

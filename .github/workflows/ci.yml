@@ -1,0 +1,37 @@
+name: Release checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Synchronize Android native configuration
+        run: npx expo prebuild --platform android --no-install
+      - name: Verify generated Android project is committed
+        run: git diff --exit-code -- android app.json package.json
+      - name: TypeScript
+        run: npm run typecheck
+      - name: ESLint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Expo project checks
+        run: npm run doctor
+      - name: Android release lint
+        run: npm run android:lint

@@ -137,7 +137,7 @@ class DeviceDiscoveryService {
     try {
       const name = ExpoDevice.deviceName ?? ExpoDevice.modelName;
       return name || 'Unknown Device';
-    } catch (error) {
+    } catch {
       return 'Unknown Device';
     }
   }

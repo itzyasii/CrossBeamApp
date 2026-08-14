@@ -50,22 +50,44 @@ const withAndroidTv = (config) => {
       ),
     );
     if (mainFilter) {
-      const categories = mainFilter.category ?? [];
-      if (
-        !categories.some(
-          (category) =>
-            category.$?.["android:name"] ===
-            "android.intent.category.LEANBACK_LAUNCHER",
-        )
-      ) {
-        categories.push({
-          $: {
-            "android:name": "android.intent.category.LEANBACK_LAUNCHER",
-          },
-        });
-      }
-      mainFilter.category = categories;
+      mainFilter.category = (mainFilter.category ?? []).filter(
+        (category) =>
+          category.$?.["android:name"] !==
+          "android.intent.category.LEANBACK_LAUNCHER",
+      );
     }
+
+    const aliases = application["activity-alias"] ?? [];
+    const tvAliasName = ".TvLauncherActivity";
+    const existingAlias = aliases.find(
+      (alias) => alias.$?.["android:name"] === tvAliasName,
+    );
+    const tvAlias = existingAlias ?? { $: {} };
+    tvAlias.$ = {
+      ...tvAlias.$,
+      "android:name": tvAliasName,
+      "android:targetActivity": ".MainActivity",
+      "android:exported": "true",
+      "android:icon": "@drawable/tv_icon",
+      "android:banner": "@drawable/tv_banner",
+    };
+    tvAlias["intent-filter"] = [
+      {
+        action: [
+          { $: { "android:name": "android.intent.action.MAIN" } },
+        ],
+        category: [
+          {
+            $: {
+              "android:name":
+                "android.intent.category.LEANBACK_LAUNCHER",
+            },
+          },
+        ],
+      },
+    ];
+    if (!existingAlias) aliases.push(tvAlias);
+    application["activity-alias"] = aliases;
 
     return manifestConfig;
   });
@@ -90,6 +112,14 @@ const withAndroidTv = (config) => {
       await fs.promises.copyFile(
         source,
         path.join(destinationDirectory, "tv_banner.png"),
+      );
+      await fs.promises.copyFile(
+        path.join(
+          modConfig.modRequest.projectRoot,
+          "assets",
+          "tv_icon_xhdpi.png",
+        ),
+        path.join(destinationDirectory, "tv_icon.png"),
       );
       return modConfig;
     },

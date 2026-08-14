@@ -490,7 +490,7 @@ class CrossBeamNativeModule : Module() {
     AsyncFunction("startForegroundService") {
       val context = appContext.reactContext ?: return@AsyncFunction false
       try {
-        val intent = Intent(context, ForegroundTransferService::class.java)
+        val intent = Intent(context, CrossBeamTransferService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
           context.startForegroundService(intent)
         } else {
@@ -505,7 +505,7 @@ class CrossBeamNativeModule : Module() {
     AsyncFunction("stopForegroundService") {
       val context = appContext.reactContext ?: return@AsyncFunction false
       try {
-        val intent = Intent(context, ForegroundTransferService::class.java)
+        val intent = Intent(context, CrossBeamTransferService::class.java)
         context.stopService(intent)
         true
       } catch (e: Exception) {
@@ -1073,22 +1073,24 @@ class CrossBeamNativeModule : Module() {
     }
   }
 
-  private fun localIpv4Address(): String? = try {
-    val interfaces = NetworkInterface.getNetworkInterfaces()
-    while (interfaces.hasMoreElements()) {
-      val networkInterface = interfaces.nextElement()
-      if (!networkInterface.isUp || networkInterface.isLoopback) continue
-      val addresses = networkInterface.inetAddresses
-      while (addresses.hasMoreElements()) {
-        val address = addresses.nextElement()
-        if (!address.isLoopbackAddress && address.hostAddress?.contains(":") == false) {
-          return address.hostAddress
+  private fun localIpv4Address(): String? {
+    return try {
+      val interfaces = NetworkInterface.getNetworkInterfaces()
+      while (interfaces.hasMoreElements()) {
+        val networkInterface = interfaces.nextElement()
+        if (!networkInterface.isUp || networkInterface.isLoopback) continue
+        val addresses = networkInterface.inetAddresses
+        while (addresses.hasMoreElements()) {
+          val address = addresses.nextElement()
+          if (!address.isLoopbackAddress && address.hostAddress?.contains(":") == false) {
+            return address.hostAddress
+          }
         }
       }
+      null
+    } catch (_: Exception) {
+      null
     }
-    null
-  } catch (_: Exception) {
-    null
   }
 
   private fun stopTransferServer() {

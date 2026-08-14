@@ -2,7 +2,6 @@ import { PermissionsAndroid, Platform } from "react-native";
 import { isRunningInExpoGo } from "expo";
 
 import * as Device from "expo-device";
-import * as MediaLibrary from "expo-media-library";
 import * as Location from "expo-location";
 import { Camera } from "expo-camera";
 
@@ -109,10 +108,9 @@ export const usePermissions = () => {
         return true;
       }
 
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      const granted = status === "granted" || (status as any) === "limited";
-      console.log(`[Permissions] Storage access: ${status}`);
-      return granted;
+      // iOS document pickers and the share extension grant access only to the
+      // items selected by the user, so broad photo-library access is not needed.
+      return true;
     } catch (error) {
       console.error("[Permissions] Error requesting media permissions:", error);
       return false;
@@ -235,16 +233,6 @@ export const usePermissions = () => {
 
   const getMissingPermissions = async (): Promise<string[]> => {
     const missing: string[] = [];
-
-    if (Platform.OS === "ios" && !Platform.isTV) {
-      const mediaPerm = await MediaLibrary.getPermissionsAsync();
-      if (
-        mediaPerm.status !== "granted" &&
-        (mediaPerm as any).status !== "limited"
-      ) {
-        missing.push("Storage/Media");
-      }
-    }
 
     const Notifications = await getNotifications();
     if (Notifications) {

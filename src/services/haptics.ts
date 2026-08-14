@@ -13,7 +13,7 @@ export const haptics = {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
+    } catch {
       // Ignore errors if haptics fail
     }
   },
@@ -25,7 +25,7 @@ export const haptics = {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } catch (e) {
+    } catch {
       // Ignore
     }
   },
@@ -37,7 +37,7 @@ export const haptics = {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } catch (e) {
+    } catch {
       // Ignore
     }
   },
@@ -49,7 +49,7 @@ export const haptics = {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) {
+    } catch {
       // Ignore
     }
   },
@@ -61,7 +61,7 @@ export const haptics = {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) {
+    } catch {
       // Ignore
     }
   },
@@ -73,7 +73,7 @@ export const haptics = {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    } catch (e) {
+    } catch {
       // Ignore
     }
   },
@@ -85,7 +85,7 @@ export const haptics = {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.selectionAsync();
-    } catch (e) {
+    } catch {
       // Ignore
     }
   },

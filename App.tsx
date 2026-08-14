@@ -6,7 +6,6 @@ import {
   FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -18,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as NavigationBar from "expo-navigation-bar";
 import * as SystemUI from "expo-system-ui";
 import * as DeviceInfo from "expo-device";
+import * as Application from "expo-application";
+import * as ScreenOrientation from "expo-screen-orientation";
 
 import { HomeScreen, SettingsScreen } from "@/screens";
 
@@ -73,6 +74,8 @@ import {
 const { width: SCREEN_W } = Dimensions.get("window");
 const DRAWER_W = 300;
 const TAB_BAR_H = 98;
+const DISPLAY_VERSION = Application.nativeApplicationVersion ?? "1.0.0";
+const DISPLAY_BUILD = Application.nativeBuildVersion;
 
 type Tab = "home" | "discover" | "devices" | "history" | "settings";
 type TabConfig = { id: Tab; icon: any; label: string; desc: string };
@@ -112,7 +115,9 @@ import { platformFeatureService } from "@/services/platformFeatureService";
 import { notificationService } from "@/services/notificationService";
 import { Device } from "@/types/domain";
 import { IncomingTransferApprovalModal } from "@/components/IncomingTransferApprovalModal";
+import { LegalDocumentModal } from "@/components/LegalDocumentModal";
 import { useIncomingTransferApprovals } from "@/hooks/useIncomingTransferApprovals";
+import { PRIVACY_SECTIONS, TERMS_SECTIONS } from "@/constants/legal";
 
 export default function App() {
   const { colors, isDark } = useTheme();
@@ -188,6 +193,15 @@ export default function App() {
   } = useTransferManager(devices);
 
   useEffect(() => {
+    if (!Platform.isTV) return;
+    void ScreenOrientation.lockAsync(
+      ScreenOrientation.OrientationLock.LANDSCAPE,
+    ).catch((error) => {
+      console.warn("[App] Unable to lock Android TV orientation:", error);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!Platform.isTV || tvDiscoveryPermissionRequested.current) return;
     tvDiscoveryPermissionRequested.current = true;
     // NSD can still receive on a LAN when optional Wi-Fi Direct/BLE permissions
@@ -222,6 +236,7 @@ export default function App() {
         closeDrawer();
         return true;
       }
+      if (Platform.isTV) return false;
       if (Platform.OS !== "android" || exitPromptVisible.current) return true;
 
       exitPromptVisible.current = true;
@@ -728,6 +743,7 @@ export default function App() {
               <FocusablePressable
                 accessibilityRole="tab"
                 accessibilityLabel="Home"
+                hasTVPreferredFocus={Platform.isTV}
                 accessibilityState={{
                   selected: tabIndex === HOME_TAB_INDEX,
                 }}
@@ -869,7 +885,8 @@ export default function App() {
                 <View style={S.drawerHeaderTop}>
                   <CrossBeamWordmark width={220} />
                   <Text style={[S.drawerVersion, { color: DRAWER_TEXT_MUTED }]}>
-                    Version 0.1
+                    Version {DISPLAY_VERSION}
+                    {DISPLAY_BUILD ? ` (${DISPLAY_BUILD})` : ""}
                   </Text>
                 </View>
 
@@ -1028,6 +1045,32 @@ export default function App() {
                   },
                 ]}
               >
+                <View style={S.legalLinks}>
+                  <FocusablePressable
+                    onPress={() => {
+                      closeDrawer();
+                      setShowPrivacyModal(true);
+                    }}
+                    style={S.legalLink}
+                  >
+                    <ShieldCheck size={16} color={DRAWER_TEXT_SECONDARY} />
+                    <Text style={[S.legalLinkText, { color: DRAWER_TEXT_PRIMARY }]}>
+                      Privacy
+                    </Text>
+                  </FocusablePressable>
+                  <FocusablePressable
+                    onPress={() => {
+                      closeDrawer();
+                      setShowTermsModal(true);
+                    }}
+                    style={S.legalLink}
+                  >
+                    <FileText size={16} color={DRAWER_TEXT_SECONDARY} />
+                    <Text style={[S.legalLinkText, { color: DRAWER_TEXT_PRIMARY }]}>
+                      Terms
+                    </Text>
+                  </FocusablePressable>
+                </View>
                 <FocusablePressable
                   onPress={() => {
                     void haptics.light();
@@ -1058,74 +1101,18 @@ export default function App() {
             </View>
           </Animated.View>
 
-          {/* ── Privacy Policy Modal ── */}
-          <Modal visible={showPrivacyModal} animationType="slide" transparent>
-            <BlurView intensity={80} tint="dark" style={S.modalContainer}>
-              <View
-                style={[
-                  S.modalContent,
-                  { backgroundColor: colors.backgroundElevated },
-                ]}
-              >
-                <View style={S.modalHeader}>
-                  <ShieldCheck size={24} color={colors.accent} />
-                  <Text style={[S.modalTitle, { color: colors.textPrimary }]}>
-                    Privacy Policy
-                  </Text>
-                  <Pressable
-                    onPress={() => setShowPrivacyModal(false)}
-                    style={S.modalClose}
-                  >
-                    <X size={24} color={colors.textSecondary} />
-                  </Pressable>
-                </View>
-                <ScrollView style={S.modalScroll}>
-                  <Text style={[S.modalText, { color: colors.textSecondary }]}>
-                    CrossBeam sends files straight to a nearby device. Your
-                    files aren't uploaded to CrossBeam.
-                    {"\n\n"}• Your sharing history stays on this device.{"\n"}•
-                    You choose whether to accept each new sender.{"\n"}•
-                    Encrypted connections are still being developed, so share
-                    only with people you trust.
-                  </Text>
-                </ScrollView>
-              </View>
-            </BlurView>
-          </Modal>
-
-          {/* ── Terms Modal ── */}
-          <Modal visible={showTermsModal} animationType="slide" transparent>
-            <BlurView intensity={80} tint="dark" style={S.modalContainer}>
-              <View
-                style={[
-                  S.modalContent,
-                  { backgroundColor: colors.backgroundElevated },
-                ]}
-              >
-                <View style={S.modalHeader}>
-                  <FileText size={24} color={colors.accent} />
-                  <Text style={[S.modalTitle, { color: colors.textPrimary }]}>
-                    Terms of Service
-                  </Text>
-                  <Pressable
-                    onPress={() => setShowTermsModal(false)}
-                    style={S.modalClose}
-                  >
-                    <X size={24} color={colors.textSecondary} />
-                  </Pressable>
-                </View>
-                <ScrollView style={S.modalScroll}>
-                  <Text style={[S.modalText, { color: colors.textSecondary }]}>
-                    By using CrossBeam, you agree to:{"\n\n"}
-                    1. Share only files you have the right to share.{"\n"}
-                    2. Respect other people and their devices.{"\n"}
-                    3. Understand that speed and availability depend on the
-                    connection between your devices.
-                  </Text>
-                </ScrollView>
-              </View>
-            </BlurView>
-          </Modal>
+          <LegalDocumentModal
+            kind="privacy"
+            visible={showPrivacyModal}
+            sections={PRIVACY_SECTIONS}
+            onClose={() => setShowPrivacyModal(false)}
+          />
+          <LegalDocumentModal
+            kind="terms"
+            visible={showTermsModal}
+            sections={TERMS_SECTIONS}
+            onClose={() => setShowTermsModal(false)}
+          />
 
           {/* Incoming transfer approval modal (shows when an approval is active) */}
           <IncomingTransferApprovalModal
@@ -1357,6 +1344,17 @@ const S = StyleSheet.create({
     borderTopWidth: 1,
     gap: 16,
   },
+  legalLinks: { flexDirection: "row", gap: 10 },
+  legalLink: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 12,
+  },
+  legalLinkText: { fontSize: 12, fontWeight: "800" },
   themeSwitch: {
     flexDirection: "row",
     alignItems: "center",

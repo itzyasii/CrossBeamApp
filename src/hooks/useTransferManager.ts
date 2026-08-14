@@ -83,7 +83,7 @@ export const useTransferManager = (knownDevices: Device[] = []) => {
       void (async () => {
         try {
           await Promise.all(updates.map((u) => saveTransferHistory(u as any)));
-        } catch (e) {
+        } catch {
           // swallow DB errors — already logged in saveTransferHistory
         }
       })();

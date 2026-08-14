@@ -1,0 +1,15 @@
+CrossBeam sends photos, videos, documents, text, and other files directly between nearby devices.
+
+No account is required. CrossBeam discovers compatible devices on your local network and transfers the content you select without uploading it to CrossBeam cloud storage.
+
+Highlights:
+• Send one file or an entire batch
+• Receive files on Android phones, tablets, and Android TV
+• Share directly to CrossBeam from Gallery, Files, browsers, and other apps
+• Pair a phone with Android TV using a QR code
+• Approve new senders before accepting files
+• Track progress and retry interrupted transfers
+• Keep transfer history and settings on your device
+• Use the app without ads, accounts, or analytics
+
+Transfers depend on compatible devices and local network conditions. For the current release, use CrossBeam only with devices and networks you trust.
